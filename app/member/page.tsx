@@ -1,13 +1,15 @@
 'use client';
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
+import ConsoleHeader from '@/components/ui/ConsoleHeader';
+import ToolGroup, { ConsoleTool } from '@/components/ui/ToolGroup';
+import Panel from '@/components/ui/Panel';
+import EmptyState from '@/components/ui/EmptyState';
+import EventReplyRow from '@/components/ui/EventReplyRow';
+import PluginIframeCard from '@/components/PluginCard';
 import { AppState, loadStateSlice, visibleEventsForMember, replyStatus } from '@/lib/store';
 import { apiSetReply } from '@/lib/api';
 import { getSession } from '@/lib/session';
-import Collapsible from '@/components/Collapsible';
-import EmptyState from '@/components/ui/EmptyState';
-import PluginIframeCard from '@/components/PluginCard';
-import Link from 'next/link';
-import AttendanceCard from '@/components/AttendanceCard';
 
 export default function Member(){
   const [s,setS]=useState<AppState|null>(null);const [err,setErr]=useState('');
@@ -15,17 +17,24 @@ export default function Member(){
   // 按需載入：成員空間（visibleEventsForMember 用到 events/replies）
   useEffect(()=>{loadStateSlice(['patrols','members','plugins','pluginSettings','events','replies']).then(setS).catch(e=>setErr(e.message))},[]);
   const session=getSession();
-  if(err)return <div className="card"><p className="badge red">{err}</p></div>;
-  if(!s)return <div className="card">載入中...</div>;
+
+  const tools: ConsoleTool[] = [
+    { id: 'attendance', icon: '📝', label: '出席紀錄', desc: '日常集會及旅團自辦活動的出席紀錄。', href: '/attendance' },
+    { id: 'equipment', icon: '📦', label: '借用物資', desc: '查看可借數量並申請借用，待領袖批核。', href: '/equipment' },
+    { id: 'calendar', icon: '📅', label: '行事曆', desc: '旅團公開行事曆及集會時間。', href: '/calendar' },
+  ];
+
+  if(err)return <div className="bg-rose-50 border border-rose-200 rounded-2xl p-4"><p className="text-xs text-rose-700 font-bold m-0 whitespace-pre-wrap leading-relaxed">{err}</p></div>;
+  if(!s)return <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 text-sm text-slate-600">載入中...</div>;
   const member=s.members.find(m=>m.id===(session?.memberId))||s.members[0];
-  if(!member)return <div className="card">找不到成員資料。</div>;
+  if(!member)return <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 text-sm text-slate-600">找不到成員資料。</div>;
   const adult=member.age>=18;
   async function act(eid:string,type:'interested'|'registered'|'declined'){
     setLoadingId(eid+type);setErr('');
     try{const f=await apiSetReply({eventId:eid,memberId:member.id,type});setS(f)}catch(e:any){setErr(e.message)}finally{setLoadingId('')}
   }
   const events=visibleEventsForMember(s,member);
-  
+
   // Filter plugins by role and branch if needed
   const visiblePlugins = s.plugins.filter(p => {
     // 點名已內建，避免舊 Plugins 表紀錄重複顯示。
@@ -34,122 +43,97 @@ export default function Member(){
     if (p.id === 'vs_badge_tracker' && member.branchId !== 'b4') return false;
     return true;
   });
-  
+
   return (
-    <div className="stack">
-      <section className="card stack" style={{ background: 'linear-gradient(135deg, #166534 0%, #15803d 100%)', color: '#fff' }}>
-        <div className="row" style={{ justifyContent: 'space-between' }}>
-            <div>
-              <h2 style={{ margin: 0 }}>👤 {member.name}</h2>
-              <p style={{ opacity: 0.9, margin: 0 }}>身份：成員 {member.specialRole ? `(${member.specialRole})` : ''}</p>
-            </div>
-            <div className="row">
-              <Link href="/profile" className="btn" style={{ background: 'rgba(255,255,255,0.94)', color: '#0f2742' }}>個人設定 / 改密碼</Link>
-            </div>
-        </div>
-      </section>
+    <div className="space-y-3">
+      <ConsoleHeader
+        icon="👤"
+        name={member.name}
+        roleLabel={`成員${member.specialRole ? `（${member.specialRole}）` : ''}`}
+        tone="emerald"
+        tagline={adult ? '你已 18 歲或以上，可自行回覆活動 ✅ / ❌。' : '你未滿 18 歲，可按 ❤️ 表示有興趣；參加 / 不參加由家長決定。'}
+        action={
+          <Link href="/profile" className="no-underline text-[11px] font-bold bg-white/95 text-slate-800 px-3 py-2 rounded-xl hover:bg-white transition whitespace-nowrap">
+            👤 個人設定
+          </Link>
+        }
+      />
 
-      <section className="hero">
-        <span className="badge gold">成員空間</span>
-        <p>已登入：{member.name}</p>
-      </section>
-
-      {err&&<p className="badge red">{err}</p>}
-
-      <section className="grid" style={{ marginBottom: '2rem' }}>
-          <AttendanceCard description="查看自己在日常集會及旅團自辦活動的出席紀錄。" />
-          <a className="card feature-card" href="/equipment" style={{ textDecoration: 'none' }}>
-            <h3>📦 借用物資</h3>
-            <p className="muted">查看旅團現有物資及可借數量，填寫數量申請借用，待領袖批核。</p>
-            <span className="btn block">前往物資頁</span>
-          </a>
-          {visiblePlugins.map(p => (
-            <PluginIframeCard 
-              key={p.id} 
-              plugin={p} 
-              unitCode={session?.troopCode || ''} 
-              settings={s.pluginSettings?.find(ps => ps.pluginId === p.id)}
-            />
-          ))}
+      {err && (
+        <section className="bg-rose-50 border border-rose-200 rounded-2xl p-4">
+          <p className="text-xs text-rose-700 font-bold m-0 whitespace-pre-wrap leading-relaxed">{err}</p>
         </section>
+      )}
 
-      <Collapsible title="📢 活動與集會" defaultOpen={true}>
-        <p className="muted">{adult?'你已 18 歲或以上，可自行 ✅ / ❌。':'你未滿 18 歲，可按 ❤️ 表示有興趣；參加 / 不參加由家長決定。'}</p>
-        <div className="stack">
-          {events.length===0?<EmptyState icon="🏕️" title="暫無可見活動" desc="領袖發布活動後,這裡會顯示可以報名的活動。"/>:
+      <Panel icon="📢" title="活動與集會" subtitle="回覆出席狀態" tone="blue" count={`${events.length} 個`}>
+        <div className="grid gap-2">
+          {events.length===0 ? (
+            <EmptyState icon="🏕️" title="暫無可見活動" desc="領袖發布活動後，這裡會顯示可以報名的活動。" />
+          ) : (
             events.map(e=>{
               const r=replyStatus(s,e.id,member.id);
               const isDuty = e.dutyPatrol && member.patrolId && s.patrols.find(p => p.id === member.patrolId)?.name === e.dutyPatrol;
+              const badges = [];
+              if (isDuty) badges.push({ text: '你的小隊值日', tone: 'violet' as const });
+              else if (e.dutyPatrol) badges.push({ text: `${e.dutyPatrol} 值日`, tone: 'slate' as const });
               return (
-                <div className={`event-line ${isDuty ? 'event-purple' : 'event-blue'}`} key={e.id}>
-                  <div>
-                    <div className="row">
-                      <strong>{e.title}</strong>
-                      {isDuty && <span className="badge purple">你的小隊值日</span>}
-                      {e.dutyPatrol && !isDuty && <span className="badge">{e.dutyPatrol} 值日</span>}
-                    </div>
-                    <div className="muted">
-                      {e.date} · {e.location}{e.fee?` · ${e.fee}`:''}
-                    </div>
-                    {e.paymentUrl && (
-                      <div style={{ marginTop: '0.5rem' }}>
-                        <a href={e.paymentUrl} target="_blank" rel="noopener noreferrer" className="btn gold" style={{ fontSize: '0.8rem', padding: '0.2rem 0.5rem' }}>前往付款</a>
-                      </div>
-                    )}
-                  </div>
-                  <div className="row" style={{ flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
-                    {(() => {
-                      const st = r?.type;
-                      if (st === 'registered') return <span className="badge green" style={{fontSize: '0.85rem', padding: '4px 8px', fontWeight: 'bold'}}>✅ 狀態：已報名參加</span>;
-                      if (st === 'declined') return <span className="badge red" style={{fontSize: '0.85rem', padding: '4px 8px', fontWeight: 'bold'}}>❌ 狀態：已婉拒參加</span>;
-                      if (st === 'interested') return <span className="badge gold" style={{fontSize: '0.85rem', padding: '4px 8px', fontWeight: 'bold'}}>❤️ 狀態：有興趣</span>;
-                      return <span className="badge" style={{fontSize: '0.85rem', padding: '4px 8px', background: '#fff9c4', color: '#555', border: '1px solid #fbc02d'}}>⚠️ 狀態：尚未回覆</span>;
-                    })()}
-                    <button
-                      className="btn"
-                      disabled={loadingId===e.id+'interested'}
-                      style={r?.type === 'interested' ? { background: '#e91e63', color: '#fff', border: '2px solid #880e4f', boxShadow: '0 0 8px rgba(233,30,99,0.5)', fontWeight: 'bold' } : { opacity: r?.type ? 0.65 : 1 }}
-                      onClick={()=>act(e.id,'interested')}
-                    >
-                      {r?.type === 'interested' ? '【已點選】❤️ 有興趣' : '❤️ 有興趣'}
-                    </button>
-                    {adult&&<>
-                      <button
-                        className="btn"
-                        disabled={loadingId===e.id+'registered'}
-                        style={r?.type === 'registered' ? { background: '#2e7d32', color: '#fff', border: '2px solid #1b5e20', boxShadow: '0 0 8px rgba(46,125,50,0.5)', fontWeight: 'bold' } : { background: '#f5f5f5', color: '#333', border: '1px solid #ccc', opacity: r?.type ? 0.65 : 1 }}
-                        onClick={()=>act(e.id,'registered')}
-                      >
-                        {r?.type === 'registered' ? '【已報名】✅ 參加' : '✅ 參加'}
-                      </button>
-                      <button
-                        className="btn"
-                        disabled={loadingId===e.id+'declined'}
-                        style={r?.type === 'declined' ? { background: '#d32f2f', color: '#fff', border: '2px solid #b71c1c', boxShadow: '0 0 8px rgba(211,47,47,0.5)', fontWeight: 'bold' } : { background: '#f5f5f5', color: '#333', border: '1px solid #ccc', opacity: r?.type ? 0.65 : 1 }}
-                        onClick={()=>act(e.id,'declined')}
-                      >
-                        {r?.type === 'declined' ? '【已婉拒】❌ 不參加' : '❌ 不參加'}
-                      </button>
-                    </>}
-                  </div>
-                </div>
+                <EventReplyRow
+                  key={e.id}
+                  event={e}
+                  status={r?.type}
+                  badges={badges}
+                  actions={[
+                    { type: 'interested', idle: '❤️ 有興趣', active: '【已點選】❤️ 有興趣' },
+                    ...(adult ? [
+                      { type: 'registered' as const, idle: '✅ 參加', active: '【已報名】✅ 參加' },
+                      { type: 'declined' as const, idle: '❌ 不參加', active: '【已婉拒】❌ 不參加' },
+                    ] : []),
+                  ]}
+                  loading={!!loadingId && loadingId.startsWith(e.id)}
+                  onAct={t => act(e.id, t)}
+                />
               );
-            })}
+            })
+          )}
         </div>
-      </Collapsible>
+      </Panel>
 
-      <Collapsible title="🆘 個人緊急聯絡資料">
-        <div className="stack card" style={{ background: '#f8f9fa' }}>
-          <div className="row"><strong>聯絡人：</strong><span>{member.emergencyContactName || '未設定'}</span></div>
-          <div className="row"><strong>電話：</strong><span>{member.emergencyContactPhone || '未設定'}</span></div>
-          <div className="row"><strong>支部：</strong><span>{member.branchId}</span></div>
-          <div className="row"><strong>小隊：</strong><span>{s.patrols.find(p=>p.id===member.patrolId)?.name || '—'}</span></div>
+      <ToolGroup icon="🧰" title="我的工具" subtitle="出席紀錄 · 借用物資 · 行事曆" tone="emerald" tools={tools} />
+
+      {visiblePlugins.length > 0 && (
+        <Panel icon="🧩" title="擴充元件" subtitle="旅團已啟用的 2／3 級元件" tone="violet" count={`${visiblePlugins.length} 個`} bodyClass="pt-3" defaultOpen={false}>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            {visiblePlugins.map(p => (
+              <PluginIframeCard
+                key={p.id}
+                plugin={p}
+                unitCode={session?.troopCode || ''}
+                settings={s.pluginSettings?.find(ps => ps.pluginId === p.id)}
+              />
+            ))}
+          </div>
+        </Panel>
+      )}
+
+      <Panel icon="🆘" title="個人緊急聯絡資料" subtitle="領袖及急救時使用" tone="rose" defaultOpen={false}>
+        <div className="grid sm:grid-cols-2 gap-2">
+          {[
+            { k: '聯絡人', v: member.emergencyContactName || '未設定' },
+            { k: '電話', v: member.emergencyContactPhone || '未設定' },
+            { k: '支部', v: member.branchId },
+            { k: '小隊', v: s.patrols.find(p=>p.id===member.patrolId)?.name || '—' },
+          ].map(item => (
+            <div key={item.k} className="rounded-xl bg-slate-50 border border-slate-200 px-3 py-2">
+              <div className="text-[11px] text-slate-500 font-bold">{item.k}</div>
+              <div className="text-sm font-bold text-slate-800">{item.v}</div>
+            </div>
+          ))}
         </div>
-      </Collapsible>
+      </Panel>
 
-      <div className="row" style={{ marginTop: '2rem' }}>
-        <Link className="btn" href="/profile">我的資料 / 改密碼</Link>
-        <Link className="btn" href="/calendar">行事曆</Link>
+      <div className="flex gap-2 flex-wrap">
+        <Link href="/profile" className="no-underline text-[11px] font-bold bg-white text-slate-700 border border-slate-200 px-3 py-2 rounded-xl hover:bg-slate-50 transition">我的資料 / 改密碼</Link>
+        <Link href="/calendar" className="no-underline text-[11px] font-bold bg-white text-slate-700 border border-slate-200 px-3 py-2 rounded-xl hover:bg-slate-50 transition">行事曆</Link>
       </div>
     </div>
   );

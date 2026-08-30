@@ -209,12 +209,13 @@ function mockLinkChildren(parent: any, children: any): { linked: string[]; creat
 
 // ==================== 角色過濾(演示用,邏輯與真後台同向) ====================
 
+// 與 GS 端 FEATURE_DEFAULTS 保持一致（漏了 equipment 會讓演示模式看不到物資借用管理卡）
 const FEATURES: Record<string, string[]> = {
-  super_admin: ['branches', 'members', 'applications', 'events', 'registrations', 'attendance', 'meetings', 'library_import', 'notices', 'users', 'permissions', 'settings', 'plugins', 'audit', 'calendar'],
-  troop_super: ['branches', 'members', 'applications', 'events', 'registrations', 'attendance', 'meetings', 'library_import', 'notices', 'users', 'permissions', 'settings', 'plugins', 'audit', 'calendar'],
-  admin: ['branches', 'members', 'applications', 'events', 'registrations', 'attendance', 'meetings', 'library_import', 'notices', 'users', 'permissions', 'settings', 'plugins', 'audit', 'calendar'],
-  group_leader: ['members', 'applications', 'events', 'registrations', 'attendance', 'meetings', 'library_import', 'notices', 'calendar'],
-  branch_leader: ['members', 'applications', 'events', 'registrations', 'attendance', 'meetings', 'library_import', 'notices', 'calendar'],
+  super_admin: ['branches', 'members', 'applications', 'events', 'registrations', 'attendance', 'meetings', 'library_import', 'notices', 'users', 'permissions', 'settings', 'plugins', 'audit', 'calendar', 'equipment'],
+  troop_super: ['branches', 'members', 'applications', 'events', 'registrations', 'attendance', 'meetings', 'library_import', 'notices', 'users', 'permissions', 'settings', 'plugins', 'audit', 'calendar', 'equipment'],
+  admin: ['branches', 'members', 'applications', 'events', 'registrations', 'attendance', 'meetings', 'library_import', 'notices', 'users', 'permissions', 'settings', 'plugins', 'audit', 'calendar', 'equipment'],
+  group_leader: ['members', 'applications', 'events', 'registrations', 'attendance', 'meetings', 'library_import', 'notices', 'calendar', 'equipment'],
+  branch_leader: ['members', 'applications', 'events', 'registrations', 'attendance', 'meetings', 'library_import', 'notices', 'calendar', 'equipment'],
   coach: ['events', 'registrations', 'attendance', 'library_import', 'notices'],
   parent: [],
   member: [],

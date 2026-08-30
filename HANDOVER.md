@@ -142,6 +142,54 @@ GS `doGet` 新增以下讀取 action（回傳 `{ success, state }`，state 只�
 
 巡檢後剩餘項目皆為 hover 態或已 ≥3.8:1；`npm run build` 全綠。
 
+## 2026-08-30 控制台 UI：把「精簡 + 同類歸類大卡」設計真正接到角色頁
+
+### 問題（為什麼看起來「回舊版」）
+新版控制台設計（Tailwind + `DashboardCard` / `SectionHeader`，同類項目收在同一張大卡內）
+**只存在於 `app/dashboard/**` 的模擬展示樹**：`app/dashboard/page.tsx` 頂部的
+`MY_REGISTRATIONS` / `ACTIVITIES` / `BRANCH_STATS` / `MEETINGS` / `APPROVALS` 全是寫死的假資料。
+全站除 `components/layout/BottomNav.tsx`（只在 `/dashboard*` 才顯示）外沒有任何連結通往 `/dashboard`；
+`components/layout/TopNav.tsx` 更明確把已登入用戶導向 `/member`、`/parent`、`/admin`、`/calendar`
+（註釋原文：「已登入 → 回到該角色的真實控制台（不是 /dashboard 的 mock 展示樹）」）。
+所以登入後看到的仍是舊版 `.card` / `.grid` / `FeatureCard` 控制台，管理員頁一次排開約 21 個獨立卡。
+（本節即「待完成」第 4 項的根因。）
+
+### 處理：新版設計落到真正的角色控制台
+
+| 頁面 | 舊版 | 新版（實測區塊數） |
+|---|---|---|
+| `/admin` | 身份卡 + hero 說明卡 + 4 統計卡 + 點名卡 + 14 功能卡 ≈ **21 個獨立卡** | 身份條 + 1 張統計卡 + **5 張分類大卡**（成員與帳號 4 項／活動與報名 4 項／通告與物資 3 項／會議與紀錄 2 項／系統設定 2 項）= **7** |
+| `/leader` | 身份卡 + hero + 3 統計卡 + 物資卡 + 6 功能卡 + 點名卡 + 元件區 | 身份條 + 統計卡 + **3 張大卡**（待回覆與出席活動／管理工具 7 項／擴充元件）= **5** |
+| `/member` | 身份卡 + hero + 工具卡格 + 2 收合卡 | 身份條 + **4 張大卡**（活動與集會／我的工具 3 項／擴充元件／個人緊急聯絡資料）= **5** |
+| `/parent` | 身份卡 + hero + 點名卡 + 每子女一卡 + 家庭資料卡 | 身份條 + 每子女一張大卡 + 我的工具 + 家庭聯絡資料 = **4** |
+
+### 新元件（`components/ui/`）
+- `Panel.tsx` — 可收合大卡容器（標題列 = icon + 標題 + 副題 + 數量 + ▼，`aria-expanded` 可測）
+- `ToolGroup.tsx` — 同類功能歸類成一張大卡，卡內以小方格排列（`ConsoleTool`）
+- `StatStrip.tsx` — 統計數字合併成一張卡（取代舊版每個數字一張 `.summary`）
+- `ConsoleHeader.tsx` — 身份條（合併舊版「漸變大卡 + hero 說明卡」兩張卡）
+- `EventReplyRow.tsx` — 成員／領袖／家長共用的活動回覆列（沿用 `apiSetReply` 流程，只是換掉 inline style）
+
+### 保留的行為（逐項驗證）
+- `loadStateSlice([...])` 的切片 key 完全沒動
+- `userFeatures` 權限過濾照舊：無權限的功能不會出現在大卡內（`FEATURE_DEFS` 沒有的 key 自動略過）
+- 未成年成員只出 ❤️ 有興趣，`age >= 18` 才出 ✅ / ❌
+- 值日小隊提示、活動付款連結、`/admin` 的「GS 版本太舊」紅色警告卡
+
+### 一併修掉的小問題
+- `lib/mock.ts` 的 `FEATURES` 漏了 `equipment`（GS `FEATURE_DEFAULTS` 是有的）→ 演示模式下管理員看不到「物資借用管理」卡；已補齊並與 GS 對齊
+- 刪除已無人引用的舊控制台元件：`components/Cards.tsx`、`components/Collapsible.tsx`、`components/AttendanceCard.tsx`
+- `components/PluginCard.tsx` 樣式跟上新設計（legacy `.card` 塞進新大卡內會格格不入）；iframe 展開／resize 邏輯不變
+
+### 驗證
+- `npm run build` 全綠（57 頁）
+- 用 jsdom 載入 `next start` 的**真實 client bundle** + 演示模式資料逐頁實測：
+  `/admin` 5 張分類大卡（4/4/3/2/2 項）、`/leader` 3 張、`/member` 4 張、`/parent` 3 張，無 console error
+- 收合：點大卡標題 `aria-expanded` true → false → true，卡內連結 14 → 10 → 14
+- 回覆寫入回路：`/parent` ✅ 已報名 → ❌ 已婉拒、`/member` ⚠️ 尚未回覆 → ❤️ 有興趣，都即時更新
+- 已知（非本次改動造成）：`/leader` 領袖本人的出席確認在演示模式下不會變色 —— mock 只回傳「支部成員」的
+  replies，而領袖是用 `userId` 當 `memberId` 寫入，被切片過濾掉；對照舊版頁面實測行為相同
+
 ## 待完成（下一階段）
 1. **82 旅重新部署 GS** — 把本 repo 的 `gs/SCOUTSYSTEM_2_SETUP.gs`（或 `public/downloads/SCOUTSYSTEM_2_SETUP.gs.txt`）貼回 82 旅 Script Editor → Deploy → 管理部署 → 新增版本；部署後用 `?action=health&apiKey=...` 確認 version=3.0-live，並複測超管登入。
    （過渡期：前端已改以 `sheep` 作 userId，未重新部署也能拿到全部資料；但仍建議盡快部署，才有 `publicConfig_` 敏感值剝除等修正）
