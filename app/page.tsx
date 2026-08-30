@@ -31,7 +31,7 @@ export default function HomePage() {
   return (
     <div className="min-h-screen">
       {/* ── Hero ── */}
-      <section className="hero-gradient text-white px-6 py-14 sm:py-20 relative overflow-hidden">
+      <section className="hero-gradient text-white px-6 py-14 sm:py-20 relative overflow-hidden rounded-3xl">
         <div className="absolute right-4 bottom-4 text-[10rem] opacity-[0.06] pointer-events-none select-none leading-none">⚜</div>
         <div className="max-w-5xl mx-auto relative z-10">
           <span className="inline-flex items-center gap-1.5 bg-white/15 text-[11px] font-semibold px-3 py-1 rounded-full border border-white/25">

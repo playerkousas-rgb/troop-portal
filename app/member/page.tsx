@@ -4,6 +4,7 @@ import { AppState, loadStateSlice, visibleEventsForMember, replyStatus } from '@
 import { apiSetReply } from '@/lib/api';
 import { getSession } from '@/lib/session';
 import Collapsible from '@/components/Collapsible';
+import EmptyState from '@/components/ui/EmptyState';
 import PluginIframeCard from '@/components/PluginCard';
 import Link from 'next/link';
 import AttendanceCard from '@/components/AttendanceCard';
@@ -70,7 +71,7 @@ export default function Member(){
       <Collapsible title="📢 活動與集會" defaultOpen={true}>
         <p className="muted">{adult?'你已 18 歲或以上，可自行 ✅ / ❌。':'你未滿 18 歲，可按 ❤️ 表示有興趣；參加 / 不參加由家長決定。'}</p>
         <div className="stack">
-          {events.length===0?<div className="card"><p className="muted">暫無可見活動。</p></div>:
+          {events.length===0?<EmptyState icon="🏕️" title="暫無可見活動" desc="領袖發布活動後,這裡會顯示可以報名的活動。"/>:
             events.map(e=>{
               const r=replyStatus(s,e.id,member.id);
               const isDuty = e.dutyPatrol && member.patrolId && s.patrols.find(p => p.id === member.patrolId)?.name === e.dutyPatrol;

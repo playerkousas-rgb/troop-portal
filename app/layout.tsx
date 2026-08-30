@@ -13,7 +13,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="zh-HK">
       <body>
         <TopNav />
-        {children}
+        <main className="container">{children}</main>
         {/* © Copyright */}
         <footer className="pt-2 pb-16 text-center">
           <p className="text-[10px] text-slate-400">© 2026 Scout System · 旅團管理系統</p>

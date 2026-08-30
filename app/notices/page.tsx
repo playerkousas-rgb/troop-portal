@@ -104,7 +104,7 @@ export default function Notices(){
       <section className="card stack">
         <h2>通告（{s.bookmarks.length}）</h2>
         {s.bookmarks.length===0?
-          <p className="muted">暫無通告。</p>
+          <div className="empty-inline"><div className="empty-icon">📢</div>暫無通告,領袖發布後會顯示在這裡。</div>
         :
         <table className="table">
           <thead><tr><th>標題</th><th>來源</th><th>類型</th><th>支部</th><th>對象</th><th>截止</th><th>費用</th><th>模式</th>{isLeader&&<th>操作</th>}</tr></thead>
@@ -142,7 +142,7 @@ export default function Notices(){
       <section className="card stack">
         <h2>日常公告 PDF</h2>
         {pdfs.length===0?
-          <p className="muted">暫無公告 PDF。</p>
+          <div className="empty-inline"><div className="empty-icon">📄</div>暫無公告 PDF,上傳後會顯示在這裡。</div>
         :
           <div className="grid-wide">{pdfs.map(pdf=>
             <div key={pdf.id} className="card" style={{position:'relative'}}>
