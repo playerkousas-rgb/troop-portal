@@ -190,6 +190,21 @@ GS `doGet` 新增以下讀取 action（回傳 `{ success, state }`，state 只�
 - 已知（非本次改動造成）：`/leader` 領袖本人的出席確認在演示模式下不會變色 —— mock 只回傳「支部成員」的
   replies，而領袖是用 `userId` 當 `memberId` 寫入，被切片過濾掉；對照舊版頁面實測行為相同
 
+### 底部 4 個快捷 tab 一併接回（同一個根因）
+`components/layout/BottomNav.tsx` 由第一個 commit（`11b41c4`）起就是
+`if (!pathname?.startsWith('/dashboard')) return null`，4 條連結亦全部指住 `/dashboard/*`，
+所以真實控制台永遠睇唔到底部導航。現在：
+- 已選旅團或已登入 → 全站顯示（`/`、`/setup`、`/onboard`、`/downloads`、`/troops`、`/updates`、`/marketplace`、`/connectors` 例外）
+- 連結改指真實路由：📅 `/calendar`、🎯 `/activities`、📢 `/notices`、👤 `/profile`（未登入則 `/login`）
+- `/dashboard/**` 展示樹維持原有 demo 連結，展示頁不受影響
+- 頂欄右上本來就已是目標版本：管理員兩個小按鈕（⚙️ `/admin/settings`、🧩 `/admin/plugins`）+ ⋮ 選單（借用物資／我的資料／改密碼／我的控制台／登出），未登入顯示「登入」——未作改動
+
+### 順帶修掉的 hydration mismatch（`/profile`）
+`app/profile/page.tsx` 在 render 期直接 `getSession()`：SSR 拿不到 localStorage → 渲染「請先登入」，
+client 第一次 render 已有 session → 渲染用戶名，觸發 **React error #425**（文字內容與 SSR 不符）。
+改為 `useState + useEffect`（同 `components/Auth.tsx` 做法），載入切片改為 `[session]` 依賴。
+實測 `/profile`：admin 顯示「陳堅強／管理員」且姓名、Email 欄位照舊自動填入；member 顯示「張磊磊／成員」；console error 由 2 個變 0。
+
 ## 待完成（下一階段）
 1. **82 旅重新部署 GS** — 把本 repo 的 `gs/SCOUTSYSTEM_2_SETUP.gs`（或 `public/downloads/SCOUTSYSTEM_2_SETUP.gs.txt`）貼回 82 旅 Script Editor → Deploy → 管理部署 → 新增版本；部署後用 `?action=health&apiKey=...` 確認 version=3.0-live，並複測超管登入。
    （過渡期：前端已改以 `sheep` 作 userId，未重新部署也能拿到全部資料；但仍建議盡快部署，才有 `publicConfig_` 敏感值剝除等修正）

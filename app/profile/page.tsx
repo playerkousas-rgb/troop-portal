@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react';
 import { AppState, loadState, loadStateSlice } from '@/lib/store';
 import { apiUpdateMember, apiUpdateUserField } from '@/lib/api';
-import { getSession } from '@/lib/session';
+import { getSession, Session } from '@/lib/session';
 import { branches, ROLE_LABEL, LEADER_ROLES } from '@/lib/model';
 import Link from 'next/link';
 
@@ -11,7 +11,11 @@ export default function Profile(){
   const [err,setErr]=useState('');
   const [ok,setOk]=useState('');
   const [saving,setSaving]=useState(false);
-  const session=getSession();
+  // 不能在 render 期直接 getSession()：SSR 拿不到 localStorage 會渲染「請先登入」，
+  // client 第一次 render 卻有 session → hydration mismatch（React error #425）。
+  // 改用 useState + useEffect（同 components/Auth.tsx 的做法）。
+  const [session,setSession]=useState<Session|null|undefined>(undefined);
+  useEffect(()=>{setSession(getSession())},[]);
 
   // editable fields
   const [name,setName]=useState('');
@@ -22,9 +26,9 @@ export default function Profile(){
   const [patrolRole,setPatrolRole]=useState('');
 
   useEffect(()=>{
+    if(!session)return;
     loadStateSlice(['patrols','users','members']).then(st=>{
       setS(st);
-      if(!session){return}
       if(session.role==='member'){
         const m=st.members.find(x=>x.id===session.memberId);
         if(m){setName(m.name);setPhone(m.emergencyContactPhone||'');setEmail('');setPatrolId(m.patrolId||'');setPatrolRole(m.patrolRole||'')}
@@ -33,7 +37,7 @@ export default function Profile(){
         if(u){setName(u.name);if(!LEADER_ROLES.includes(session.role))setEmail(u.email||'')}
       }
     }).catch(e=>setErr(e.message))
-  },[]);
+  },[session]);
 
   async function save(){
     setErr('');setOk('');setSaving(true);
@@ -58,6 +62,7 @@ export default function Profile(){
     }catch(e:any){setErr(e.message)}finally{setSaving(false)}
   }
 
+  if(session===undefined)return <div className="card">載入中...</div>;
   if(!session)return <div className="card"><p className="muted">請先登入。<Link href="/login">登入</Link></p></div>;
   if(!s)return <div className="card">載入中...</div>;
 
