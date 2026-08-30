@@ -122,6 +122,7 @@ export default function Page(){
   const [bulkText,setBulkText]=useState(BULK_TEMPLATE);
   const [bulkRows,setBulkRows]=useState<BulkRow[]>([]);
   const [bulkErrors,setBulkErrors]=useState<string[]>([]);
+  const [bulkWarnings,setBulkWarnings]=useState<string[]>([]);
   const [search,setSearch]=useState('');
   const [filterRole,setFilterRole]=useState('all');
   const [name,setName]=useState('');const [email,setEmail]=useState('');const [pw,setPw]=useState('changeme');
@@ -166,8 +167,10 @@ export default function Page(){
   function normaliseBulkRows(rawRows: Record<string, any>[]) {
     const rows: BulkRow[] = [];
     const errors: string[] = [];
+    const warnings: string[] = [];
     const seenEmails = new Set(s?.users.map(u => (u.email || '').toLowerCase()).filter(Boolean));
     const seenYm = new Set(s?.members.map(m => m.ymNumber).filter(Boolean));
+    const findParentByEmail = (em: string) => s?.users.find(u => u.role === 'parent' && (u.email || '').toLowerCase() === (em || '').toLowerCase());
 
     rawRows.forEach((raw, idx) => {
       const rowNo = idx + 1;
@@ -201,14 +204,32 @@ export default function Page(){
       } else {
         if (!ymNumber) errors.push(`第 ${rowNo} 行：成員缺少 YMIS / 成員編號`);
         if (!branchId) errors.push(`第 ${rowNo} 行：成員缺少支部(可填 童軍/幼童軍/深資/樂行/小童軍 或 b1~b5)`);
-        if (!item.dateOfBirth) errors.push(`第 ${rowNo} 行：缺少出生日期(無法計算年齡,影響 18 歲以下報名規則)`);
+        if (!item.dateOfBirth) errors.push(`第 ${rowNo} 行：缺少出生日期(必填 — 無法計算年齡,影響 18 歲以下報名規則)`);
         if (ymNumber && seenYm.has(ymNumber)) errors.push(`第 ${rowNo} 行：YMIS 已存在 (${ymNumber})`);
         if (ymNumber) seenYm.add(ymNumber);
+
+        // 選填個人資料:不擋開戶,只提示會影響什麼功能
+        const dob = item.dateOfBirth ? new Date(item.dateOfBirth) : null;
+        const age = dob && !isNaN(dob.getTime()) ? (() => {
+          const now = new Date();
+          let a = now.getFullYear() - dob.getFullYear();
+          const m = now.getMonth() - dob.getMonth();
+          if (m < 0 || (m === 0 && now.getDate() < dob.getDate())) a--;
+          return a;
+        })() : null;
+        const hasParent = !!(item.parentUserId || (item.parentEmail && findParentByEmail(item.parentEmail)));
+        if (!hasParent) {
+          if (item.parentEmail) warnings.push(`第 ${rowNo} 行(${name || ymNumber})：填了家長電郵 ${item.parentEmail} 但找不到該家長帳號 — 不會建立連結,請先開家長帳號`);
+          else if (age !== null && age < 18) warnings.push(`第 ${rowNo} 行(${name || ymNumber})：未滿 18 歲且未連結家長 — 報名活動需家長操作,之後可於成員管理補建連結`);
+        }
+        if (!item.email) warnings.push(`第 ${rowNo} 行(${name || ymNumber})：無 Email — 不影響 YMIS 登入,但無法寄出密碼重設信`);
+        if (!item.emergencyContactName && !item.emergencyContactPhone) warnings.push(`第 ${rowNo} 行(${name || ymNumber})：無緊急聯絡人 — 只影響成員頁「緊急聯絡資料」顯示`);
       }
       rows.push(item);
     });
     setBulkRows(rows);
     setBulkErrors(errors);
+    setBulkWarnings(warnings);
   }
 
   function previewBulk(text = bulkText) {
@@ -220,7 +241,7 @@ export default function Page(){
         : gridToObjects(parseTable(t));
       normaliseBulkRows(raw);
     } catch (e: any) {
-      setBulkRows([]); setBulkErrors(['格式錯誤：' + (e.message || String(e))]);
+      setBulkRows([]); setBulkErrors(['格式錯誤：' + (e.message || String(e))]); setBulkWarnings([]);
     }
   }
 
@@ -245,7 +266,7 @@ export default function Page(){
         emergencyContactName: r.emergencyContactName, emergencyContactPhone: r.emergencyContactPhone, note: r.note,
       };
     });
-    if (!confirm(`確定批量開戶？\n帳號：${userRows.length} 個\n成員：${memberRows.length} 名`)) return;
+    if (!confirm(`確定批量開戶？\n帳號：${userRows.length} 個\n成員：${memberRows.length} 名${bulkWarnings.length ? `\n(另有 ${bulkWarnings.length} 項選填提示)` : ''}`)) return;
     setLoading(true); setErr(''); setOk('');
     try {
       let fresh: AppState | null = null;
@@ -253,7 +274,7 @@ export default function Page(){
       if (memberRows.length) fresh = await apiBatchCreateMembers(memberRows as any);
       if (fresh) setS(fresh);
       setOk(`✅ 批量開戶已完成：帳號 ${userRows.length} 個、成員 ${memberRows.length} 名。`);
-      setShowBulk(false); setBulkRows([]);
+      setShowBulk(false); setBulkRows([]); setBulkWarnings([]);
     } catch (e: any) { setErr(e.message); } finally { setLoading(false); }
   }
 
@@ -336,7 +357,7 @@ export default function Page(){
 
     {showBulk&&<section className="card stack" id="bulk-onboard">
       <div className="row" style={{justifyContent:'space-between'}}>
-        <div><h3>📥 批量開戶（全前端匯入）</h3><p className="muted">下載範本、貼上 CSV / JSON、或直接複製 YMIS 自訂報表的表格(含出生日期)貼入。前端自動偵測格式、檢查重複 Email / YMIS，再一次寫入後台。</p></div>
+        <div><h3>📥 批量開戶（全前端匯入）</h3><p className="muted">下載範本、貼上 CSV / JSON、或直接複製 YMIS 自訂報表的表格(含出生日期)貼入。前端自動偵測格式、檢查重複 Email / YMIS，再一次寫入後台。<br/><b>必填：姓名、YMIS、支部、出生日期。</b>其餘個人資料(緊急聯絡、家長、Email 等)皆選填 — 不填不影響開戶,預覽會列出哪些功能會受限。</p></div>
         <span className="badge green">手機可用</span>
       </div>
       <div className="row" style={{flexWrap:'wrap'}}>
@@ -345,11 +366,17 @@ export default function Page(){
         <label className="btn">📤 上傳 CSV / TXT / JSON<input type="file" accept=".csv,.txt,.json,text/csv,text/plain,application/json" onChange={e=>loadBulkFile(e.target.files?.[0])} style={{display:'none'}}/></label>
         <button className="btn gold" onClick={()=>previewBulk()}>🔎 預覽及檢查</button>
       </div>
-      <textarea value={bulkText} onChange={e=>setBulkText(e.target.value)} rows={8} placeholder={"貼上 CSV / JSON,或直接複製 YMIS 報表內容(欄位含:姓名、成員編號、出生日期、支部…)。\n無表頭也可以 — 系統會自動識別 10 位 YMIS 編號及出生日期。成員資料必須有出生日期才能計算年齡。"} style={{fontFamily:'ui-monospace, SFMono-Regular, Menlo, monospace',fontSize:12}}/>
+      <textarea value={bulkText} onChange={e=>setBulkText(e.target.value)} rows={8} placeholder={"貼上 CSV / JSON,或直接複製 YMIS 報表內容(欄位含:姓名、成員編號、出生日期、支部…)。\n無表頭也可以 — 系統會自動識別 10 位 YMIS 編號及出生日期。\n必填:姓名、YMIS、支部、出生日期;其餘個人資料選填,缺了會列出受影響的功能。"} style={{fontFamily:'ui-monospace, SFMono-Regular, Menlo, monospace',fontSize:12}}/>
       {bulkErrors.length>0&&<div className="card" style={{borderColor:'#fca5a5',background:'#fff5f5'}}>
-        <b className="danger">需要修正：</b>
+        <b className="danger">需要修正(修正前無法開戶)：</b>
         <ul>{bulkErrors.slice(0,8).map((e,i)=><li key={i}>{e}</li>)}</ul>
         {bulkErrors.length>8&&<p className="muted">另有 {bulkErrors.length-8} 項錯誤未顯示。</p>}
+      </div>}
+      {bulkErrors.length===0&&bulkWarnings.length>0&&<div className="card" style={{borderColor:'#fcd34d',background:'#fffbeb'}}>
+        <b style={{color:'#92400e'}}>⚠️ 選填項未填(不影響開戶,部分功能會受限)：</b>
+        <ul>{bulkWarnings.slice(0,8).map((w,i)=><li key={i}>{w}</li>)}</ul>
+        {bulkWarnings.length>8&&<p className="muted">另有 {bulkWarnings.length-8} 項提示未顯示。</p>}
+        <p className="muted" style={{fontSize:12}}>可先開戶,之後隨時於「成員管理 / 使用者管理」補填。</p>
       </div>}
       {bulkRows.length>0&&<div className="table-card-list">
         <p className="muted">預覽：帳號 {bulkRows.filter(r=>r.type==='user').length} 個、成員 {bulkRows.filter(r=>r.type==='member').length} 名</p>
