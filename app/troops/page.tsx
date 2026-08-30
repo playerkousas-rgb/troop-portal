@@ -1,0 +1,2 @@
+const troops=[['0082','第82旅','已開通','已接入圖書館及 DBS'],['0083','第83旅','測試中','測試財務管家'],['0104','第104旅','準備接入','已接入圖書館']];
+export default function Troops(){return <div className="stack"><section className="hero"><span className="badge gold">使用旅團</span><h1>現已使用 / 測試旅團</h1><p>公開展示可協助推廣，讓其他旅團了解接入情況。</p></section><section className="grid">{troops.map(t=><div className="card" key={t[0]}><span className="badge blue">{t[0]}</span><h3>{t[1]}</h3><p className="muted">{t[2]} · {t[3]}</p></div>)}</section></div>}

@@ -1,0 +1,17 @@
+ScoutSystem 通告 Word 標準格式總覽
+
+本系統建議分兩種 Word 格式：
+
+A. 活動通告（一個活動一張）
+下載 / 複製：SCOUTSYSTEM_ACTIVITY_NOTICE_TEMPLATE.txt
+適合：露營、訓練日、服務、比賽、旅團安排一起參加的活動。
+
+B. 日常集會安排 / 公告
+下載 / 複製：SCOUTSYSTEM_MEETING_NOTICE_TEMPLATE.txt
+適合：每月集會安排、每週集會內容公告。可一張通告內列出多個集會項目。
+
+抽取準確原則：
+1. 每項一行。
+2. 標頭固定，例如「參加資格：」「收費：」「本旅截止日期：」。
+3. 日常集會的每一列使用「｜」分隔欄位。
+4. Word 請用 .docx，不建議 PDF / 圖片。
