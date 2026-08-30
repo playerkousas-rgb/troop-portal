@@ -2240,11 +2240,11 @@ function linkChildrenToParent_(parentId, children, operator) {
       linked.push(getField_(m, 'name') || ym);
     } else {
       appendRowByHeaders_('Members', {
-        memberId: uid_('m'), ymNumber: ym, password: '', name: nm || ('成員 ' + ym), email: '',
+        memberId: uid_('m'), ymNumber: ym, password: ym, name: nm || ('成員 ' + ym), email: '',
         branchId: String(cObj.branchId || 'b1'), patrolId: '', patrolRole: '', specialRole: '',
         dateOfBirth: String(cObj.dateOfBirth || ''), parentUserId: parentId,
         emergencyContactName: '', emergencyContactPhone: '', active: true,
-        note: '經家長開戶建立（無登入帳號，由家長代報名）'
+        note: ym ? '經家長開戶建立（預設密碼=SCOUT ID，請提醒成員更改）' : '經家長開戶建立（無 SCOUT ID，無登入帳號，由家長代報名）'
       });
       created.push(nm || ym);
     }

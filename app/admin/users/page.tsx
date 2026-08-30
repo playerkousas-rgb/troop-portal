@@ -30,29 +30,29 @@ type BulkRow = {
   emergencyContactPhone: string;
   parentUserId: string;
   parentEmail: string;
-  children: string[];
+  children: { ym: string; name: string }[];
   childBranch: string;
   childDob: string;
   note: string;
   _merged?: boolean;
 };
 
-const BULK_TEMPLATE = `type,name,email,ymNumber,password,role,branchId,patrolId,patrolRole,specialRole,dateOfBirth,emergencyContactName,emergencyContactPhone,parentUserId,children,note
-member,王小明,wong.member@example.org,1234560001,,member,b3,p10,member,,2012-03-15,王太,91234567,,,童軍成員，可用 YMIS 登入
-member,李小美,lee.member@example.org,1234560002,,member,b2,p1,member,,2015-07-20,李太,98765432,,,幼童軍成員
-user,王家長,wong.parent@example.org,,changeme,parent,,,,,,,,1234560001;李小美,家長帳號(子女填 SCOUT ID 或姓名,分號分隔)
-user,陳領袖,leader@example.org,,changeme,branch_leader,b3,,,,,,,,支部領袖帳號`;
+const BULK_TEMPLATE = `type,name,email,ymNumber,password,role,branchId,patrolId,patrolRole,specialRole,dateOfBirth,emergencyContactName,emergencyContactPhone,parentUserId,childYmNumber,childName,note
+member,王小明,wong.member@example.org,1234560001,,member,b3,p10,member,,2012-03-15,王太,91234567,,,,童軍成員，可用 YMIS 登入
+member,李小美,lee.member@example.org,1234560002,,member,b2,p1,member,,2015-07-20,李太,98765432,,,,幼童軍成員
+user,王家長,wong.parent@example.org,,changeme,parent,,,,,,,,,1234560001,王小明,家長帳號(子女每行一個;多位子女寫多行)
+user,陳領袖,leader@example.org,,changeme,branch_leader,b3,,,,,,,,,,支部領袖帳號`;
 
 /** 簡化範本:對照 YMIS 自訂報表的中文欄位,領袖只需照樣貼上報表內容 */
 const BULK_SIMPLE_TEMPLATE = `姓名,成員編號,出生日期,支部,小隊,家長電郵,緊急聯絡人,緊急聯絡電話
 示例成員,3000000123,2012-03-15,童軍,WOLF,parent@example.org,王太,91234567
 示例成員二,3000000456,2015-07-20,幼童軍,黃,,李太,98765432`;
 
-/** 家長+子女範本:一位家長可佔多行(每位子女一行);小童軍未有 SCOUT ID 就只填姓名 */
-const BULK_PARENT_TEMPLATE = `家長姓名,家長Email,子女SCOUT ID/姓名,子女支部,子女出生日期
-王秀蘭,parent@example.org,3000000001,童軍,2010-06-12
-王秀蘭,parent@example.org,王小明,小童軍,
-李爸爸,lee.parent@example.org,3000000456,幼童軍,2015-07-20`;
+/** 家長+子女範本:SCOUT ID 與姓名分開填;一位家長可佔多行(每位子女一行) */
+const BULK_PARENT_TEMPLATE = `家長姓名,家長Email,子女SCOUT ID,子女姓名,子女支部,子女出生日期
+王秀蘭,parent@example.org,3000000001,陳大文,童軍,2010-06-12
+王秀蘭,parent@example.org,,王小寶,小童軍,
+李爸爸,lee.parent@example.org,3000000456,李小美,幼童軍,2015-07-20`;
 
 /** 日期正規化:2012/3/5 → 2012-03-05 */
 function normDate(v: string): string {
@@ -81,7 +81,7 @@ const HEADER_SET = new Set([
   '類型', '姓名', '全名', '電郵', '邮箱', 'Email', '成員編號', '號碼', '成員號碼', 'YMIS', 'YMIS編號',
   '密碼', '角色', '支部', '單位', '小隊', '隊', '隊內身份', '特別身份', '出生日期', '生日',
   '緊急聯絡人', '聯絡人', '緊急聯絡電話', '電話', '家長ID', '家長電郵', '備註',
-  '家長姓名', '家長Email', '子女SCOUT ID/姓名', '子女SCOUT ID', '子女編號/姓名', '子女支部', '子女出生日期',
+  '家長姓名', '家長Email', '子女SCOUT ID', '子女姓名', 'childYmNumber', 'childName', '子女SCOUT ID/姓名', '子女支部', '子女出生日期',
 ]);
 
 /** 無表頭時:按內容自動識別(10 位數字=YMIS、日期=出生日期、@=Email、支部名稱) */
@@ -138,7 +138,7 @@ export default function Page(){
   const [filterRole,setFilterRole]=useState('all');
   const [name,setName]=useState('');const [email,setEmail]=useState('');const [pw,setPw]=useState('changeme');
   const [role,setRole]=useState<Role>('parent');const [branchId,setBranchId]=useState('');
-  const [childrenText,setChildrenText]=useState('');const [newChildBranch,setNewChildBranch]=useState('b1');
+  const [childRows,setChildRows]=useState<{ym:string;name:string}[]>([{ym:'',name:''}]);const [newChildBranch,setNewChildBranch]=useState('b1');
   const [loading,setLoading]=useState(false);
   const [ok,setOk]=useState('');
   const [permsUserId,setPermsUserId]=useState<string|null>(null);
@@ -162,11 +162,11 @@ export default function Page(){
     if(!name||!email){setErr('請填姓名及 Email');return;}
     setErr('');setLoading(true);
     try{
-      const children = role === 'parent' && childrenText.trim()
-        ? childrenText.split(/[\n;；,，]+/).map(x => x.trim()).filter(Boolean).map(c => /^\d{7,12}$/.test(c) ? { ymNumber: c, branchId: newChildBranch || 'b1' } : { name: c, branchId: newChildBranch || 'b1' })
+      const children = role === 'parent'
+        ? childRows.filter(c => c.ym.trim() || c.name.trim()).map(c => ({ ymNumber: c.ym.trim() || undefined, name: c.name.trim() || undefined, branchId: newChildBranch || 'b1' }))
         : undefined;
       const res = await apiCreateUser({name,email,password:pw,role,branchId:LEADER_ROLES.includes(role)?branchId:'',children});
-      setS(res.state);setShowAdd(false);setName('');setEmail('');setChildrenText('');
+      setS(res.state);setShowAdd(false);setName('');setEmail('');setChildRows([{ym:'',name:''}]);
       setOk(children?.length ? `✅ 已建立 ${name} 的帳號 — 連結已有成員 ${res.linked.length} 名、新建成員紀錄(無登入帳號) ${res.created.length} 名。` : '✅ 帳號已建立。');
     }catch(e:any){setErr(e.message)}finally{setLoading(false)}
   }
@@ -223,8 +223,13 @@ export default function Page(){
         if (!email) errors.push(`第 ${rowNo} 行：帳號缺少 Email`);
         if (email && seenEmails.has(email.toLowerCase())) errors.push(`第 ${rowNo} 行：Email 已存在 (${email})`);
         if (email) seenEmails.add(email.toLowerCase());
-        // 家長的子女(SCOUT ID 或中文姓名,; 或 , 分隔;多行重複家長 Email 會自動合併)
-        item.children = String(raw.children || raw['子女SCOUT ID/姓名'] || raw['子女SCOUT ID'] || raw['子女編號/姓名'] || raw['子女'] || '').split(/[;；,，\n|]+/).map(x => x.trim()).filter(Boolean);
+        // 家長的子女:SCOUT ID 與姓名分開填(每行一個子女;多位子女寫多行,重複家長 Email 自動合併)
+        const childYm = String(raw.childYmNumber || raw['子女SCOUT ID'] || '').trim();
+        const childName = String(raw.childName || raw['子女姓名'] || '').trim();
+        if (childYm || childName) item.children.push({ ym: childYm, name: childName });
+        // 兼容舊的單欄 children(分號分隔,純數字=SCOUT ID、否則=姓名)
+        String(raw.children || raw['子女SCOUT ID/姓名'] || raw['子女'] || '').split(/[;；,，\n|]+/).map(x => x.trim()).filter(Boolean)
+          .forEach(entry => item.children.push(/^\d{7,12}$/.test(entry) ? { ym: entry, name: '' } : { ym: '', name: entry }));
         item.childBranch = normaliseBranchId(raw.childBranch || raw['子女支部'] || '');
         item.childDob = normDate(String(raw.childDob || raw['子女出生日期'] || ''));
       } else {
@@ -261,7 +266,7 @@ export default function Page(){
       const k = r.email.toLowerCase();
       if (parentSeen[k] === undefined) { parentSeen[k] = i; return; }
       const first = rows[parentSeen[k]];
-      r.children.forEach(c => { if (first.children.indexOf(c) < 0) first.children.push(c); });
+      r.children.forEach(c => { if (!first.children.some(x => (x.ym && x.ym === c.ym) || (x.name && x.name === c.name))) first.children.push(c); });
       if (!first.childBranch && r.childBranch) first.childBranch = r.childBranch;
       if (!first.childDob && r.childDob) first.childDob = r.childDob;
       warnings.push(`第 ${i + 1} 行(${r.name || r.email})：家長 Email 重複 — 子女會合併到第 ${parentSeen[k] + 1} 行的帳號`);
@@ -293,9 +298,7 @@ export default function Page(){
       name: r.name, email: r.email, password: r.password || 'changeme', role: r.role,
       branchId: LEADER_ROLES.includes(r.role) ? r.branchId : '', approved: true,
       children: r.role === 'parent' && r.children.length
-        ? r.children.map(c => /^\d{7,12}$/.test(c)
-          ? { ymNumber: c, branchId: r.childBranch || 'b1', dateOfBirth: r.children.length === 1 ? r.childDob : '' }
-          : { name: c, branchId: r.childBranch || 'b1', dateOfBirth: r.children.length === 1 ? r.childDob : '' })
+        ? r.children.map(c => ({ ymNumber: c.ym || undefined, name: c.name || undefined, branchId: r.childBranch || 'b1', dateOfBirth: r.children.length === 1 ? r.childDob : '' }))
         : undefined,
     }));
     const memberRows = bulkRows.filter(r => r.type === 'member').map(r => {
@@ -413,7 +416,7 @@ export default function Page(){
         <label className="btn">📤 上傳 CSV / TXT / JSON<input type="file" accept=".csv,.txt,.json,text/csv,text/plain,application/json" onChange={e=>loadBulkFile(e.target.files?.[0])} style={{display:'none'}}/></label>
         <button className="btn gold" onClick={()=>previewBulk()}>🔎 預覽及檢查</button>
       </div>
-      <p className="muted" style={{fontSize:12,margin:0}}>👨‍👩‍ 小童軍(未有 SCOUT ID)毋須開成員帳號 — 用「家長+子女」範本,子女只填姓名;家長帳號即可看資訊及代報名。同一家長可佔多行(每位子女一行)。</p>
+      <p className="muted" style={{fontSize:12,margin:0}}>👨‍👩‍ 子女 SCOUT ID 與姓名分開填,SCOUT ID 選填 — 小幼童軍通常未開 SCOUT ID,填姓名即可(供領袖知道是哪個小朋友);家長帳號即可看資訊及代報名,呢類成員沒有自己的登入帳號。同一家長可佔多行(每位子女一行)。</p>
       <textarea value={bulkText} onChange={e=>setBulkText(e.target.value)} rows={8} placeholder={"貼上 CSV / JSON,或直接複製 YMIS 報表內容(欄位含:姓名、成員編號、出生日期、支部…)。\n無表頭也可以 — 系統會自動識別 10 位 YMIS 編號及出生日期。\n必填:姓名、YMIS、支部、出生日期;其餘個人資料選填,缺了會列出受影響的功能。"} style={{fontFamily:'ui-monospace, SFMono-Regular, Menlo, monospace',fontSize:12}}/>
       {bulkErrors.length>0&&<div className="card" style={{borderColor:'#fca5a5',background:'#fff5f5'}}>
         <b className="danger">需要修正(修正前無法開戶)：</b>
@@ -454,13 +457,21 @@ export default function Page(){
         {LEADER_ROLES.includes(role)&&<select value={branchId} onChange={e=>setBranchId(e.target.value)}><option value="">選擇支部</option>{branches.map(b=><option key={b.id} value={b.id}>{b.name}</option>)}</select>}
       </div>
       {role==='parent'&&<div className="stack" style={{marginTop:'0.5rem'}}>
-        <label>連結子女(選填 — 每行一個:SCOUT ID 或中文姓名;小童軍未有 SCOUT ID 就只填姓名)
-          <textarea value={childrenText} onChange={e=>setChildrenText(e.target.value)} rows={3} placeholder={'3000000001\n王小名'} style={{fontFamily:'ui-monospace, SFMono-Regular, Menlo, monospace',fontSize:12}}/>
-        </label>
-        <label>新子女支部(只對「成員資料庫找不到」的子女生效)
-          <select value={newChildBranch} onChange={e=>setNewChildBranch(e.target.value)}>{branches.map(b=><option key={b.id} value={b.id}>{b.name}</option>)}</select>
-        </label>
-        <p className="muted" style={{fontSize:12,margin:0}}>小童軍毋須開自己的登入帳號 — 家長帳號即可看資訊及代報名。找不到的子女會建成員紀錄(無登入)並連結到此帳號。</p>
+        <div style={{fontWeight:700,fontSize:14}}>👨‍👩‍👧 連結子女(選填 — 每位子女一行)</div>
+        {childRows.map((cr,i)=>(
+          <div className="row" key={i} style={{gap:8,alignItems:'center'}}>
+            <input value={cr.ym} onChange={e=>setChildRows(rs=>rs.map((x,j)=>j===i?{...x,ym:e.target.value}:x))} placeholder="SCOUT ID(選填)" style={{flex:1,fontFamily:'ui-monospace, SFMono-Regular, Menlo, monospace',fontSize:12}}/>
+            <input value={cr.name} onChange={e=>setChildRows(rs=>rs.map((x,j)=>j===i?{...x,name:e.target.value}:x))} placeholder="姓名(小幼童軍可只填呢項)" style={{flex:1}}/>
+            {childRows.length>1&&<button className="btn" style={{fontSize:"0.8em"}} onClick={()=>setChildRows(rs=>rs.filter((_,j)=>j!==i))}>✕</button>}
+          </div>
+        ))}
+        <div className="row" style={{gap:12,alignItems:'center',flexWrap:'wrap'}}>
+          <button className="btn" onClick={()=>setChildRows(rs=>[...rs,{ym:'',name:''}])}>＋ 再加一位子女</button>
+          <label style={{fontSize:12}}>新子女支部(只對找不到的子女生效)
+            <select value={newChildBranch} onChange={e=>setNewChildBranch(e.target.value)}>{branches.map(b=><option key={b.id} value={b.id}>{b.name}</option>)}</select>
+          </label>
+        </div>
+        <p className="muted" style={{fontSize:12,margin:0}}>小幼童軍通常未開 SCOUT ID — 填姓名即可(供領袖知道是哪個小朋友),家長帳號即可看資訊及代報名;呢類成員沒有自己的登入帳號。有 SCOUT ID 而資料庫找不到的,會建成員紀錄(預設用 SCOUT ID 做密碼)。</p>
       </div>}
       <button className="btn primary" disabled={loading} onClick={add}>{loading?'建立中...':'建立'}</button>
     </section>}
