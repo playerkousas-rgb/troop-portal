@@ -1519,7 +1519,11 @@ function doGet(e) {
       case 'updateUserRole': return wrap_(handleUpdateUserRole_(p), p);
       case 'updateUserField': return wrap_(handleUpdateUserField_(p), p);
       case 'deleteUser': return wrap_(handleDeleteUser_(p), p);
-      case 'createUser': return wrap_(handleCreateUser_(p), p);
+      case 'createUser': {
+        var cu = handleCreateUser_(p);
+        if (cu.success === false) return json(cu);
+        return json({ success: true, state: buildDashboard(p.operatedBy || p.userId || ''), linked: cu.linked || [], created: cu.created || [] });
+      }
       case 'batchCreateUsers': return wrap_(handleBatchCreateUsers_(p), p);
       case 'batchCreateMembers': return wrap_(handleBatchCreateMembers_(p), p);
       case 'createPatrol': return wrap_(handleCreatePatrol_(p), p);
@@ -2193,7 +2197,60 @@ function handleCreateUser_(p) {
     approved: true, createdAt: now_(), note: '由 ' + (p.operatedBy || 'system') + ' 建立'
   });
   writeAudit_(p.operatedBy || 'system', 'createUser', 'Users', id, (p.name || '') + ' ' + (p.role || ''));
-  return { success: true };
+
+  // 家長開戶：連結子女（填 SCOUT ID 或中文姓名；小童軍可能未有 SCOUT ID，可只填姓名）
+  // 找不到的子女會建成員紀錄（不建登入帳號 — 小童軍由家長帳號看資訊及代報名）
+  var childResult = { linked: [], created: [] };
+  if (String(p.role || '').toLowerCase() === 'parent' || p.children) {
+    childResult = linkChildrenToParent_(id, p.children, p.operatedBy || 'system');
+  }
+  return { success: true, linked: childResult.linked, created: childResult.created };
+}
+
+/**
+ * 連結子女到家長帳號（parentUserId 寫入 Members 表，childMemberIds 由 mapUsers_ 自動派生）
+ * children：陣列 [ {ymNumber?, name?, branchId?, dateOfBirth?} ] 或字串（; , 分隔的 SCOUT ID / 姓名）
+ */
+function linkChildrenToParent_(parentId, children, operator) {
+  var linked = [], created = [];
+  var list = [];
+  if (Array.isArray(children)) {
+    children.forEach(function (c) {
+      if (typeof c === 'string') String(c).split(/[;；,，\n|]+/).forEach(function (s) { if (s.trim()) list.push(s); });
+      else if (c) list.push(c);
+    });
+  } else if (children) {
+    String(children).split(/[;；,，\n|]+/).forEach(function (s) { if (s.trim()) list.push(s); });
+  }
+  list.forEach(function (c) {
+    var cObj = (typeof c === 'object' && c) ? c : {};
+    var ym = String(cObj.ymNumber || cObj.ymis || '').trim();
+    var nm = String(cObj.name || '').trim();
+    if (!nm && typeof c === 'string') { nm = c.trim(); }
+    if (!ym && /^\d{7,12}$/.test(nm)) { ym = nm; nm = ''; }
+    if (!ym && !nm) return;
+    var members = readTable_('Members');
+    var m = null;
+    if (ym) m = members.filter(function (x) { return String(getField_(x, 'ymNumber')).trim() === ym; })[0] || null;
+    if (!m && nm) m = members.filter(function (x) { return String(getField_(x, 'name')).trim() === nm; })[0] || null;
+    if (m) {
+      var mid = getField_(m, 'memberId');
+      if (String(getField_(m, 'parentUserId')) !== parentId) updateCellByName_('Members', 'memberId', mid, 'parentUserId', parentId);
+      if (cObj.dateOfBirth && !getField_(m, 'dateOfBirth')) updateCellByName_('Members', 'memberId', mid, 'dateOfBirth', String(cObj.dateOfBirth));
+      linked.push(getField_(m, 'name') || ym);
+    } else {
+      appendRowByHeaders_('Members', {
+        memberId: uid_('m'), ymNumber: ym, password: '', name: nm || ('成員 ' + ym), email: '',
+        branchId: String(cObj.branchId || 'b1'), patrolId: '', patrolRole: '', specialRole: '',
+        dateOfBirth: String(cObj.dateOfBirth || ''), parentUserId: parentId,
+        emergencyContactName: '', emergencyContactPhone: '', active: true,
+        note: '經家長開戶建立（無登入帳號，由家長代報名）'
+      });
+      created.push(nm || ym);
+    }
+  });
+  if (linked.length || created.length) writeAudit_(operator || 'system', 'linkChildren', 'Members', parentId, linked.join(',') + ' | 新建: ' + created.join(','));
+  return { linked: linked, created: created };
 }
 
 function parseRowsParam_(rows) {
@@ -2237,7 +2294,7 @@ function handleBatchCreateUsers_(p) {
   });
 
   var allowedRoles = ['troop_super', 'admin', 'group_leader', 'branch_leader', 'coach', 'parent', 'member'];
-  var created = 0, skipped = 0;
+  var created = 0, skipped = 0, linkedChildren = 0, createdChildren = 0;
   var errors = [];
 
   rows.forEach(function (raw, idx) {
@@ -2264,10 +2321,18 @@ function handleBatchCreateUsers_(p) {
     existingEmails[emailKey] = true;
     existingIds[id] = true;
     created++;
+
+    // 家長行：連結子女（SCOUT ID 或姓名；找不到就建成員紀錄，不建登入帳號）
+    if (role === 'parent' && raw.children) {
+      var cr = linkChildrenToParent_(id, raw.children, operatedBy);
+      linkedChildren += cr.linked.length;
+      createdChildren += cr.created.length;
+      if (cr.linked.length || cr.created.length) errors.push('第 ' + rowNo + ' 行：已連結子女 — 原有 ' + cr.linked.join('、') + (cr.created.length ? '，新建 ' + cr.created.join('、') : ''));
+    }
   });
 
-  writeAudit_(operatedBy, 'batchCreateUsers', 'Users', '', 'created=' + created + ', skipped=' + skipped);
-  return { success: true, created: created, skipped: skipped, errors: errors.slice(0, 30) };
+  writeAudit_(operatedBy, 'batchCreateUsers', 'Users', '', 'created=' + created + ', skipped=' + skipped + ', linkedChildren=' + linkedChildren + ', createdChildren=' + createdChildren);
+  return { success: true, created: created, skipped: skipped, linkedChildren: linkedChildren, createdChildren: createdChildren, errors: errors.slice(0, 30) };
 }
 
 function handleBatchCreateMembers_(p) {

@@ -226,10 +226,20 @@ export function apiDecideApplication(applicationId: string, status: 'approved' |
 export function apiToggleUser(userId: string) {
   return apiMutate('toggleUser', { userId });
 }
-export function apiCreateUser(p: { name: string; email: string; password?: string; role: string; branchId?: string }) {
-  return apiMutate('createUser', p as any);
+export type ChildRef = string | { ymNumber?: string; name?: string; branchId?: string; dateOfBirth?: string };
+
+/** 建立帳號;家長可帶 children(SCOUT ID 或姓名陣列)— GS 端自動找/建成員紀錄並連結 */
+export async function apiCreateUser(p: { name: string; email: string; password?: string; role: string; branchId?: string; children?: ChildRef[] }) {
+  return withSubmissionLock('createUser', async () => {
+    const user = currentUser();
+    const data = await apiPost<{ success: boolean; state?: AppState; linked?: string[]; created?: string[]; error?: string }>('createUser', {
+      ...p, operatedBy: user?.userId || 'system',
+    });
+    if (!data.success || !data.state) throw new Error(data.error || 'createUser 失敗');
+    return { state: data.state, linked: data.linked || [], created: data.created || [] };
+  });
 }
-export function apiBatchCreateUsers(rows: Array<{ name: string; email: string; password?: string; role: string; branchId?: string; memberId?: string; approved?: boolean }>) {
+export function apiBatchCreateUsers(rows: Array<{ name: string; email: string; password?: string; role: string; branchId?: string; memberId?: string; approved?: boolean; children?: ChildRef[] }>) {
   return apiMutatePost('batchCreateUsers', { rows });
 }
 export function apiBatchCreateMembers(rows: Array<{ name: string; ymNumber: string; password?: string; email?: string; branchId: string; patrolId?: string; patrolRole?: string; specialRole?: string; dateOfBirth?: string; parentUserId?: string; emergencyContactName?: string; emergencyContactPhone?: string; note?: string }>) {

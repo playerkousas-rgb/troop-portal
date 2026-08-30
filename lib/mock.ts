@@ -169,6 +169,36 @@ function calcAge(dob: string): number {
   return age > 0 && age < 120 ? age : 0;
 }
 
+/** 家長開戶連結子女:按 SCOUT ID 或姓名找;找不到就建成員紀錄(不建登入帳號) */
+function mockLinkChildren(parent: any, children: any): { linked: string[]; created: string[] } {
+  const linked: string[] = [];
+  const created: string[] = [];
+  const list: any[] = [];
+  if (Array.isArray(children)) children.forEach((c: any) => { if (typeof c === 'string') c.split(/[;；,，\n|]+/).forEach((s: string) => { if (s.trim()) list.push(s); }); else if (c) list.push(c); });
+  else if (children) String(children).split(/[;；,，\n|]+/).forEach((s: string) => { if (s.trim()) list.push(s); });
+  list.forEach(c => {
+    const cObj: any = (typeof c === 'object' && c) ? c : {};
+    let ym = String(cObj.ymNumber || cObj.ymis || '').trim();
+    let nm = String(cObj.name || '').trim();
+    if (!nm && typeof c === 'string') nm = c.trim();
+    if (!ym && /^\d{7,12}$/.test(nm)) { ym = nm; nm = ''; }
+    if (!ym && !nm) return;
+    let m = store.members.find(x => (ym ? x.ymNumber === ym : false)) || (nm ? store.members.find(x => x.name === nm) : undefined);
+    if (!m) {
+      m = { id: uid('m'), ymNumber: ym, name: nm || ('成員 ' + ym), branchId: String(cObj.branchId || 'b1'), patrolId: '', patrolRole: '', age: calcAge(String(cObj.dateOfBirth || '')), dateOfBirth: String(cObj.dateOfBirth || '') || undefined, parentUserId: parent.id, active: true };
+      store.members.push(m);
+      created.push(nm || ym);
+    } else {
+      m.parentUserId = parent.id;
+      if (!m.dateOfBirth && cObj.dateOfBirth) { m.dateOfBirth = String(cObj.dateOfBirth); m.age = calcAge(String(cObj.dateOfBirth)); }
+      linked.push(m.name || ym);
+    }
+    if (!parent.childMemberIds) parent.childMemberIds = [];
+    if (parent.childMemberIds.indexOf(m.id) < 0) parent.childMemberIds.push(m.id);
+  });
+  return { linked, created };
+}
+
 // ==================== 角色過濾(演示用,邏輯與真後台同向) ====================
 
 const FEATURES: Record<string, string[]> = {
@@ -465,12 +495,19 @@ function handleMutate(action: string, p: Record<string, any>) {
       return S(ob);
     }
     // 使用者
-    case 'createUser':
-      store.users.push({ id: uid('u'), name: String(p.name || ''), email: String(p.email || ''), role: (p.role || 'member') as Role, branchId: String(p.branchId || ''), approved: true });
+    case 'createUser': {
+      const nu: any = { id: uid('u'), name: String(p.name || ''), email: String(p.email || ''), role: (p.role || 'member') as Role, branchId: String(p.branchId || ''), approved: true };
+      store.users.push(nu);
+      mockLinkChildren(nu, p.children);
       return S(ob);
+    }
     case 'batchCreateUsers': {
       const rows: any[] = Array.isArray(p.rows) ? p.rows : [];
-      rows.forEach(r => store.users.push({ id: uid('u'), name: String(r.name || ''), email: String(r.email || ''), role: (r.role || 'member') as Role, branchId: String(r.branchId || ''), approved: true }));
+      rows.forEach(r => {
+        const nu: any = { id: uid('u'), name: String(r.name || ''), email: String(r.email || ''), role: (r.role || 'member') as Role, branchId: String(r.branchId || ''), approved: true };
+        store.users.push(nu);
+        if (String(r.role || '').toLowerCase() === 'parent' && r.children) mockLinkChildren(nu, r.children);
+      });
       return S(ob);
     }
     case 'batchCreateMembers': {
