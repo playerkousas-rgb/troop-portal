@@ -29,6 +29,7 @@ type BulkRow = {
   emergencyContactName: string;
   emergencyContactPhone: string;
   parentUserId: string;
+  parentEmail: string;
   note: string;
 };
 
@@ -38,37 +39,71 @@ member,李小美,lee.member@example.org,1234560002,,member,b2,p1,member,,2015-07
 user,王家長,wong.parent@example.org,,changeme,parent,,,,,,,,,家長帳號
 user,陳領袖,leader@example.org,,changeme,branch_leader,b3,,,,,,,,支部領袖帳號`;
 
-function parseCsv(text: string): Record<string, string>[] {
-  const rows: string[][] = [];
-  let row: string[] = [];
-  let cell = '';
-  let quoted = false;
-  for (let i = 0; i < text.length; i++) {
-    const ch = text[i];
-    const next = text[i + 1];
-    if (ch === '"') {
-      if (quoted && next === '"') { cell += '"'; i++; }
-      else quoted = !quoted;
-    } else if (ch === ',' && !quoted) {
-      row.push(cell); cell = '';
-    } else if ((ch === '\n' || ch === '\r') && !quoted) {
-      if (ch === '\r' && next === '\n') i++;
-      row.push(cell);
-      if (row.some(v => v.trim())) rows.push(row);
-      row = []; cell = '';
-    } else {
-      cell += ch;
-    }
+/** 簡化範本:對照 YMIS 自訂報表的中文欄位,領袖只需照樣貼上報表內容 */
+const BULK_SIMPLE_TEMPLATE = `姓名,成員編號,出生日期,支部,小隊,家長電郵,緊急聯絡人,緊急聯絡電話
+示例成員,3000000123,2012-03-15,童軍,WOLF,parent@example.org,王太,91234567
+示例成員二,3000000456,2015-07-20,幼童軍,黃,,李太,98765432`;
+
+/** 日期正規化:2012/3/5 → 2012-03-05 */
+function normDate(v: string): string {
+  const m = String(v || '').trim().match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})$/);
+  if (!m) return String(v || '').trim();
+  return `${m[1]}-${m[2].padStart(2, '0')}-${m[3].padStart(2, '0')}`;
+}
+
+/** 自動偵測分隔符(逗號 / Tab / 空白),支援直接貼上 YMIS 報表 / PDF 複製的表格文字 */
+function parseTable(text: string): string[][] {
+  const lines = String(text || '').replace(/\r/g, '').split('\n').map(l => l.trimEnd()).filter(l => l.trim());
+  if (!lines.length) return [];
+  const hasTab = lines.slice(0, 3).some(l => l.includes('\t'));
+  const hasComma = lines.slice(0, 3).some(l => l.includes(','));
+  if (hasTab) return lines.map(l => l.split('\t').map(c => c.trim()));
+  if (hasComma) return lines.map(l => l.split(',').map(c => c.trim()));
+  // 無逗號無 Tab:按空白切(PDF / 試算表複製的常見格式)
+  return lines.map(l => l.split(/\s+/).map(c => c.trim()).filter(Boolean));
+}
+
+/** 認可的欄位名稱(英文 + 中文,含 YMIS 自訂報表常用欄) */
+const HEADER_SET = new Set([
+  'type', 'name', 'email', 'ymNumber', 'ymis', 'password', 'role', 'branchId', 'branch',
+  'patrolId', 'patrol', 'squad', 'patrolRole', 'specialRole', 'dateOfBirth', 'dob',
+  'emergencyContactName', 'emergencyContactPhone', 'parentUserId', 'parentEmail', 'note',
+  '類型', '姓名', '全名', '電郵', '邮箱', 'Email', '成員編號', '號碼', '成員號碼', 'YMIS', 'YMIS編號',
+  '密碼', '角色', '支部', '單位', '小隊', '隊', '隊內身份', '特別身份', '出生日期', '生日',
+  '緊急聯絡人', '聯絡人', '緊急聯絡電話', '電話', '家長ID', '家長電郵', '備註',
+]);
+
+/** 無表頭時:按內容自動識別(10 位數字=YMIS、日期=出生日期、@=Email、支部名稱) */
+function autoMapRow(cells: string[]): Record<string, string> {
+  const out: Record<string, string> = {};
+  const rest = [...cells];
+  const take = (pred: (v: string) => boolean): string => {
+    const i = rest.findIndex(pred);
+    if (i >= 0) { const v = rest[i]; rest.splice(i, 1); return v; }
+    return '';
+  };
+  out.ymNumber = take(v => /^\d{7,12}$/.test(v));
+  out.dateOfBirth = normDate(take(v => /^\d{4}[-/]\d{1,2}[-/]\d{1,2}$/.test(v)));
+  out.email = take(v => v.includes('@'));
+  const branchCell = take(v => branches.some(b => v === b.name || v === b.short || v === b.id));
+  if (branchCell) out.branchId = branchCell;
+  out.name = take(v => v.length >= 1 && v.length <= 20 && !/^\d+$/.test(v));
+  return out;
+}
+
+function gridToObjects(grid: string[][]): Record<string, string>[] {
+  if (!grid.length) return [];
+  const first = grid[0] || [];
+  const matched = first.filter(c => HEADER_SET.has(c.trim())).length;
+  if (matched >= 2) {
+    const headers = first.map(h => h.trim());
+    return grid.slice(1).map(cols => {
+      const obj: Record<string, string> = {};
+      headers.forEach((h, i) => { if (h) obj[h] = (cols[i] || '').trim(); });
+      return obj;
+    });
   }
-  row.push(cell);
-  if (row.some(v => v.trim())) rows.push(row);
-  if (rows.length < 2) return [];
-  const headers = rows[0].map(h => h.trim());
-  return rows.slice(1).map(cols => {
-    const obj: Record<string, string> = {};
-    headers.forEach((h, i) => obj[h] = (cols[i] || '').trim());
-    return obj;
-  });
+  return grid.map(autoMapRow);
 }
 
 function downloadText(filename: string, text: string) {
@@ -136,24 +171,25 @@ export default function Page(){
 
     rawRows.forEach((raw, idx) => {
       const rowNo = idx + 1;
-      const name = String(raw.name || raw.姓名 || '').trim();
-      const email = String(raw.email || raw.Email || raw['電郵'] || '').trim();
-      const ymNumber = String(raw.ymNumber || raw.ymis || raw.YMIS || raw['成員編號'] || '').trim();
-      const branchId = normaliseBranchId(raw.branchId || raw.branch || raw['支部']);
+      const name = String(raw.name || raw.姓名 || raw['全名'] || '').trim();
+      const email = String(raw.email || raw.Email || raw['電郵'] || raw['邮箱'] || '').trim();
+      const ymNumber = String(raw.ymNumber || raw.ymis || raw.YMIS || raw['成員編號'] || raw['號碼'] || raw['成員號碼'] || raw['YMIS編號'] || '').trim();
+      const branchId = normaliseBranchId(raw.branchId || raw.branch || raw['支部'] || raw['單位']);
       const type = String(raw.type || raw['類型'] || (ymNumber ? 'member' : 'user')).toLowerCase().includes('member') || String(raw.type || '').includes('成員') ? 'member' : 'user';
       const roleValue = String(raw.role || raw['角色'] || (type === 'member' ? 'member' : 'parent')).trim() as Role;
       const roleSafe = (assignable.includes(roleValue) || ['parent','member','coach','branch_leader','group_leader','admin','troop_super'].includes(roleValue)) ? roleValue : 'parent';
-      const patrolId = normalisePatrolId(String(raw.patrolId || raw.patrol || raw.squad || raw['小隊'] || ''), branchId);
+      const patrolId = normalisePatrolId(String(raw.patrolId || raw.patrol || raw.squad || raw['小隊'] || raw['隊'] || ''), branchId);
       const item: BulkRow = {
         type, name, email, ymNumber,
         password: String(raw.password || raw['密碼'] || '').trim(),
         role: roleSafe as Role, branchId, patrolId,
         patrolRole: String(raw.patrolRole || raw.squad_role || raw['隊內身份'] || '').trim(),
         specialRole: String(raw.specialRole || raw['特別身份'] || '').trim(),
-        dateOfBirth: String(raw.dateOfBirth || raw.dob || raw['出生日期'] || '').trim(),
-        emergencyContactName: String(raw.emergencyContactName || raw['緊急聯絡人'] || '').trim(),
-        emergencyContactPhone: String(raw.emergencyContactPhone || raw.phone || raw['緊急聯絡電話'] || '').trim(),
+        dateOfBirth: normDate(String(raw.dateOfBirth || raw.dob || raw['出生日期'] || raw['生日'] || '')),
+        emergencyContactName: String(raw.emergencyContactName || raw['緊急聯絡人'] || raw['聯絡人'] || '').trim(),
+        emergencyContactPhone: String(raw.emergencyContactPhone || raw.phone || raw['緊急聯絡電話'] || raw['電話'] || '').trim(),
         parentUserId: String(raw.parentUserId || raw['家長ID'] || '').trim(),
+        parentEmail: String(raw.parentEmail || raw['家長電郵'] || '').trim(),
         note: String(raw.note || raw['備註'] || '').trim(),
       };
 
@@ -164,7 +200,8 @@ export default function Page(){
         if (email) seenEmails.add(email.toLowerCase());
       } else {
         if (!ymNumber) errors.push(`第 ${rowNo} 行：成員缺少 YMIS / 成員編號`);
-        if (!branchId) errors.push(`第 ${rowNo} 行：成員缺少支部 branchId`);
+        if (!branchId) errors.push(`第 ${rowNo} 行：成員缺少支部(可填 童軍/幼童軍/深資/樂行/小童軍 或 b1~b5)`);
+        if (!item.dateOfBirth) errors.push(`第 ${rowNo} 行：缺少出生日期(無法計算年齡,影響 18 歲以下報名規則)`);
         if (ymNumber && seenYm.has(ymNumber)) errors.push(`第 ${rowNo} 行：YMIS 已存在 (${ymNumber})`);
         if (ymNumber) seenYm.add(ymNumber);
       }
@@ -177,9 +214,10 @@ export default function Page(){
   function previewBulk(text = bulkText) {
     setErr(''); setOk('');
     try {
-      const raw = text.trim().startsWith('[') || text.trim().startsWith('{')
-        ? (Array.isArray(JSON.parse(text)) ? JSON.parse(text) : [JSON.parse(text)])
-        : parseCsv(text);
+      const t = String(text || '').trim();
+      const raw = t.startsWith('[') || t.startsWith('{')
+        ? (Array.isArray(JSON.parse(t)) ? JSON.parse(t) : [JSON.parse(t)])
+        : gridToObjects(parseTable(t));
       normaliseBulkRows(raw);
     } catch (e: any) {
       setBulkRows([]); setBulkErrors(['格式錯誤：' + (e.message || String(e))]);
@@ -193,12 +231,20 @@ export default function Page(){
       name: r.name, email: r.email, password: r.password || 'changeme', role: r.role,
       branchId: LEADER_ROLES.includes(r.role) ? r.branchId : '', approved: true,
     }));
-    const memberRows = bulkRows.filter(r => r.type === 'member').map(r => ({
-      name: r.name, ymNumber: r.ymNumber, email: r.email, password: r.password || r.ymNumber,
-      branchId: r.branchId, patrolId: r.patrolId, patrolRole: r.patrolRole,
-      specialRole: r.specialRole, dateOfBirth: r.dateOfBirth, parentUserId: r.parentUserId,
-      emergencyContactName: r.emergencyContactName, emergencyContactPhone: r.emergencyContactPhone, note: r.note,
-    }));
+    const memberRows = bulkRows.filter(r => r.type === 'member').map(r => {
+      // 家長電郵 → 對應家長帳號 ID(若已存在)
+      let parentUserId = r.parentUserId;
+      if (!parentUserId && r.parentEmail) {
+        const pu = s?.users.find(u => u.role === 'parent' && (u.email || '').toLowerCase() === r.parentEmail.toLowerCase());
+        if (pu) parentUserId = pu.id;
+      }
+      return {
+        name: r.name, ymNumber: r.ymNumber, email: r.email, password: r.password || r.ymNumber,
+        branchId: r.branchId, patrolId: r.patrolId, patrolRole: r.patrolRole,
+        specialRole: r.specialRole, dateOfBirth: r.dateOfBirth, parentUserId,
+        emergencyContactName: r.emergencyContactName, emergencyContactPhone: r.emergencyContactPhone, note: r.note,
+      };
+    });
     if (!confirm(`確定批量開戶？\n帳號：${userRows.length} 個\n成員：${memberRows.length} 名`)) return;
     setLoading(true); setErr(''); setOk('');
     try {
@@ -290,15 +336,16 @@ export default function Page(){
 
     {showBulk&&<section className="card stack" id="bulk-onboard">
       <div className="row" style={{justifyContent:'space-between'}}>
-        <div><h3>📥 批量開戶（全前端匯入）</h3><p className="muted">下載範本、貼上 CSV / JSON 或直接上傳檔案。前端會先檢查重複 Email / YMIS，再一次寫入後台。</p></div>
+        <div><h3>📥 批量開戶（全前端匯入）</h3><p className="muted">下載範本、貼上 CSV / JSON、或直接複製 YMIS 自訂報表的表格(含出生日期)貼入。前端自動偵測格式、檢查重複 Email / YMIS，再一次寫入後台。</p></div>
         <span className="badge green">手機可用</span>
       </div>
-      <div className="row">
-        <button className="btn" onClick={()=>downloadText('scoutsystem_bulk_accounts.csv', BULK_TEMPLATE)}>⬇️ 下載 CSV 範本</button>
-        <label className="btn">📤 上傳 CSV / JSON<input type="file" accept=".csv,.json,text/csv,application/json" onChange={e=>loadBulkFile(e.target.files?.[0])} style={{display:'none'}}/></label>
+      <div className="row" style={{flexWrap:'wrap'}}>
+        <button className="btn" onClick={()=>downloadText('scoutsystem_bulk_members_ymis.csv', BULK_SIMPLE_TEMPLATE)}>⬇️ 下載簡化範本(YMIS 報表式)</button>
+        <button className="btn" onClick={()=>downloadText('scoutsystem_bulk_accounts.csv', BULK_TEMPLATE)}>⬇️ 下載完整範本(帳號+成員)</button>
+        <label className="btn">📤 上傳 CSV / TXT / JSON<input type="file" accept=".csv,.txt,.json,text/csv,text/plain,application/json" onChange={e=>loadBulkFile(e.target.files?.[0])} style={{display:'none'}}/></label>
         <button className="btn gold" onClick={()=>previewBulk()}>🔎 預覽及檢查</button>
       </div>
-      <textarea value={bulkText} onChange={e=>setBulkText(e.target.value)} rows={8} placeholder="貼上 CSV 或 JSON 陣列" style={{fontFamily:'ui-monospace, SFMono-Regular, Menlo, monospace',fontSize:12}}/>
+      <textarea value={bulkText} onChange={e=>setBulkText(e.target.value)} rows={8} placeholder={"貼上 CSV / JSON,或直接複製 YMIS 報表內容(欄位含:姓名、成員編號、出生日期、支部…)。\n無表頭也可以 — 系統會自動識別 10 位 YMIS 編號及出生日期。成員資料必須有出生日期才能計算年齡。"} style={{fontFamily:'ui-monospace, SFMono-Regular, Menlo, monospace',fontSize:12}}/>
       {bulkErrors.length>0&&<div className="card" style={{borderColor:'#fca5a5',background:'#fff5f5'}}>
         <b className="danger">需要修正：</b>
         <ul>{bulkErrors.slice(0,8).map((e,i)=><li key={i}>{e}</li>)}</ul>

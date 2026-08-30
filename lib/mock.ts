@@ -159,6 +159,16 @@ let att: AttRec[] = JSON.parse(JSON.stringify(mockAttendance));
 let seq = 0;
 const uid = (p: string) => `${p}_mock_${Date.now().toString(36)}_${++seq}`;
 
+function calcAge(dob: string): number {
+  const d = new Date(String(dob || ''));
+  if (isNaN(d.getTime())) return 0;
+  const now = new Date();
+  let age = now.getFullYear() - d.getFullYear();
+  const m = now.getMonth() - d.getMonth();
+  if (m < 0 || (m === 0 && now.getDate() < d.getDate())) age--;
+  return age > 0 && age < 120 ? age : 0;
+}
+
 // ==================== 角色過濾(演示用,邏輯與真後台同向) ====================
 
 const FEATURES: Record<string, string[]> = {
@@ -465,7 +475,17 @@ function handleMutate(action: string, p: Record<string, any>) {
     }
     case 'batchCreateMembers': {
       const rows: any[] = Array.isArray(p.rows) ? p.rows : [];
-      rows.forEach(r => store.members.push({ id: uid('m'), ymNumber: String(r.ymNumber || ''), name: String(r.name || ''), branchId: String(r.branchId || ''), patrolId: String(r.patrolId || ''), age: 0, active: true }));
+      rows.forEach(r => {
+        const ym = String(r.ymNumber || '');
+        if (ym && store.members.some(m => m.ymNumber === ym)) return; // 跳過重複
+        const id = uid('m');
+        const dob = String(r.dateOfBirth || '');
+        const name = String(r.name || '');
+        const branchId = String(r.branchId || '');
+        const patrolRole = ['leader', 'deputy', 'member'].includes(String(r.patrolRole || '')) ? String(r.patrolRole) as 'leader' | 'deputy' | 'member' : '';
+        store.members.push({ id, ymNumber: ym, name, branchId, patrolId: String(r.patrolId || ''), patrolRole, age: calcAge(dob), dateOfBirth: dob || undefined, parentUserId: String(r.parentUserId || ''), active: true });
+        store.users.push({ id: uid('u'), name, email: String(r.email || ''), role: 'member', branchId, memberId: id, approved: true });
+      });
       return S(ob);
     }
     case 'deleteUser': store.users = store.users.filter(u => u.id !== p.userId); return S(ob);
