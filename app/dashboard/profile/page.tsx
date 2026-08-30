@@ -110,10 +110,10 @@ export default function ProfilePage() {
 
       {/* ── Demo 切換 ── */}
       <div className="flex gap-1.5 flex-wrap">
-        <span className="text-[9px] text-slate-400 mr-1 self-center">Demo：</span>
+        <span className="text-[11px] text-slate-500 mr-1 self-center">Demo：</span>
         {(['admin', 'branch_leader', 'coach', 'parent', 'member'] as Role[]).map(r => (
           <button key={r} onClick={() => { setRole(r); setTab('dashboard'); }}
-            className={`text-[10px] px-2.5 py-1 rounded-full border transition font-bold ${
+            className={`text-[11px] px-2.5 py-1 rounded-full border transition font-bold ${
               role === r ? 'bg-brand-600 text-white border-brand-600 shadow' : 'bg-white text-slate-500 border-slate-200'
             }`}>
             {ROLE_LABEL[r]}
@@ -128,9 +128,9 @@ export default function ProfilePage() {
           <div className="flex-1 min-w-0">
             <h2 className="text-lg font-extrabold">{isLeader ? '陳管理員' : MY_PROFILE.name}</h2>
             <div className="flex gap-1.5 mt-1 flex-wrap">
-              <span className="bg-white/20 text-[9px] font-bold px-2 py-0.5 rounded-full">{currentRoleName}</span>
-              {!isLeader && <span className="bg-white/20 text-[9px] font-bold px-2 py-0.5 rounded-full">{MY_PROFILE.branch}</span>}
-              {!isLeader && <span className="bg-white/20 text-[9px] font-bold px-2 py-0.5 rounded-full">{MY_PROFILE.patrol}</span>}
+              <span className="bg-white/20 text-[11px] font-bold px-2 py-0.5 rounded-full">{currentRoleName}</span>
+              {!isLeader && <span className="bg-white/20 text-[11px] font-bold px-2 py-0.5 rounded-full">{MY_PROFILE.branch}</span>}
+              {!isLeader && <span className="bg-white/20 text-[11px] font-bold px-2 py-0.5 rounded-full">{MY_PROFILE.patrol}</span>}
             </div>
           </div>
         </div>
@@ -157,10 +157,10 @@ export default function ProfilePage() {
           <div className="bg-white rounded-2xl border border-slate-200 p-4">
             <div className="flex items-center justify-between mb-3">
               <h3 className="font-bold text-sm flex items-center gap-1.5">
-                <span className="bg-amber-400 text-slate-900 text-[10px] font-extrabold px-2 py-0.5 rounded-lg">📡</span>
+                <span className="bg-amber-400 text-slate-900 text-[11px] font-extrabold px-2 py-0.5 rounded-lg">📡</span>
                 我的監察
               </h3>
-              <span className="text-[10px] text-slate-400">1 待回覆</span>
+              <span className="text-[11px] text-slate-500">1 待回覆</span>
             </div>
             <div className="space-y-2">
               {MY_REGISTRATIONS.map((r, i) => (
@@ -168,13 +168,13 @@ export default function ProfilePage() {
                   <div className="flex items-center justify-between mb-1.5">
                     <span className="font-bold text-xs">{r.title}</span>
                     <div className="flex gap-1">
-                      <span className={`text-[8px] px-1.5 py-0.5 rounded-full font-bold ${
+                      <span className={`text-[11px] px-1.5 py-0.5 rounded-full font-bold ${
                         r.status === 'registered' ? 'bg-emerald-100 text-emerald-700' :
                         r.status === 'interested' ? 'bg-amber-100 text-amber-700' : 'bg-rose-100 text-rose-700'
                       }`}>
                         {r.status === 'registered' ? '✅' : r.status === 'interested' ? '❤️' : '❌'}
                       </span>
-                      <span className={`text-[8px] px-1.5 py-0.5 rounded-full font-bold ${
+                      <span className={`text-[11px] px-1.5 py-0.5 rounded-full font-bold ${
                         r.paid === 'confirmed' ? 'bg-emerald-100 text-emerald-700' :
                         r.paid === 'pending' ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-500'
                       }`}>
@@ -182,12 +182,12 @@ export default function ProfilePage() {
                       </span>
                     </div>
                   </div>
-                  <div className="text-[10px] text-slate-500">{r.date} · {r.location} · {r.fee}</div>
+                  <div className="text-[11px] text-slate-500">{r.date} · {r.location} · {r.fee}</div>
                   {/* 活動回覆快捷鍵（家長） */}
                   {isParent && r.status !== 'registered' && (
                     <div className="flex gap-1.5 mt-2">
-                      <button className="flex-1 text-[10px] font-bold py-1.5 rounded-lg bg-emerald-600 text-white">✅ 確認參加</button>
-                      <button className="flex-1 text-[10px] font-bold py-1.5 rounded-lg bg-rose-100 text-rose-700">❌ 不參加</button>
+                      <button className="flex-1 text-[11px] font-bold py-1.5 rounded-lg bg-emerald-700 text-white">✅ 確認參加</button>
+                      <button className="flex-1 text-[11px] font-bold py-1.5 rounded-lg bg-rose-100 text-rose-700">❌ 不參加</button>
                     </div>
                   )}
                 </div>
@@ -199,7 +199,7 @@ export default function ProfilePage() {
           <div className="bg-white rounded-2xl border border-slate-200 p-4">
             <button onClick={() => setShowPast(!showPast)} className="w-full flex items-center justify-between text-left">
               <h3 className="font-bold text-xs text-slate-600">📁 過往活動（已參加）</h3>
-              <span className="text-slate-400 text-xs">{showPast ? '▲' : '▼'}</span>
+              <span className="text-slate-500 text-xs">{showPast ? '▲' : '▼'}</span>
             </button>
             {showPast && (
               <div className="space-y-1.5 mt-2">
@@ -207,9 +207,9 @@ export default function ProfilePage() {
                   <div key={i} className="flex items-center justify-between bg-slate-50 rounded-lg px-3 py-2">
                     <div>
                       <div className="text-[11px] font-bold">{p.title}</div>
-                      <div className="text-[9px] text-slate-400">{p.date} · {p.location}</div>
+                      <div className="text-[11px] text-slate-500">{p.date} · {p.location}</div>
                     </div>
-                    <span className="text-[8px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded font-bold">✓ 已參加</span>
+                    <span className="text-[11px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded font-bold">✓ 已參加</span>
                   </div>
                 ))}
               </div>
@@ -230,9 +230,9 @@ export default function ProfilePage() {
               {APPROVALS.map((a, i) => (
                 <Link key={i} href={`/dashboard/admin/applications?type=${a.type}`} className="no-underline text-inherit">
                   <div className={`rounded-xl p-2.5 text-center relative ${a.count > 0 ? 'bg-amber-50 border border-amber-200' : 'bg-slate-50'}`}>
-                    {a.count > 0 && <span className="absolute -top-1 -right-1 text-[8px] bg-rose-500 text-white w-3.5 h-3.5 rounded-full flex items-center justify-center font-bold">{a.count}</span>}
+                    {a.count > 0 && <span className="absolute -top-1 -right-1 text-[11px] bg-rose-600 text-white w-3.5 h-3.5 rounded-full flex items-center justify-center font-bold">{a.count}</span>}
                     <div className="text-lg">{a.icon}</div>
-                    <div className={`text-[9px] font-bold ${a.count > 0 ? 'text-amber-800' : 'text-slate-500'}`}>{a.type}</div>
+                    <div className={`text-[11px] font-bold ${a.count > 0 ? 'text-amber-800' : 'text-slate-500'}`}>{a.type}</div>
                   </div>
                 </Link>
               ))}
@@ -243,7 +243,7 @@ export default function ProfilePage() {
           <div>
             <div className="flex items-center justify-between mb-2">
               <h3 className="font-bold text-sm">🎯 活動概況</h3>
-              <Link href="/dashboard/admin/registrations" className="text-[10px] text-brand-600 font-bold no-underline">全部 →</Link>
+              <Link href="/dashboard/admin/registrations" className="text-[11px] text-brand-600 font-bold no-underline">全部 →</Link>
             </div>
             <div className="space-y-2">
               {ACTIVITIES_OVERVIEW.map(a => (
@@ -251,18 +251,18 @@ export default function ProfilePage() {
                   <div className={`bg-white rounded-xl border p-3 card-hover ${a.expired ? 'opacity-60 border-dashed' : 'border-slate-200'}`}>
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center gap-2">
-                        <span className={`text-[8px] px-1.5 py-0.5 rounded font-bold ${a.type === 'internal' ? 'bg-blue-100 text-blue-700' : 'bg-violet-100 text-violet-700'}`}>
+                        <span className={`text-[11px] px-1.5 py-0.5 rounded font-bold ${a.type === 'internal' ? 'bg-blue-100 text-blue-700' : 'bg-violet-100 text-violet-700'}`}>
                           {a.type === 'internal' ? '🏠' : '📚'}
                         </span>
                         <span className="font-bold text-xs">{a.title}</span>
                       </div>
-                      <span className="text-[9px] text-slate-400">{a.expired ? '⏰' : `截止 ${a.deadline}`}</span>
+                      <span className="text-[11px] text-slate-500">{a.expired ? '⏰' : `截止 ${a.deadline}`}</span>
                     </div>
                     <div className="grid grid-cols-4 gap-1">
-                      <div className="bg-emerald-50 rounded px-1.5 py-1 text-center"><div className="text-[11px] font-extrabold text-emerald-700">{a.registered}</div><div className="text-[7px] text-emerald-600">✅報名</div></div>
-                      <div className="bg-amber-50 rounded px-1.5 py-1 text-center"><div className="text-[11px] font-extrabold text-amber-700">{a.interested}</div><div className="text-[7px] text-amber-600">❤️興趣</div></div>
-                      <div className="bg-slate-100 rounded px-1.5 py-1 text-center"><div className="text-[11px] font-extrabold text-slate-600">{a.pending}</div><div className="text-[7px] text-slate-500">⚠️待覆</div></div>
-                      <div className={`rounded px-1.5 py-1 text-center ${a.paid >= a.registered ? 'bg-emerald-50' : 'bg-rose-50'}`}><div className={`text-[11px] font-extrabold ${a.paid >= a.registered ? 'text-emerald-700' : 'text-rose-700'}`}>{a.paid}/{a.registered}</div><div className="text-[7px] text-slate-500">💰付款</div></div>
+                      <div className="bg-emerald-50 rounded px-1.5 py-1 text-center"><div className="text-[11px] font-extrabold text-emerald-700">{a.registered}</div><div className="text-[11px] text-emerald-700">✅報名</div></div>
+                      <div className="bg-amber-50 rounded px-1.5 py-1 text-center"><div className="text-[11px] font-extrabold text-amber-700">{a.interested}</div><div className="text-[11px] text-amber-700">❤️興趣</div></div>
+                      <div className="bg-slate-100 rounded px-1.5 py-1 text-center"><div className="text-[11px] font-extrabold text-slate-600">{a.pending}</div><div className="text-[11px] text-slate-500">⚠️待覆</div></div>
+                      <div className={`rounded px-1.5 py-1 text-center ${a.paid >= a.registered ? 'bg-emerald-50' : 'bg-rose-50'}`}><div className={`text-[11px] font-extrabold ${a.paid >= a.registered ? 'text-emerald-700' : 'text-rose-700'}`}>{a.paid}/{a.registered}</div><div className="text-[11px] text-slate-500">💰付款</div></div>
                     </div>
                   </div>
                 </Link>
@@ -274,7 +274,7 @@ export default function ProfilePage() {
           <div>
             <div className="flex items-center justify-between mb-2">
               <h3 className="font-bold text-sm">👥 成員</h3>
-              <Link href="/dashboard/admin/members" className="text-[10px] text-brand-600 font-bold no-underline">管理 →</Link>
+              <Link href="/dashboard/admin/members" className="text-[11px] text-brand-600 font-bold no-underline">管理 →</Link>
             </div>
             <div className="space-y-1.5">
               {BRANCH_STATS.map(b => (
@@ -283,12 +283,12 @@ export default function ProfilePage() {
                     <span className="font-bold text-xs">{b.name}</span>
                     <div className="flex gap-1 flex-wrap">
                       {b.patrolDetail?.map((p, i) => (
-                        <span key={i} className="text-[8px] bg-slate-50 border border-slate-100 rounded px-1.5 py-0.5">
+                        <span key={i} className="text-[11px] bg-slate-50 border border-slate-100 rounded px-1.5 py-0.5">
                           <span className="font-bold">{p.name}</span> {p.count}
-                          {'leader' in p && p.leader && <span className="text-emerald-600"> ★</span>}
+                          {'leader' in p && p.leader && <span className="text-emerald-700"> ★</span>}
                         </span>
                       ))}
-                      <span className="text-[9px] text-slate-400 self-center ml-1">{b.members}人</span>
+                      <span className="text-[11px] text-slate-500 self-center ml-1">{b.members}人</span>
                     </div>
                   </div>
                 </Link>
@@ -300,7 +300,7 @@ export default function ProfilePage() {
           <div>
             <div className="flex items-center justify-between mb-2">
               <h3 className="font-bold text-sm">🤝 會議</h3>
-              <Link href="/dashboard/meetings" className="text-[10px] text-brand-600 font-bold no-underline">全部 →</Link>
+              <Link href="/dashboard/meetings" className="text-[11px] text-brand-600 font-bold no-underline">全部 →</Link>
             </div>
             <div className="space-y-1.5">
               {MEETINGS.map(m => (
@@ -309,9 +309,9 @@ export default function ProfilePage() {
                     <span className="text-lg">{m.status === 'upcoming' ? '📋' : '📁'}</span>
                     <div className="flex-1 min-w-0">
                       <div className="font-bold text-[11px]">{m.title}</div>
-                      <div className="text-[9px] text-slate-400">{m.date} {m.time}</div>
+                      <div className="text-[11px] text-slate-500">{m.date} {m.time}</div>
                     </div>
-                    {m.files > 0 && <span className="text-[8px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded font-bold">📎{m.files}</span>}
+                    {m.files > 0 && <span className="text-[11px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded font-bold">📎{m.files}</span>}
                   </div>
                 </Link>
               ))}
@@ -331,7 +331,7 @@ export default function ProfilePage() {
                 <Link key={i} href={item.href} className="no-underline text-inherit">
                   <div className="bg-white rounded-xl border border-slate-200 p-2.5 card-hover text-center">
                     <div className="text-xl mb-1">{item.icon}</div>
-                    <div className="font-bold text-[9px]">{item.label}</div>
+                    <div className="font-bold text-[11px]">{item.label}</div>
                   </div>
                 </Link>
               ))}
@@ -356,17 +356,17 @@ export default function ProfilePage() {
               { label: '緊急電話', value: MY_PROFILE.emergencyContactPhone },
             ].map((item, i) => (
               <div key={i} className="bg-slate-50 rounded-xl p-2.5">
-                <div className="text-[8px] text-slate-400 font-bold uppercase">{item.label}</div>
+                <div className="text-[11px] text-slate-500 font-bold uppercase">{item.label}</div>
                 <div className="text-[11px] font-bold text-slate-800 mt-0.5">{item.value}</div>
               </div>
             ))}
           </div>
           {!isLeader && !isParent && (
             <div className="border-t border-slate-100 pt-3">
-              <h4 className="text-[10px] font-bold text-slate-500 mb-1.5">👨‍👩‍👧 家長連結</h4>
+              <h4 className="text-[11px] font-bold text-slate-500 mb-1.5">👨‍👩‍👧 家長連結</h4>
               <div className="bg-blue-50 rounded-xl p-2.5 flex items-center justify-between">
-                <div><div className="text-[11px] font-bold">{MY_PROFILE.parentName}</div><div className="text-[9px] text-slate-500">{MY_PROFILE.parentEmail}</div></div>
-                <span className="text-[8px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full font-bold">已連結</span>
+                <div><div className="text-[11px] font-bold">{MY_PROFILE.parentName}</div><div className="text-[11px] text-slate-500">{MY_PROFILE.parentEmail}</div></div>
+                <span className="text-[11px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full font-bold">已連結</span>
               </div>
             </div>
           )}
@@ -383,29 +383,29 @@ export default function ProfilePage() {
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2">
                   <span className="text-lg">🧒</span>
-                  <div><div className="font-bold text-[11px]">{c.name}</div><div className="text-[9px] text-slate-400">{c.branch} · {c.patrol}</div></div>
+                  <div><div className="font-bold text-[11px]">{c.name}</div><div className="text-[11px] text-slate-500">{c.branch} · {c.patrol}</div></div>
                 </div>
               </div>
               <div className="space-y-1 border-t border-slate-100 pt-2">
                 <div className="flex items-center justify-between bg-slate-50 rounded-lg px-2.5 py-1.5">
-                  <span className="text-[10px]">旅團露營 (9月20日)</span>
+                  <span className="text-[11px]">旅團露營 (9月20日)</span>
                   <div className="flex gap-1">
-                    <span className="text-[8px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded font-bold">✅</span>
-                    <span className="text-[8px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded font-bold">💰 已核實</span>
+                    <span className="text-[11px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded font-bold">✅</span>
+                    <span className="text-[11px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded font-bold">💰 已核實</span>
                   </div>
                 </div>
                 <div className="flex items-center justify-between bg-slate-50 rounded-lg px-2.5 py-1.5">
-                  <span className="text-[10px]">區運會 (10月5日)</span>
+                  <span className="text-[11px]">區運會 (10月5日)</span>
                   <div className="flex gap-1">
-                    <span className="text-[8px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded font-bold">✅</span>
-                    <span className="text-[8px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-bold">💰 待核實</span>
+                    <span className="text-[11px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded font-bold">✅</span>
+                    <span className="text-[11px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-bold">💰 待核實</span>
                   </div>
                 </div>
               </div>
               {/* 家長快捷回覆 */}
               <div className="flex gap-1.5 mt-2">
-                <button className="flex-1 text-[9px] font-bold py-1.5 rounded-lg bg-emerald-600 text-white">✅ 確認參加</button>
-                <button className="flex-1 text-[9px] font-bold py-1.5 rounded-lg bg-rose-100 text-rose-700">❌ 不參加</button>
+                <button className="flex-1 text-[11px] font-bold py-1.5 rounded-lg bg-emerald-700 text-white">✅ 確認參加</button>
+                <button className="flex-1 text-[11px] font-bold py-1.5 rounded-lg bg-rose-100 text-rose-700">❌ 不參加</button>
               </div>
             </div>
           ))}
@@ -419,21 +419,21 @@ export default function ProfilePage() {
         <section className="bg-white rounded-2xl border border-slate-200 p-4 space-y-3">
           <div className="flex items-center justify-between">
             <h3 className="font-bold text-sm">🎖️ 想考的章</h3>
-            <button className="bg-brand-600 text-white text-[10px] font-bold px-3 py-1.5 rounded-lg">+ 新增</button>
+            <button className="bg-brand-600 text-white text-[11px] font-bold px-3 py-1.5 rounded-lg">+ 新增</button>
           </div>
-          <p className="text-[10px] text-slate-500">填寫你想考的獎章，領袖看到後會標記「已讀」。</p>
+          <p className="text-[11px] text-slate-500">填寫你想考的獎章，領袖看到後會標記「已讀」。</p>
           <div className="space-y-2">
             {MY_BADGES.map((b, i) => (
               <div key={i} className="rounded-xl p-3 bg-slate-50 border border-slate-100">
                 <div className="flex items-center justify-between mb-1">
                   <span className="font-bold text-[11px]">{b.name}</span>
                   {b.read ? (
-                    <span className="text-[8px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded-full font-bold">✓ 領袖已讀</span>
+                    <span className="text-[11px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded-full font-bold">✓ 領袖已讀</span>
                   ) : (
-                    <span className="text-[8px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full font-bold">⏳ 待查看</span>
+                    <span className="text-[11px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full font-bold">⏳ 待查看</span>
                   )}
                 </div>
-                <div className="text-[10px] text-slate-500">我想考：{b.note}</div>
+                <div className="text-[11px] text-slate-500">我想考：{b.note}</div>
               </div>
             ))}
           </div>
@@ -447,12 +447,12 @@ export default function ProfilePage() {
         <section className="bg-white rounded-2xl border border-slate-200 p-4 space-y-3">
           <div className="flex items-center justify-between">
             <h3 className="font-bold text-sm">📦 物資借用</h3>
-            <button className="bg-brand-600 text-white text-[10px] font-bold px-3 py-1.5 rounded-lg">申請借用</button>
+            <button className="bg-brand-600 text-white text-[11px] font-bold px-3 py-1.5 rounded-lg">申請借用</button>
           </div>
           {SUPPLIES.map(s => (
             <div key={s.id} className={`rounded-xl p-3 flex items-center justify-between ${s.status === 'borrowed' ? 'bg-amber-50 border border-amber-200' : 'bg-slate-50'}`}>
-              <div><div className="text-[11px] font-bold">{s.name}</div><div className="text-[9px] text-slate-500">{s.borrowDate} → {s.returnDate}</div></div>
-              <span className={`text-[8px] px-2 py-0.5 rounded-full font-bold ${s.status === 'borrowed' ? 'bg-amber-100 text-amber-700' : 'bg-slate-200 text-slate-500'}`}>
+              <div><div className="text-[11px] font-bold">{s.name}</div><div className="text-[11px] text-slate-500">{s.borrowDate} → {s.returnDate}</div></div>
+              <span className={`text-[11px] px-2 py-0.5 rounded-full font-bold ${s.status === 'borrowed' ? 'bg-amber-100 text-amber-700' : 'bg-slate-200 text-slate-500'}`}>
                 {s.status === 'borrowed' ? '借用中' : '已歸還'}
               </span>
             </div>
@@ -467,9 +467,9 @@ export default function ProfilePage() {
         <section className="bg-white rounded-2xl border border-slate-200 p-4 space-y-3">
           <h3 className="font-bold text-sm">🔑 更改密碼</h3>
           <div className="space-y-2.5">
-            <div><label className="text-[9px] font-bold text-slate-500 uppercase">目前密碼</label><input type="password" className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm" /></div>
-            <div><label className="text-[9px] font-bold text-slate-500 uppercase">新密碼</label><input type="password" className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm" /></div>
-            <div><label className="text-[9px] font-bold text-slate-500 uppercase">確認新密碼</label><input type="password" className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm" /></div>
+            <div><label className="text-[11px] font-bold text-slate-500 uppercase">目前密碼</label><input type="password" className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm" /></div>
+            <div><label className="text-[11px] font-bold text-slate-500 uppercase">新密碼</label><input type="password" className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm" /></div>
+            <div><label className="text-[11px] font-bold text-slate-500 uppercase">確認新密碼</label><input type="password" className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm" /></div>
             <button className="w-full bg-brand-600 text-white py-2.5 rounded-xl text-sm font-bold">更新密碼</button>
           </div>
         </section>

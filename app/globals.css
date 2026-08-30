@@ -19,258 +19,285 @@
   --color-scout-purple: #6d28d9;
 }
 
-/* ── Base ── */
-body {
-  font-family: -apple-system, BlinkMacSystemFont, "Noto Sans TC", "PingFang HK", "Microsoft JhengHei", sans-serif;
-  background: #f3f6fa;
-  color: #0f2742;
-  -webkit-tap-highlight-color: transparent;
-}
-
-/* ── Smooth card hover ── */
-.card-hover {
-  transition: all 0.22s ease;
-}
-.card-hover:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 24px rgba(0, 35, 80, 0.1);
-}
-
-/* ── Hero gradient ── */
-.hero-gradient {
-  background: linear-gradient(135deg, #003366 0%, #0158a0 55%, #0c8de7 100%);
-}
-
-/* ── Month grid for calendar ── */
-.month-grid {
-  display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
-  gap: 6px;
-}
-.month-head {
-  font-weight: 800;
-  color: #003366;
-  text-align: center;
-  padding: 8px;
-  font-size: 13px;
-}
-.month-cell {
-  min-height: 100px;
-  background: white;
-  border: 1px solid #e2e8f0;
-  border-radius: 12px;
-  padding: 6px;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-.month-cell.dim {
-  opacity: 0.4;
-}
-.day-num {
-  font-weight: 800;
-  color: #003366;
-  font-size: 14px;
-}
-.mini-event {
-  font-size: 11px;
-  padding: 3px 6px;
-  border-radius: 6px;
-  background: #eff6ff;
-  border: 1px solid #bfdbfe;
-  line-height: 1.3;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.mini-event.purple {
-  background: #f3e8ff;
-  border-color: #ddd6fe;
-}
-.mini-event.cancelled {
-  text-decoration: line-through;
-  background: #fee2e2;
-  border-color: #fecaca;
-}
-
-/* ── Attendance statuses ── */
-.att-status-P { background: #dcfce7; color: #166534; border-color: #86efac; }
-.att-status-A { background: #fee2e2; color: #991b1b; border-color: #fca5a5; }
-.att-status-L { background: #fef9c3; color: #854d0e; border-color: #fde047; }
-.att-status-E { background: #dbeafe; color: #1e40af; border-color: #93c5fd; }
-.att-status-S { background: #f3e8ff; color: #6b21a8; border-color: #d8b4fe; }
-
-/* ── Print ── */
-@media print {
-  .no-print { display: none !important; }
-}
-
-/* ── Mobile ── */
-@media (max-width: 760px) {
-  .month-grid {
-    display: flex;
-    overflow-x: auto;
-  }
-  .month-head { display: none; }
-  .month-cell { min-width: 140px; }
-}
-
 /* ════════════════════════════════════════════════════════════
-   Legacy design system（.card / .btn / .muted / .container …）
-   34 個舊頁面依賴這套 class，必須與 Tailwind 頁共存
+   設計代幣（對比度已校正）
+   —— 次要文字一律 ≥ 4.5:1，不再使用 slate-400 / 8~10px 級數
    ════════════════════════════════════════════════════════════ */
 :root {
   --blue: #003366;
   --blue2: #0b5cab;
   --bg: #f3f6fa;
   --line: #d8e4f0;
-  --muted: #5c6b7a;
+  --muted: #5c6b7a;      /* 白底 4.9:1 */
+  --muted-strong: #45556c;
   --green: #17803d;
   --red: #c62828;
   --gold: #9a6a00;
+  --gold-deep: #7a5200;
   --purple: #6d28d9;
   --card: #fff;
 }
 
-a { color: inherit; }
+/* ════════════════════════════════════════════════════════════
+   基底層：放在 @layer base，Tailwind utilities 永遠可覆寫
+   （舊版放在 unlayered，會反過來蓋掉 utility class，導致
+     「改了 class 但畫面沒反應」的配色／字體問題）
+   ════════════════════════════════════════════════════════════ */
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
 
-.container { max-width: 1100px; margin: 0 auto; padding: 24px 20px 80px; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans TC",
+      "Noto Sans CJK TC", "Noto Sans HK", "Source Han Sans TC", "PingFang HK",
+      "PingFang TC", "Microsoft JhengHei", "Heiti TC", Roboto, "Helvetica Neue",
+      Arial, sans-serif;
+    background: var(--bg);
+    color: #0f2742;
+    line-height: 1.6;
+    -webkit-tap-highlight-color: transparent;
+  }
 
-.hero { background: white; border: 1px solid var(--line); border-radius: 18px; padding: 28px; box-shadow: 0 10px 30px rgba(0, 35, 80, .06); }
-.hero h1 { margin: 8px 0 12px; color: var(--blue); font-size: clamp(26px, 4vw, 42px); }
-.hero p { color: var(--muted); line-height: 1.7; }
+  a { color: inherit; }
 
-.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 14px; }
-.grid-wide { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px; }
+  input, select, textarea {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: #fff;
+    font: inherit;
+  }
+  input:focus, select:focus, textarea:focus {
+    outline: 2px solid rgba(11, 92, 171, .25);
+    border-color: var(--blue2);
+  }
 
-.card { background: white; border: 1px solid var(--line); border-radius: 14px; padding: 18px; box-shadow: 0 8px 24px rgba(0, 35, 80, .05); }
-.card h2, .card h3 { color: var(--blue); margin-top: 0; }
-
-.stack { display: grid; gap: 16px; }
-.row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
-
-.btn { display: inline-flex; align-items: center; justify-content: center; border: 0; border-radius: 10px; background: #e5edf5; color: #0f2742; text-decoration: none; padding: 9px 14px; font-weight: 700; cursor: pointer; transition: filter .15s ease, transform .15s ease; }
-.btn:hover { filter: brightness(1.05); }
-.btn:active { transform: translateY(1px); }
-.btn.primary { background: var(--blue); color: white; }
-.btn.gold { background: #fff2cc; color: #7a5200; }
-.btn.ghost { background: transparent; border: 1px solid var(--line); }
-.btn.block { width: 100%; }
-.btn:disabled, .btn.disabled { opacity: .6; cursor: not-allowed; }
-
-.badge { display: inline-flex; border-radius: 999px; padding: 5px 10px; font-size: 12px; font-weight: 800; background: #e7f0ff; color: #135cab; }
-.badge.blue { background: #dbeafe; color: #1e40af; }
-.badge.green { background: #dcfce7; color: #166534; }
-.badge.red { background: #fee2e2; color: #991b1b; }
-.badge.gold { background: #fef3c7; color: #92400e; }
-.badge.purple { background: #ede9fe; color: #5b21b6; }
-
-.muted { color: var(--muted); font-size: 14px; line-height: 1.6; }
-.summary h2 { font-size: 30px; margin: 8px 0; }
-.feature-card { text-decoration: none; color: inherit; display: grid; gap: 16px; }
-.feature-card:hover { border-color: #9fc3e8; transform: translateY(-1px); }
-
-input, select, textarea { width: 100%; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: white; font: inherit; }
-input:focus, select:focus, textarea:focus { outline: 2px solid rgba(11, 92, 171, .25); border-color: var(--blue2); }
-label { display: grid; gap: 6px; font-weight: 600; font-size: 13px; color: var(--muted); margin-bottom: 10px; }
-
-.table { width: 100%; border-collapse: collapse; }
-.table th, .table td { padding: 10px; border-bottom: 1px solid var(--line); text-align: left; font-size: 14px; }
-
-.notice-mode { border: 2px solid var(--line); cursor: pointer; }
-.notice-mode.active { border-color: var(--blue); background: #f8fbff; }
-
-.calendar-day { display: grid; gap: 8px; }
-.event-line { display: flex; justify-content: space-between; gap: 12px; border-radius: 12px; padding: 10px 12px; align-items: center; }
-.event-blue { background: #eff6ff; border: 1px solid #bfdbfe; }
-.event-purple { background: #f3e8ff; border: 1px solid #ddd6fe; }
-
-.footer { text-align: center; color: var(--muted); font-size: 13px; padding: 24px; }
-.code { background: #0f172a; color: #e2e8f0; border-radius: 12px; padding: 14px; overflow: auto; font-family: ui-monospace, monospace; font-size: 13px; }
-.danger { color: var(--red); }
-
-/* ── Empty state（空資料的設計化呈現） ── */
-.empty-state { text-align: center; padding: 40px 20px; border-style: dashed; background: #fbfdff; }
-.empty-state .empty-icon { width: 58px; height: 58px; margin: 0 auto 14px; border-radius: 50%; background: linear-gradient(135deg, #eff6ff, #dcebfd); display: grid; place-items: center; font-size: 28px; }
-.empty-state h3 { color: var(--blue); margin: 0 0 6px; font-size: 16px; }
-.empty-state .muted { margin: 0 auto; max-width: 340px; }
-.empty-inline { display: grid; justify-items: center; gap: 8px; padding: 22px 0; color: var(--muted); font-size: 14px; line-height: 1.6; }
-.empty-inline .empty-icon { width: 46px; height: 46px; margin: 0; font-size: 22px; }
-
-/* ── 簽到／點名擴充 ── */
-.attendance-feature-card { border: 2px solid #c4b5fd; background: linear-gradient(145deg, #fff 0%, #f5f3ff 100%); }
-.attendance-feature-card:hover { border-color: #7c3aed; box-shadow: 0 12px 30px rgba(109, 40, 217, .13); }
-.attendance-feature-card h3 { margin: 0 0 6px; color: #5b21b6; }
-.attendance-feature-card p { margin: 0; }
-.attendance-feature-icon { display: grid; place-items: center; width: 46px; height: 46px; border-radius: 13px; background: #ede9fe; font-size: 25px; }
-.attendance-hero { border-top: 5px solid #7c3aed; background: linear-gradient(145deg, #fff 0%, #faf5ff 100%); }
-.attendance-separation-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-.attendance-purpose-card { box-shadow: none; }
-.attendance-purpose-card--checkin { border-left: 5px solid #16a34a; }
-.attendance-purpose-card--registration { border-left: 5px solid #2563eb; }
-.attendance-purpose-card h3 { margin: 10px 0 4px; }
-.attendance-purpose-card p { margin: 0; }
-.attendance-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-.attendance-history-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; }
-.att-status-row { gap: 6px; }
-.att-btn { min-width: 42px; min-height: 42px; padding: 6px 8px; border-radius: 10px; border: 1px solid var(--line); background: #fff; font-weight: 800; cursor: pointer; }
-.att-btn.active { outline: 2px solid currentColor; box-shadow: 0 0 0 3px rgba(109, 40, 217, .15); }
-.att-chip { display: inline-flex; align-items: center; gap: 4px; border-radius: 999px; padding: 4px 10px; font-size: 12px; font-weight: 800; }
-.att-chip.att-status-P, .att-btn.att-status-P { background: #dcfce7; color: #166534; border-color: #86efac; }
-.att-chip.att-status-A, .att-btn.att-status-A { background: #fee2e2; color: #991b1b; border-color: #fca5a5; }
-.att-chip.att-status-L, .att-btn.att-status-L { background: #fef9c3; color: #854d0e; border-color: #fde047; }
-.att-chip.att-status-E, .att-btn.att-status-E { background: #dbeafe; color: #1e40af; border-color: #93c5fd; }
-.att-chip.att-status-S, .att-btn.att-status-S { background: #f3e8ff; color: #6b21a8; border-color: #d8b4fe; }
-.attendance-matrix td.att-status-P, .attendance-matrix td.att-status-A, .attendance-matrix td.att-status-L, .attendance-matrix td.att-status-E, .attendance-matrix td.att-status-S { text-align: center; font-weight: 800; }
-
-/* ── 行動裝置 ── */
-.table { display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; }
-.table th { white-space: nowrap; }
-.table td { vertical-align: top; }
-.btn, input, select, textarea { min-height: 42px; }
-.table-card-list { display: grid; gap: 10px; }
-
-@media (max-width: 680px) {
-  .container { padding: 16px 12px 60px; }
-  .hero { padding: 20px; }
-  .nav .optional { display: none; }
+  label {
+    display: grid;
+    gap: 6px;
+    font-weight: 600;
+    font-size: 13px;
+    color: var(--muted-strong);
+    margin-bottom: 10px;
+  }
 }
 
-@media (max-width: 760px) {
-  body { font-size: 15px; }
-  .container { padding: 14px 10px 74px; }
-  .hero { border-radius: 14px; padding: 18px; }
-  .card { border-radius: 12px; padding: 14px; }
-  .grid, .grid-wide { grid-template-columns: 1fr; }
-  .row { align-items: stretch; }
-  .row > input, .row > select { flex: 1 1 180px; }
-  .row > .btn { flex: 1 1 auto; }
-  .btn { padding: 10px 12px; min-height: 44px; }
-  .summary h2 { font-size: 24px; }
-  .table.responsive { display: block; overflow: visible; border-collapse: separate; border-spacing: 0; }
-  .table.responsive thead { display: none; }
-  .table.responsive tbody, .table.responsive tr, .table.responsive td { display: block; width: 100%; }
-  .table.responsive tr { border: 1px solid var(--line); border-radius: 12px; margin: 0 0 10px; background: #fff; box-shadow: 0 4px 14px rgba(0, 35, 80, .04); overflow: hidden; }
-  .table.responsive td { border-bottom: 1px solid var(--line); padding: 10px 12px; }
-  .table.responsive td:last-child { border-bottom: 0; }
-  .table.responsive td[data-label] { display: flex; justify-content: space-between; gap: 14px; align-items: flex-start; }
-  .table.responsive td[data-label]::before { content: attr(data-label); font-weight: 800; color: var(--muted); font-size: 12px; min-width: 82px; flex: 0 0 82px; }
-  .event-line { align-items: flex-start; }
-  .event-line .btn { width: 100%; }
-  .attendance-separation-grid { grid-template-columns: 1fr; }
+/* ════════════════════════════════════════════════════════════
+   Legacy design system（.card / .btn / .muted / .container …）
+   34 個舊頁面依賴這套 class，必須與 Tailwind 頁共存。
+   放在 @layer components：元件預設樣式，utilities 可覆寫。
+   ════════════════════════════════════════════════════════════ */
+@layer components {
+
+  /* ── 版面 ── */
+  .page-container { max-width: 1100px; margin: 0 auto; padding: 24px 20px 80px; }
+  .container { max-width: 1100px; margin: 0 auto; padding: 24px 20px 80px; }
+
+  .hero { background: #fff; border: 1px solid var(--line); border-radius: 18px; padding: 28px; box-shadow: 0 10px 30px rgba(0, 35, 80, .06); }
+  .hero h1 { margin: 8px 0 12px; color: var(--blue); font-size: clamp(26px, 4vw, 42px); }
+  .hero p { color: var(--muted); line-height: 1.7; }
+
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 14px; }
+  .grid-wide { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px; }
+
+  .card { background: #fff; border: 1px solid var(--line); border-radius: 14px; padding: 18px; box-shadow: 0 8px 24px rgba(0, 35, 80, .05); }
+  .card h2, .card h3 { color: var(--blue); margin-top: 0; }
+
+  .stack { display: grid; gap: 16px; }
+  .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+
+  /* ── 頂部列（舊版 TopNav）── */
+  .topbar {
+    position: sticky; top: 0; z-index: 50;
+    background: rgba(255, 255, 255, .96);
+    border-bottom: 1px solid var(--line);
+    backdrop-filter: blur(6px);
+  }
+  .topbar-inner {
+    max-width: 1100px; margin: 0 auto; padding: 10px 16px;
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 12px; flex-wrap: wrap;
+  }
+  .brand { font-weight: 900; font-size: 17px; color: var(--blue); text-decoration: none; letter-spacing: .2px; }
+  .nav { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+
+  /* ── 按鈕 ── */
+  .btn { display: inline-flex; align-items: center; justify-content: center; border: 0; border-radius: 10px; background: #e5edf5; color: #0f2742; text-decoration: none; padding: 9px 14px; font-weight: 700; cursor: pointer; transition: filter .15s ease, transform .15s ease; }
+  .btn:hover { filter: brightness(1.05); }
+  .btn:active { transform: translateY(1px); }
+  .btn.primary { background: var(--blue); color: #fff; }
+  .btn.gold { background: #fff2cc; color: var(--gold-deep); }
+  .btn.ghost { background: transparent; border: 1px solid var(--line); }
+  .btn.block { width: 100%; }
+  .btn:disabled, .btn.disabled { opacity: .6; cursor: not-allowed; }
+
+  /* ── 徽章 ── */
+  .badge { display: inline-flex; border-radius: 999px; padding: 5px 10px; font-size: 12px; font-weight: 800; background: #e7f0ff; color: #135cab; }
+  .badge.blue { background: #dbeafe; color: #1e40af; }
+  .badge.green { background: #dcfce7; color: #166534; }
+  .badge.red { background: #fee2e2; color: #991b1b; }
+  .badge.gold { background: #fef3c7; color: #92400e; }
+  .badge.purple { background: #ede9fe; color: #5b21b6; }
+
+  /* ── 文字 ── */
+  .muted { color: var(--muted); font-size: 14px; line-height: 1.6; }
+  .summary h2 { font-size: 30px; margin: 8px 0; }
+  .feature-card { text-decoration: none; color: inherit; display: grid; gap: 16px; }
+  .feature-card:hover { border-color: #9fc3e8; transform: translateY(-1px); }
+  .danger { color: var(--red); }
+  .code { background: #0f172a; color: #e2e8f0; border-radius: 12px; padding: 14px; overflow: auto; font-family: ui-monospace, monospace; font-size: 13px; }
+  .footer { text-align: center; color: var(--muted); font-size: 13px; padding: 24px; }
+
+  /* ── 表格 ── */
+  .table { width: 100%; border-collapse: collapse; }
+  .table th, .table td { padding: 10px; border-bottom: 1px solid var(--line); text-align: left; font-size: 14px; }
+
+  /* ── 通告模式 / 行事曆 ── */
+  .notice-mode { border: 2px solid var(--line); cursor: pointer; }
+  .notice-mode.active { border-color: var(--blue); background: #f8fbff; }
+  .calendar-day { display: grid; gap: 8px; }
+  .event-line { display: flex; justify-content: space-between; gap: 12px; border-radius: 12px; padding: 10px 12px; align-items: center; }
+  .event-blue { background: #eff6ff; border: 1px solid #bfdbfe; }
+  .event-purple { background: #f3e8ff; border: 1px solid #ddd6fe; }
+
+  /* ── 收合卡片 ── */
+  .collapsible-header { cursor: pointer; user-select: none; }
+  .collapsible-header h2 { color: var(--blue); }
+  .collapsible.open .collapsible-header { border-bottom: 1px solid var(--line); padding-bottom: 12px; }
+  .collapsible-content { gap: 14px; }
+
+  /* ── 元件（Plugin）卡片 ── */
+  .plugin-card { border-color: #ddd6fe; }
+  .plugin-card.expanded { border-color: #7c3aed; box-shadow: 0 8px 24px rgba(109, 40, 217, .12); }
+  .plugin-card h3 { margin: 0; color: #5b21b6; }
+
+  /* ── 分頁標籤 ── */
+  .tab { display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; border-radius: 10px; border: 1px solid var(--line); background: #fff; font-weight: 700; font-size: 13px; color: #33475b; cursor: pointer; }
+  .tab.active { background: var(--blue); border-color: var(--blue); color: #fff; }
+
+  /* ── Hero 漸層 / 卡片懸浮 ── */
+  .hero-gradient { background: linear-gradient(135deg, #003366 0%, #0158a0 55%, #0c8de7 100%); }
+  .card-hover { transition: all 0.22s ease; }
+  .card-hover:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0, 35, 80, 0.1); }
+
+  /* ── 月曆 ── */
+  .month-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; }
+  .month-head { font-weight: 800; color: #003366; text-align: center; padding: 8px; font-size: 13px; }
+  .month-cell { min-height: 100px; background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 6px; display: flex; flex-direction: column; gap: 4px; }
+  .month-cell.dim { opacity: 0.4; }
+  .day-num { font-weight: 800; color: #003366; font-size: 14px; }
+  .mini-event { font-size: 11px; padding: 3px 6px; border-radius: 6px; background: #eff6ff; border: 1px solid #bfdbfe; line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .mini-event.purple { background: #f3e8ff; border-color: #ddd6fe; }
+  .mini-event.cancelled { text-decoration: line-through; background: #fee2e2; border-color: #fecaca; }
+
+  /* ── 出席狀態底色（.btn / .att-chip 的覆寫必須寫在後面）── */
+  .att-status-P { background: #dcfce7; color: #166534; border-color: #86efac; }
+  .att-status-A { background: #fee2e2; color: #991b1b; border-color: #fca5a5; }
+  .att-status-L { background: #fef9c3; color: #854d0e; border-color: #fde047; }
+  .att-status-E { background: #dbeafe; color: #1e40af; border-color: #93c5fd; }
+  .att-status-S { background: #f3e8ff; color: #6b21a8; border-color: #d8b4fe; }
+  .btn.att-status-P, .btn.att-status-A, .btn.att-status-L, .btn.att-status-E, .btn.att-status-S { border-width: 1px; border-style: solid; }
+
+  /* ── 空狀態 ── */
+  .empty-state { text-align: center; padding: 40px 20px; border-style: dashed; background: #fbfdff; }
+  .empty-state .empty-icon { width: 58px; height: 58px; margin: 0 auto 14px; border-radius: 50%; background: linear-gradient(135deg, #eff6ff, #dcebfd); display: grid; place-items: center; font-size: 28px; }
+  .empty-state h3 { color: var(--blue); margin: 0 0 6px; font-size: 16px; }
+  .empty-state .muted { margin: 0 auto; max-width: 340px; }
+  .empty-inline { display: grid; justify-items: center; gap: 8px; padding: 22px 0; color: var(--muted); font-size: 14px; line-height: 1.6; }
+  .empty-inline .empty-icon { width: 46px; height: 46px; margin: 0; font-size: 22px; }
+
+  /* ── 簽到／點名 ── */
+  .attendance-page { gap: 18px; }
+  .attendance-rollcall { gap: 14px; }
+  .attendance-legend { gap: 10px; font-size: 12px; color: var(--muted-strong); }
+  .attendance-table { font-size: 13px; }
+  .attendance-feature-card { border: 2px solid #c4b5fd; background: linear-gradient(145deg, #fff 0%, #f5f3ff 100%); }
+  .attendance-feature-card:hover { border-color: #7c3aed; box-shadow: 0 12px 30px rgba(109, 40, 217, .13); }
+  .attendance-feature-card h3 { margin: 0 0 6px; color: #5b21b6; }
+  .attendance-feature-card p { margin: 0; }
+  .attendance-feature-icon { display: grid; place-items: center; width: 46px; height: 46px; border-radius: 13px; background: #ede9fe; font-size: 25px; }
+  .attendance-hero { border-top: 5px solid #7c3aed; background: linear-gradient(145deg, #fff 0%, #faf5ff 100%); }
+  .attendance-separation-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .attendance-purpose-card { box-shadow: none; }
+  .attendance-purpose-card--checkin { border-left: 5px solid #16a34a; }
+  .attendance-purpose-card--registration { border-left: 5px solid #2563eb; }
+  .attendance-purpose-card h3 { margin: 10px 0 4px; }
+  .attendance-purpose-card p { margin: 0; }
+  .attendance-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .attendance-history-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; }
+  .att-status-row { gap: 6px; }
+  .att-btn { min-width: 42px; min-height: 42px; padding: 6px 8px; border-radius: 10px; border: 1px solid var(--line); background: #fff; font-weight: 800; cursor: pointer; }
+  .att-btn.active { outline: 2px solid currentColor; box-shadow: 0 0 0 3px rgba(109, 40, 217, .15); }
+  .att-chip { display: inline-flex; align-items: center; gap: 4px; border-radius: 999px; padding: 4px 10px; font-size: 12px; font-weight: 800; }
+  .att-chip.att-status-P, .att-btn.att-status-P { background: #dcfce7; color: #166534; border-color: #86efac; }
+  .att-chip.att-status-A, .att-btn.att-status-A { background: #fee2e2; color: #991b1b; border-color: #fca5a5; }
+  .att-chip.att-status-L, .att-btn.att-status-L { background: #fef9c3; color: #854d0e; border-color: #fde047; }
+  .att-chip.att-status-E, .att-btn.att-status-E { background: #dbeafe; color: #1e40af; border-color: #93c5fd; }
+  .att-chip.att-status-S, .att-btn.att-status-S { background: #f3e8ff; color: #6b21a8; border-color: #d8b4fe; }
+  .attendance-matrix td.att-status-P, .attendance-matrix td.att-status-A, .attendance-matrix td.att-status-L, .attendance-matrix td.att-status-E, .attendance-matrix td.att-status-S { text-align: center; font-weight: 800; }
+
+  /* ── 行動裝置：表格橫向捲動 ── */
+  .table { display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .table th { white-space: nowrap; }
+  .table td { vertical-align: top; }
+  .btn, input, select, textarea { min-height: 42px; }
+  .table-card-list { display: grid; gap: 10px; }
+
+  @media (max-width: 680px) {
+    .container, .page-container { padding: 16px 12px 60px; }
+    .hero { padding: 20px; }
+    .nav .optional { display: none; }
+  }
+
+  @media (max-width: 760px) {
+    body { font-size: 15px; }
+    .container, .page-container { padding: 14px 10px 74px; }
+    .hero { border-radius: 14px; padding: 18px; }
+    .card { border-radius: 12px; padding: 14px; }
+    .grid, .grid-wide { grid-template-columns: 1fr; }
+    .row { align-items: stretch; }
+    .row > input, .row > select { flex: 1 1 180px; }
+    .row > .btn { flex: 1 1 auto; }
+    .btn { padding: 10px 12px; min-height: 44px; }
+    .summary h2 { font-size: 24px; }
+    .table.responsive { display: block; overflow: visible; border-collapse: separate; border-spacing: 0; }
+    .table.responsive thead { display: none; }
+    .table.responsive tbody, .table.responsive tr, .table.responsive td { display: block; width: 100%; }
+    .table.responsive tr { border: 1px solid var(--line); border-radius: 12px; margin: 0 0 10px; background: #fff; box-shadow: 0 4px 14px rgba(0, 35, 80, .04); overflow: hidden; }
+    .table.responsive td { border-bottom: 1px solid var(--line); padding: 10px 12px; }
+    .table.responsive td:last-child { border-bottom: 0; }
+    .table.responsive td[data-label] { display: flex; justify-content: space-between; gap: 14px; align-items: flex-start; }
+    .table.responsive td[data-label]::before { content: attr(data-label); font-weight: 800; color: var(--muted-strong); font-size: 12px; min-width: 82px; flex: 0 0 82px; }
+    .event-line { align-items: flex-start; }
+    .event-line .btn { width: 100%; }
+    .attendance-separation-grid { grid-template-columns: 1fr; }
+  }
+
+  @media (max-width: 760px) {
+    .month-grid { display: flex; overflow-x: auto; }
+    .month-head { display: none; }
+    .month-cell { min-width: 140px; }
+  }
+
+  @media (max-width: 480px) {
+    .hero h1 { font-size: 24px; }
+    .badge { font-size: 11px; }
+    .card h2, .card h3 { font-size: 18px; }
+    .btn { width: 100%; }
+    .row .badge { width: auto; }
+    .table.responsive td[data-label] { display: block; }
+    .table.responsive td[data-label]::before { display: block; margin-bottom: 4px; }
+  }
 }
 
-@media (max-width: 480px) {
-  .hero h1 { font-size: 24px; }
-  .badge { font-size: 11px; }
-  .card h2, .card h3 { font-size: 18px; }
-  .btn { width: 100%; }
-  .row .badge { width: auto; }
-  .table.responsive td[data-label] { display: block; }
-  .table.responsive td[data-label]::before { display: block; margin-bottom: 4px; }
-}
-
-@media print {
-  .attendance-table-wrap { overflow: visible; }
-  .attendance-hero, .topbar, .footer { display: none !important; }
+/* 列印／隱藏：放在 utilities 層，確保蓋過元件樣式 */
+@layer utilities {
+  @media print {
+    .no-print { display: none !important; }
+    .attendance-table-wrap { overflow: visible; }
+    .attendance-hero, .topbar, .footer { display: none !important; }
+  }
 }

@@ -55,12 +55,12 @@ export default function DashboardCard({
           </div>
         </div>
         {badge && (
-          <span className={`text-[10px] px-2 py-0.5 rounded-full border font-bold whitespace-nowrap ${BADGE_COLORS[badgeColor]}`}>
+          <span className={`text-[11px] px-2 py-0.5 rounded-full border font-bold whitespace-nowrap ${BADGE_COLORS[badgeColor]}`}>
             {badge}
           </span>
         )}
         {locked && (
-          <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-400 font-bold">
+          <span className="text-[11px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 font-bold">
             🔒
           </span>
         )}
@@ -77,7 +77,7 @@ export default function DashboardCard({
           {stats.map((s, i) => (
             <div key={i} className="bg-slate-50 rounded-lg px-2 py-1.5 text-center">
               <div className="text-base font-extrabold text-slate-800">{s.value}</div>
-              <div className="text-[9px] text-slate-500 font-semibold">{s.label}</div>
+              <div className="text-[11px] text-slate-500 font-semibold">{s.label}</div>
             </div>
           ))}
         </div>
@@ -97,7 +97,7 @@ export default function DashboardCard({
                 {item.label}
               </span>
               {item.badge && (
-                <span className="text-[9px] bg-rose-100 text-rose-700 px-1.5 py-0.5 rounded-full font-bold">
+                <span className="text-[11px] bg-rose-100 text-rose-700 px-1.5 py-0.5 rounded-full font-bold">
                   {item.badge}
                 </span>
               )}

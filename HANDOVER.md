@@ -62,8 +62,90 @@ GS `doGet` 新增以下讀取 action（回傳 `{ success, state }`，state 只�
 
 測試觀察（暫不改）：`calcAge_('')` 回 0 → 無生日成員登入顯示 age:0（18 歲 guard 走 fail-closed，安全）；deleteEvent 不會級聯刪 EventReplies 孤兒行；createMember 與 createEvent 相隔 <1 秒時，活動 targetMemberIds 可能因 Sheets 最終一致性漏掉新成員（正常使用順序不受影響）。
 
+## 2026-08-31 新功能：物資清單與借用流程（參考 member-portal `/stock`）
+
+### Sheet
+| 工作表 | 顏色 | 內容 |
+|---|---|---|
+| `Equipment`（物資清單） | 綠（可改） | `equipmentId, name, category, unit, totalQty, availableQty, location, note, enabled, updatedAt` |
+| `EquipmentLoans`（借用紀錄） | 藍（資料） | `loanId, batchRef, equipmentId, equipmentName, unit, qty, memberId, memberName, branchId, purpose, borrowDate, returnDueDate, status, requestedAt, decidedBy, decidedAt, decisionNote, returnedAt, returnedBy, note` |
+
+`status`：pending 待批核 / approved 已批核（未歸還）/ rejected 已拒絕 / returned 已歸還 / cancelled 已取消
+
+### 流程
+1. 領袖到 **控制台 → 物資借用管理**（`/admin/equipment`）新增物資、填總數（`availableQty` 自動 = 總數）
+2. 成員在 `/equipment` 看**現有物資總覽**（分類、可借／總數），在想借的物資旁填數量，一次填用途＋借還日期遞交
+3. 申請後 `status = pending`，**仍未扣庫存**
+4. 領袖按「✅ 批准」→ `status = approved` 並**即時扣除 availableQty**
+5. 成員歸還後，領袖按「✅ 已歸還（Tick）」→ `status = returned` 並**即時回補 availableQty**
+
+### 借用資格
+- 領袖角色（團長／支部領袖／教練員／管理員／超管）一律可借
+- 成員限 **童軍支部（b3）、深資童軍（b4）、樂行童軍（b5）**；小童軍／幼童軍由領袖代借
+- GS：`EQUIPMENT_BORROW_BRANCHES_ = ['b3','b4','b5']`；前端 `lib/store.ts` 的 `EQUIPMENT_BORROW_BRANCHES`
+
+### API（新增 action）
+`getEquipment`（切片）／`createEquipment`／`updateEquipment`／`adjustEquipmentQty`（入庫+／報廢−）／`deleteEquipment`／
+`requestEquipmentLoan`／`updateEquipmentLoan`／`cancelEquipmentLoan`／`decideEquipmentLoan`／`returnEquipmentLoan`
+
+- 資料切片：`buildStateSlice_` 支援 `equipment` / `equipmentLoans` 兩個 key
+- 角色過濾：管理員全看；領袖看全部物資＋自己支部／自己紀錄；成員看可借物資＋自己紀錄
+- 保護：不可重複批核、庫存不足拒批、總數不可少於已借出未還、有未完成紀錄的物資不可刪除
+
+### 前端
+- `/admin/equipment`：物資清單 CRUD、入庫／報廢調整、啟用／停用、批核與歸還（含統計卡）
+- `/equipment`：物資總覽、多項數量借用申請（一次填表，參考 member-portal）、我的借用紀錄（待批核可改數量／取消）、領袖批核／歸還區
+- 入口：控制台功能卡 `equipment`、頂欄選單「📦 借用物資」、成員頁與領袖頁各加一張卡
+
+### 測試
+- GS 邏輯（Apps Script 模擬器）：28 項全綠（資格、申請、超量、批核扣庫存、重複批核、歸還回補、拒絕不扣、增減庫存、刪除保護、角色切片）
+- 演示模式：19 項全綠（同一條流程走 mock store）
+
+> ⚠️ 旅團要把新版 `gs/SCOUTSYSTEM_2_SETUP.gs` 重新部署後才會有這兩張工作表；
+> 首次執行任何物資 action 時 `ensureEquipmentSheets_()` 亦會自動補建（舊部署未重跑 setup 也不會炸）。
+
+## 2026-08-31 修復：超管登入 + 全站配色／字體對比度巡檢
+
+### 1) 超管（sheep / 0728）登入
+
+| 問題 | 處理 |
+|---|---|
+| 舊版 GS 認得 `SUPER_ADMIN` 登入，但 `buildDashboardCore_` 不認這個 userId → 登入成功卻全頁空白 | 前端登入後改用**實際輸入的帳號（`sheep`）**作為 session userId。`sheep` 在新舊版 GS 都屬 `TECH_TEST_ACCOUNTS_`（最高權限），**不必等 82 旅重新部署 GS 就能用** |
+| 複製貼上帶了空白／大小寫 → 密碼永遠不對 | GS `handleLogin_` 對 `sheep` 做 `trim` + 不分大小寫；STAFF_TOKEN 亦先 `trim` 再比對 |
+| 瀏覽器停留在演示模式時，輸入 sheep/0728 只會進去 mock 資料 | 登入頁新增黃色警告卡「🎭 正在演示模式：真實帳號（含超級管理員）不會生效」+ 一鍵退出 |
+| 未選旅團 | 「請先選擇旅團」文案補充：超管也屬於某個旅團後台 |
+| 登入失敗只有一句「登入失敗」 | 新增 `explainError()`：API Key 不符／未設、Apps Script 未公開、網路錯誤各有可執行的修復建議 |
+| 無從判斷後台版本 | 新增 `lib/api.ts → apiDiagnose()`；登入頁「🩺 連線檢查」一次顯示：旅團 key、Vercel API Key 是否已設、**GS 版本**（非 3.0-live 會提示重新部署） |
+| 已登入但資料全空，畫面看起來像沒登入 | `/admin` 新增紅色警告卡，直接列出重新部署三步 |
+
+同時把 `public/downloads/SCOUTSYSTEM_2_SETUP.gs.txt` 與 `gs/SCOUTSYSTEM_2_SETUP.gs` 同步（之前少了家長開戶連結子女、createUser 等改動，管理員下載到的會是舊版）。
+
+### 2) 配色／字體全面巡檢（對照 WCAG）
+
+以腳本掃描全部 tsx 的 className 與 inline style，套用 Tailwind v4 實際產生的顏色值計算對比度：
+
+- **低對比文字**：`text-slate-400`（白底僅 **2.63:1**）共 66 處 → 全部改 `text-slate-500`（4.77:1）
+- **白色字配亮色底**（最嚴重、等於隱形）：
+  - `/admin` 控制台身份卡：白字 + 金黃漸層 `#f9ab00→#ffc107` = **1.63:1** → 改 `#7a4f01→#a16207`（4.9:1）
+  - 該卡內「個人設定」按鈕：`rgba(255,255,255,.2)` 底 + 白字 = **1.0:1** → 改 `.94` 白底 + 深色字（`/admin`、`/leader`、`/member`、`/parent` 四張卡）
+  - `/member` 綠色漸層（3.06:1）、`/leader` 藍色（3.56:1）→ 一併調深至 ≥4.5:1
+  - `bg-amber-400/500 + text-white`（1.73 / 2.16:1）→ 小標籤改深字、按鈕改 `amber-700`
+  - `bg-emerald-500/600 + text-white`、`bg-rose-500`、`bg-blue-500`、`bg-violet-500`、`bg-brand-500` → 全部升一級（≥4.7:1）
+  - 報名管理支部標題用 `#fbc02d`（**1.66:1**）/`#ff9800`（2.16:1）→ `GROUP_DEFS` 新增 `text` 欄位（4.65–9.4:1）
+  - 活動管理「💳 已設收款連結」`color: 'gold'`（1.16:1）→ `#b06000`
+- **字級過小**：`text-[7px]`×5、`text-[8px]`×39、`text-[9px]`×102、`text-[10px]`×96 → 統一最低 **11px**
+- **CSS 層級打架**（改了 Tailwind class 卻沒反應）：legacy 設計系統原本寫在 unlayered，會反過來蓋掉 utilities（`a{color:inherit}`、`label{font-size:13px}`、`input{width:100%}` 等）。已全部收進 `@layer base` / `@layer components`，utilities 現在一定生效。
+- **缺樣式的 class**：`.topbar` / `.topbar-inner` / `.brand` / `.nav` / `.collapsible*` / `.plugin-card` / `.tab` / `.attendance-page|rollcall|legend|table` 原本完全沒定義 → 全部補上
+- **簽到狀態鈕全變灰色**：`.btn` 寫在 `.att-status-*` 之後，蓋掉了狀態底色 → 補 `.btn.att-status-*` 規則
+- **字體**：補齊中文 fallback（`Noto Sans CJK TC` / `Source Han Sans TC` / `PingFang TC` / `Heiti TC`），避免 Android／Linux 出現缺字豆腐
+- `.container` 與 Tailwind v4 的 `container` utility 撞名 → 版面改用 `.page-container`
+
+巡檢後剩餘項目皆為 hover 態或已 ≥3.8:1；`npm run build` 全綠。
+
 ## 待完成（下一階段）
-1. **82 旅重新部署 GS** — 把本 repo 的 `gs/SCOUTSYSTEM_2_SETUP.gs` 貼回 82 旅 Script Editor → Deploy → 管理部署 → 新增版本；部署後用 `?action=health&apiKey=...` 確認 version=3.0-live，並複測超管登入
+1. **82 旅重新部署 GS** — 把本 repo 的 `gs/SCOUTSYSTEM_2_SETUP.gs`（或 `public/downloads/SCOUTSYSTEM_2_SETUP.gs.txt`）貼回 82 旅 Script Editor → Deploy → 管理部署 → 新增版本；部署後用 `?action=health&apiKey=...` 確認 version=3.0-live，並複測超管登入。
+   （過渡期：前端已改以 `sheep` 作 userId，未重新部署也能拿到全部資料；但仍建議盡快部署，才有 `publicConfig_` 敏感值剝除等修正）
+6. **安全待辦** — 技術測試帳號 `sheep` / `0728` 目前「免密碼」即可登入並取得 `super_admin`（寫死在 GS `handleLogin_`）。建議確認完超管流程後，改成只接受超管密碼或加白名單 IP。
 2. **/onboard 第 6 步實測** — 走一次表單提交，確認管理員 Sheet「申請記錄」有新記錄 + 收到通知 email
 3. **旅團部署** — 新旅團接入流程（收到自動寄信 → `DEPLOY_ADMIN_GUIDE.md` 五步）
 4. **`/dashboard/*` demo 樹** — 仍是內嵌 mock 的展示頁（帶 Demo 角色切換），非真實登入頁；確認不再需要可刪

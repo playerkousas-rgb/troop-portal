@@ -23,10 +23,10 @@ export default function MeetingsPage() {
               <button key={m.id} onClick={() => setSelected(m.id)} className="w-full text-left bg-white rounded-2xl border border-slate-200 p-4 card-hover">
                 <div className="flex items-center justify-between mb-1">
                   <span className="font-bold text-sm">{m.title}</span>
-                  <span className="text-[9px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded font-bold">即將進行</span>
+                  <span className="text-[11px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded font-bold">即將進行</span>
                 </div>
-                <div className="text-[10px] text-slate-500">📅 {m.date} · ⏰ {m.time} · 📍 {m.location}</div>
-                {m.files.length > 0 && <div className="text-[9px] text-brand-600 mt-1">📎 {m.files.length} 個文件</div>}
+                <div className="text-[11px] text-slate-500">📅 {m.date} · ⏰ {m.time} · 📍 {m.location}</div>
+                {m.files.length > 0 && <div className="text-[11px] text-brand-600 mt-1">📎 {m.files.length} 個文件</div>}
               </button>
             ))}
           </div>
@@ -36,10 +36,10 @@ export default function MeetingsPage() {
               <button key={m.id} onClick={() => setSelected(m.id)} className="w-full text-left bg-white rounded-2xl border border-slate-200 p-4 card-hover opacity-70">
                 <div className="flex items-center justify-between mb-1">
                   <span className="font-bold text-sm">{m.title}</span>
-                  <span className="text-[9px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded font-bold">已結束</span>
+                  <span className="text-[11px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded font-bold">已結束</span>
                 </div>
-                <div className="text-[10px] text-slate-500">📅 {m.date} · ⏰ {m.time} · 📍 {m.location}</div>
-                {m.files.length > 0 && <div className="text-[9px] text-brand-600 mt-1">📎 {m.files.length} 個文件</div>}
+                <div className="text-[11px] text-slate-500">📅 {m.date} · ⏰ {m.time} · 📍 {m.location}</div>
+                {m.files.length > 0 && <div className="text-[11px] text-brand-600 mt-1">📎 {m.files.length} 個文件</div>}
               </button>
             ))}
           </div>
@@ -55,16 +55,16 @@ export default function MeetingsPage() {
             </div>
             <h3 className="font-bold text-xs mb-2">📎 文件 ({meeting.files.length})</h3>
             {meeting.files.length === 0 ? (
-              <p className="text-[10px] text-slate-400">暫無文件</p>
+              <p className="text-[11px] text-slate-500">暫無文件</p>
             ) : (
               <div className="space-y-1.5">
                 {meeting.files.map((f, i) => (
                   <div key={i} className="flex items-center justify-between bg-slate-50 rounded-xl px-3 py-2">
                     <div className="flex items-center gap-2">
                       <span className="text-sm">{f.name.endsWith('.pdf') ? '📄' : f.name.endsWith('.xlsx') ? '📊' : f.name.endsWith('.docx') ? '📝' : '📦'}</span>
-                      <div><div className="text-[11px] font-bold">{f.name}</div><div className="text-[9px] text-slate-400">{f.size}</div></div>
+                      <div><div className="text-[11px] font-bold">{f.name}</div><div className="text-[11px] text-slate-500">{f.size}</div></div>
                     </div>
-                    <span className="text-[9px] text-brand-600 font-bold">下載 →</span>
+                    <span className="text-[11px] text-brand-600 font-bold">下載 →</span>
                   </div>
                 ))}
               </div>

@@ -86,10 +86,10 @@ export default function CalendarPage() {
 
       {/* Demo */}
       <div className="flex gap-1.5 flex-wrap">
-        <span className="text-[9px] text-slate-400 mr-1 self-center">Demo：</span>
+        <span className="text-[11px] text-slate-500 mr-1 self-center">Demo：</span>
         {['parent', 'member', 'branch_leader', 'admin'].map(r => (
           <button key={r} onClick={() => setRole(r)}
-            className={`text-[10px] px-2 py-0.5 rounded-full border font-bold ${role === r ? 'bg-brand-600 text-white border-brand-600' : 'bg-white text-slate-500 border-slate-200'}`}>
+            className={`text-[11px] px-2 py-0.5 rounded-full border font-bold ${role === r ? 'bg-brand-600 text-white border-brand-600' : 'bg-white text-slate-500 border-slate-200'}`}>
             {r === 'parent' ? '家長' : r === 'member' ? '成員' : r === 'branch_leader' ? '支部領袖' : '管理員'}
           </button>
         ))}
@@ -99,8 +99,8 @@ export default function CalendarPage() {
       <div className="flex items-center justify-between">
         <h1 className="font-bold text-lg">📅 行事曆</h1>
         <div className="flex gap-1.5">
-          <button onClick={() => setView('month')} className={`text-[10px] px-2.5 py-1 rounded-lg font-bold ${view === 'month' ? 'bg-brand-600 text-white' : 'bg-white border border-slate-200 text-slate-600'}`}>月曆</button>
-          <button onClick={() => setView('list')} className={`text-[10px] px-2.5 py-1 rounded-lg font-bold ${view === 'list' ? 'bg-brand-600 text-white' : 'bg-white border border-slate-200 text-slate-600'}`}>清單</button>
+          <button onClick={() => setView('month')} className={`text-[11px] px-2.5 py-1 rounded-lg font-bold ${view === 'month' ? 'bg-brand-600 text-white' : 'bg-white border border-slate-200 text-slate-600'}`}>月曆</button>
+          <button onClick={() => setView('list')} className={`text-[11px] px-2.5 py-1 rounded-lg font-bold ${view === 'list' ? 'bg-brand-600 text-white' : 'bg-white border border-slate-200 text-slate-600'}`}>清單</button>
         </div>
       </div>
 
@@ -108,7 +108,7 @@ export default function CalendarPage() {
       <div className="flex gap-1 overflow-x-auto pb-1 -mx-1 px-1">
         {[{ id: 'all', label: '全部' }, { id: '小童軍', label: '小童軍' }, { id: '幼童軍', label: '幼童軍' }, { id: '童軍', label: '童軍' }, { id: '深資', label: '深資' }, { id: '樂行', label: '樂行' }, { id: '全旅', label: '全旅' }].map(b => (
           <button key={b.id} onClick={() => setBranchFilter(b.id)}
-            className={`text-[10px] px-2.5 py-1 rounded-full font-bold whitespace-nowrap border ${branchFilter === b.id ? 'bg-brand-600 text-white border-brand-600' : 'bg-white text-slate-600 border-slate-200'}`}>
+            className={`text-[11px] px-2.5 py-1 rounded-full font-bold whitespace-nowrap border ${branchFilter === b.id ? 'bg-brand-600 text-white border-brand-600' : 'bg-white text-slate-600 border-slate-200'}`}>
             {b.label}
           </button>
         ))}
@@ -139,12 +139,12 @@ export default function CalendarPage() {
                 {items.slice(0, 3).map((item, j) => (
                   <div key={j} className={`mini-event ${item.cancelled ? 'cancelled' : ''}`}
                     style={{ borderLeft: `3px solid ${BRANCH_COLORS[item.branch] || '#999'}` }}>
-                    {item.time && <span className="text-[8px] opacity-70">{item.time.slice(0, 5)} </span>}
+                    {item.time && <span className="text-[11px] opacity-70">{item.time.slice(0, 5)} </span>}
                     {item.title}
-                    {item.cancelled && isLeader && <span className="text-[7px] text-rose-600 ml-0.5">取消</span>}
+                    {item.cancelled && isLeader && <span className="text-[11px] text-rose-600 ml-0.5">取消</span>}
                   </div>
                 ))}
-                {items.length > 3 && <div className="text-[8px] text-slate-400 text-center">+{items.length - 3}</div>}
+                {items.length > 3 && <div className="text-[11px] text-slate-500 text-center">+{items.length - 3}</div>}
               </div>
             );
           })}
@@ -156,18 +156,18 @@ export default function CalendarPage() {
           ═══════════════════════════════════════ */}
       {view === 'list' && (
         <div className="space-y-2">
-          {listItems.length === 0 && <p className="text-center text-sm text-slate-400 py-8">此月份暫無活動</p>}
+          {listItems.length === 0 && <p className="text-center text-sm text-slate-500 py-8">此月份暫無活動</p>}
           {listItems.map((item, i) => (
             <div key={i} className="bg-white rounded-xl border border-slate-200 p-3 flex items-center gap-3 card-hover"
               style={{ borderLeft: `4px solid ${BRANCH_COLORS[item.branch] || '#999'}` }}>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-1.5">
-                  {item.cancelled && <span className="text-[8px] bg-rose-100 text-rose-700 px-1 py-0.5 rounded font-bold">已取消</span>}
+                  {item.cancelled && <span className="text-[11px] bg-rose-100 text-rose-700 px-1 py-0.5 rounded font-bold">已取消</span>}
                   <span className="font-bold text-xs">{item.title}</span>
                 </div>
-                <div className="text-[9px] text-slate-500 mt-0.5">{item.date} {item.time && `· ${item.time}`} · {item.branch}</div>
+                <div className="text-[11px] text-slate-500 mt-0.5">{item.date} {item.time && `· ${item.time}`} · {item.branch}</div>
               </div>
-              <span className={`text-[8px] px-1.5 py-0.5 rounded font-bold ${item.type === 'event' ? 'bg-blue-100 text-blue-700' : 'bg-emerald-100 text-emerald-700'}`}>
+              <span className={`text-[11px] px-1.5 py-0.5 rounded font-bold ${item.type === 'event' ? 'bg-blue-100 text-blue-700' : 'bg-emerald-100 text-emerald-700'}`}>
                 {item.type === 'event' ? '活動' : '集會'}
               </span>
             </div>
@@ -182,7 +182,7 @@ export default function CalendarPage() {
         <section className="bg-white rounded-2xl border border-slate-200 p-4 space-y-3">
           <div className="flex items-center justify-between">
             <h3 className="font-bold text-sm">⚙️ 集會規則</h3>
-            <button className="text-[10px] bg-brand-600 text-white px-2.5 py-1 rounded-lg font-bold">+ 新增規則</button>
+            <button className="text-[11px] bg-brand-600 text-white px-2.5 py-1 rounded-lg font-bold">+ 新增規則</button>
           </div>
           <div className="space-y-1.5">
             {[
@@ -193,18 +193,18 @@ export default function CalendarPage() {
                 <div className="flex items-center gap-2">
                   <span className="w-2 h-2 rounded-full" style={{ background: BRANCH_COLORS[r.branch] }} />
                   <span className="font-bold text-[11px]">{r.branch}</span>
-                  <span className="text-[10px] text-slate-500">{r.weekday} {r.time} · {r.location}</span>
+                  <span className="text-[11px] text-slate-500">{r.weekday} {r.time} · {r.location}</span>
                 </div>
                 <div className="flex gap-1">
-                  <button className="text-[9px] text-slate-400 px-1.5 py-0.5 rounded hover:bg-slate-200">編輯</button>
-                  <button className={`text-[9px] px-1.5 py-0.5 rounded font-bold ${r.active ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-500'}`}>
+                  <button className="text-[11px] text-slate-500 px-1.5 py-0.5 rounded hover:bg-slate-200">編輯</button>
+                  <button className={`text-[11px] px-1.5 py-0.5 rounded font-bold ${r.active ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-500'}`}>
                     {r.active ? '啟用' : '停用'}
                   </button>
                 </div>
               </div>
             ))}
           </div>
-          <p className="text-[9px] text-slate-400">💡 在月曆上按 ✕ 可取消某日集會，按 ↺ 可恢復。</p>
+          <p className="text-[11px] text-slate-500">💡 在月曆上按 ✕ 可取消某日集會，按 ↺ 可恢復。</p>
         </section>
       )}
     </main>

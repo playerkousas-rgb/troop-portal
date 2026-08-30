@@ -19,7 +19,24 @@ export type PluginCard = { id:string; title:string; icon:string; tier:2|3; url:s
 export type PluginSetting = { pluginId:string; frontendUrl?:string; backendUrl?:string; apiKey?:string };
 export type Meeting = { id:string; title:string; type:'agenda'|'minutes'; date:string; startTime?:string; endTime?:string; location?:string; targetRoles?:string[]; branchId?:string; url?:string; status:'draft'|'published' };
 export type Audit = { id:string; userId:string; action:string; entity:string; entityId:string; createdAt:string; detail:string };
-export type AppState = { patrols:Patrol[]; users:User[]; members:Member[]; applications:Application[]; events:EventItem[]; replies:Reply[]; bookmarks:Bookmark[]; announcements:Announcement[]; announcementPdfs:AnnouncementPdf[]; regularMeetings:RegularMeeting[]; cancelledMeetings:CancelledMeeting[]; meetings:Meeting[]; plugins:PluginCard[]; pluginSettings?:PluginSetting[]; audits:Audit[]; config:Record<string,string>; userFeatures?:string[] };
+export type Equipment = { id:string; name:string; category:string; unit:string; totalQty:number; availableQty:number; location?:string; note?:string; enabled:boolean; updatedAt?:string };
+export type EquipmentLoanStatus = 'pending' | 'approved' | 'rejected' | 'returned' | 'cancelled';
+export type EquipmentLoan = {
+  id:string; batchRef:string; equipmentId:string; equipmentName:string; unit:string; qty:number;
+  memberId:string; memberName:string; branchId:string; purpose:string;
+  borrowDate:string; returnDueDate:string; status:EquipmentLoanStatus;
+  requestedAt?:string; decidedBy?:string; decidedAt?:string; decisionNote?:string;
+  returnedAt?:string; returnedBy?:string; note?:string;
+};
+/** 可借用物資的成員支部（童軍支部及以上）；領袖角色一律可借 */
+export const EQUIPMENT_BORROW_BRANCHES = ['b3', 'b4', 'b5'];
+export const LOAN_STATUS_LABEL: Record<EquipmentLoanStatus, string> = {
+  pending: '待批核', approved: '已批核（未歸還）', rejected: '已拒絕', returned: '已歸還', cancelled: '已取消',
+};
+export const LOAN_STATUS_TONE: Record<EquipmentLoanStatus, string> = {
+  pending: 'gold', approved: 'blue', rejected: 'red', returned: 'green', cancelled: 'red',
+};
+export type AppState = { patrols:Patrol[]; users:User[]; members:Member[]; applications:Application[]; events:EventItem[]; replies:Reply[]; bookmarks:Bookmark[]; announcements:Announcement[]; announcementPdfs:AnnouncementPdf[]; regularMeetings:RegularMeeting[]; cancelledMeetings:CancelledMeeting[]; meetings:Meeting[]; plugins:PluginCard[]; pluginSettings?:PluginSetting[]; audits:Audit[]; equipment:Equipment[]; equipmentLoans:EquipmentLoan[]; config:Record<string,string>; userFeatures?:string[] };
 
 // ==================== 載入（API） ====================
 

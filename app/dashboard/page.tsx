@@ -74,10 +74,10 @@ export default function DashboardPage() {
 
       {/* ── Demo 切換 ── */}
       <div className="flex gap-1.5 flex-wrap">
-        <span className="text-[9px] text-slate-400 mr-1 self-center">Demo：</span>
+        <span className="text-[11px] text-slate-500 mr-1 self-center">Demo：</span>
         {(['admin', 'branch_leader', 'coach', 'parent', 'member'] as Role[]).map(r => (
           <button key={r} onClick={() => setRole(r)}
-            className={`text-[10px] px-2.5 py-1 rounded-full border transition font-bold ${
+            className={`text-[11px] px-2.5 py-1 rounded-full border transition font-bold ${
               role === r ? 'bg-brand-600 text-white border-brand-600 shadow' : 'bg-white text-slate-500 border-slate-200 hover:border-brand-300'
             }`}>
             {ROLE_LABEL[r]}
@@ -92,26 +92,26 @@ export default function DashboardPage() {
         <section className="bg-gradient-to-br from-brand-600 to-brand-800 text-white rounded-2xl p-4 shadow-lg">
           <div className="flex items-center justify-between mb-3">
             <h3 className="font-bold text-sm flex items-center gap-1.5">
-              <span className="bg-amber-400 text-slate-900 text-[10px] font-extrabold px-2 py-0.5 rounded-lg">📡</span>
+              <span className="bg-amber-400 text-slate-900 text-[11px] font-extrabold px-2 py-0.5 rounded-lg">📡</span>
               我的監察
             </h3>
-            <span className="bg-rose-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">1 待回覆</span>
+            <span className="bg-rose-600 text-white text-[11px] font-bold px-2 py-0.5 rounded-full">1 待回覆</span>
           </div>
           <div className="space-y-2">
             {MY_REGISTRATIONS.map((r, i) => (
               <div key={i} className="flex items-center justify-between gap-2 bg-white/10 rounded-xl px-3 py-2.5">
                 <div className="flex-1 min-w-0">
                   <div className="font-bold text-xs truncate">{r.title}</div>
-                  <div className="text-white/50 text-[10px]">{r.date} · {r.fee} · 截止 {r.deadline}</div>
+                  <div className="text-white/80 text-[11px]">{r.date} · {r.fee} · 截止 {r.deadline}</div>
                 </div>
                 <div className="flex items-center gap-1.5 flex-shrink-0">
-                  <span className={`text-[9px] px-2 py-0.5 rounded-full font-bold ${
+                  <span className={`text-[11px] px-2 py-0.5 rounded-full font-bold ${
                     r.status === 'registered' ? 'bg-emerald-400/20 text-emerald-200' :
                     r.status === 'interested' ? 'bg-amber-400/20 text-amber-200' : 'bg-rose-400/20 text-rose-200'
                   }`}>
                     {r.status === 'registered' ? '✅ 已報名' : r.status === 'interested' ? '❤️ 有興趣' : '❌ 婉拒'}
                   </span>
-                  <span className={`text-[9px] px-2 py-0.5 rounded-full font-bold ${
+                  <span className={`text-[11px] px-2 py-0.5 rounded-full font-bold ${
                     r.paid === 'confirmed' ? 'bg-emerald-400/20 text-emerald-200' :
                     r.paid === 'pending' ? 'bg-amber-400/20 text-amber-200' :
                     'bg-rose-400/20 text-rose-200'
@@ -122,7 +122,7 @@ export default function DashboardPage() {
               </div>
             ))}
           </div>
-          <Link href="/dashboard/activities" className="block text-center text-[10px] text-white/60 hover:text-white/80 mt-3 font-bold no-underline">
+          <Link href="/dashboard/activities" className="block text-center text-[11px] text-white/60 hover:text-white/80 mt-3 font-bold no-underline">
             查看全部活動 →
           </Link>
         </section>
@@ -135,21 +135,21 @@ export default function DashboardPage() {
         <section className="bg-white rounded-2xl border border-slate-200 p-4">
           <div className="flex items-center justify-between mb-3">
             <h3 className="font-bold text-sm flex items-center gap-2">
-              <span className="w-6 h-6 bg-amber-500 text-white rounded-lg flex items-center justify-center text-[10px]">📋</span>
+              <span className="w-6 h-6 bg-amber-500 text-slate-900 rounded-lg flex items-center justify-center text-[11px]">📋</span>
               申請
             </h3>
-            <span className="text-[10px] text-slate-400">點擊查看詳情</span>
+            <span className="text-[11px] text-slate-500">點擊查看詳情</span>
           </div>
           <div className="grid grid-cols-4 gap-2">
             {APPROVALS.map((a, i) => (
               <Link key={i} href={`/dashboard/admin/applications?type=${a.type}`} className="no-underline text-inherit">
                 <div className={`rounded-xl p-3 text-center transition hover:shadow-md relative ${a.count > 0 ? 'bg-amber-50 border border-amber-200' : 'bg-slate-50'}`}>
                   {a.count > 0 && (
-                    <span className="absolute -top-1.5 -right-1.5 text-[9px] bg-rose-500 text-white w-4 h-4 rounded-full flex items-center justify-center font-bold">{a.count}</span>
+                    <span className="absolute -top-1.5 -right-1.5 text-[11px] bg-rose-600 text-white w-4 h-4 rounded-full flex items-center justify-center font-bold">{a.count}</span>
                   )}
                   <div className="text-xl mb-1">{a.icon}</div>
-                  <div className={`text-[10px] font-bold ${a.count > 0 ? 'text-amber-800' : 'text-slate-500'}`}>{a.type}</div>
-                  {a.count > 0 && <div className="text-[9px] text-amber-600 font-semibold mt-0.5">{a.count} 待批核</div>}
+                  <div className={`text-[11px] font-bold ${a.count > 0 ? 'text-amber-800' : 'text-slate-500'}`}>{a.type}</div>
+                  {a.count > 0 && <div className="text-[11px] text-amber-700 font-semibold mt-0.5">{a.count} 待批核</div>}
                 </div>
               </Link>
             ))}
@@ -164,10 +164,10 @@ export default function DashboardPage() {
         <section>
           <div className="flex items-center justify-between mb-3">
             <h3 className="font-bold text-sm flex items-center gap-2">
-              <span className="w-6 h-6 bg-blue-500 text-white rounded-lg flex items-center justify-center text-[10px]">🎯</span>
+              <span className="w-6 h-6 bg-blue-600 text-white rounded-lg flex items-center justify-center text-[11px]">🎯</span>
               活動概況
             </h3>
-            <Link href="/dashboard/admin/registrations" className="text-[10px] text-brand-600 font-bold no-underline">全部 →</Link>
+            <Link href="/dashboard/admin/registrations" className="text-[11px] text-brand-600 font-bold no-underline">全部 →</Link>
           </div>
           <div className="space-y-2">
             {ACTIVITIES.map(a => (
@@ -175,29 +175,29 @@ export default function DashboardPage() {
                 <div className={`bg-white rounded-xl border p-3 card-hover ${a.expired ? 'opacity-60 border-dashed' : 'border-slate-200'}`}>
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2">
-                      <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold ${a.type === 'internal' ? 'bg-blue-100 text-blue-700' : 'bg-violet-100 text-violet-700'}`}>
+                      <span className={`text-[11px] px-1.5 py-0.5 rounded font-bold ${a.type === 'internal' ? 'bg-blue-100 text-blue-700' : 'bg-violet-100 text-violet-700'}`}>
                         {a.type === 'internal' ? '🏠 內部' : '📚 外部'}
                       </span>
                       <span className="font-bold text-xs">{a.title}</span>
                     </div>
-                    <span className="text-[9px] text-slate-400">{a.expired ? '⏰ 已過期' : `截止 ${a.deadline}`}</span>
+                    <span className="text-[11px] text-slate-500">{a.expired ? '⏰ 已過期' : `截止 ${a.deadline}`}</span>
                   </div>
                   <div className="grid grid-cols-4 gap-1.5">
                     <div className="bg-emerald-50 rounded-lg px-2 py-1 text-center">
                       <div className="text-xs font-extrabold text-emerald-700">{a.registered}</div>
-                      <div className="text-[8px] text-emerald-600 font-semibold">✅ 報名</div>
+                      <div className="text-[11px] text-emerald-700 font-semibold">✅ 報名</div>
                     </div>
                     <div className="bg-amber-50 rounded-lg px-2 py-1 text-center">
                       <div className="text-xs font-extrabold text-amber-700">{a.interested}</div>
-                      <div className="text-[8px] text-amber-600 font-semibold">❤️ 有興趣</div>
+                      <div className="text-[11px] text-amber-700 font-semibold">❤️ 有興趣</div>
                     </div>
                     <div className="bg-slate-100 rounded-lg px-2 py-1 text-center">
                       <div className="text-xs font-extrabold text-slate-600">{a.pending}</div>
-                      <div className="text-[8px] text-slate-500 font-semibold">⚠️ 待回覆</div>
+                      <div className="text-[11px] text-slate-500 font-semibold">⚠️ 待回覆</div>
                     </div>
                     <div className={`rounded-lg px-2 py-1 text-center ${a.paid >= a.registered ? 'bg-emerald-50' : 'bg-rose-50'}`}>
                       <div className={`text-xs font-extrabold ${a.paid >= a.registered ? 'text-emerald-700' : 'text-rose-700'}`}>{a.paid}/{a.registered}</div>
-                      <div className="text-[8px] text-slate-500 font-semibold">💰 付款</div>
+                      <div className="text-[11px] text-slate-500 font-semibold">💰 付款</div>
                     </div>
                   </div>
                 </div>
@@ -214,10 +214,10 @@ export default function DashboardPage() {
         <section>
           <div className="flex items-center justify-between mb-3">
             <h3 className="font-bold text-sm flex items-center gap-2">
-              <span className="w-6 h-6 bg-emerald-500 text-white rounded-lg flex items-center justify-center text-[10px]">👥</span>
+              <span className="w-6 h-6 bg-emerald-700 text-white rounded-lg flex items-center justify-center text-[11px]">👥</span>
               成員
             </h3>
-            <Link href="/dashboard/admin/members" className="text-[10px] text-brand-600 font-bold no-underline">管理 →</Link>
+            <Link href="/dashboard/admin/members" className="text-[11px] text-brand-600 font-bold no-underline">管理 →</Link>
           </div>
           <div className="space-y-2">
             {BRANCH_STATS.map(b => (
@@ -225,15 +225,15 @@ export default function DashboardPage() {
                 <div className="bg-white rounded-xl border border-slate-200 p-3 card-hover">
                   <div className="flex items-center justify-between mb-1.5">
                     <span className="font-bold text-xs">{b.name}</span>
-                    <span className="text-[10px] text-slate-400">{b.members} 人{b.patrols > 0 ? ` · ${b.patrols} 小隊` : ''}</span>
+                    <span className="text-[11px] text-slate-500">{b.members} 人{b.patrols > 0 ? ` · ${b.patrols} 小隊` : ''}</span>
                   </div>
                   {b.patrolDetail && (
                     <div className="flex gap-1.5 flex-wrap">
                       {b.patrolDetail.map((p, i) => (
-                        <span key={i} className="text-[9px] bg-slate-50 border border-slate-100 rounded-lg px-2 py-1 flex items-center gap-1">
+                        <span key={i} className="text-[11px] bg-slate-50 border border-slate-100 rounded-lg px-2 py-1 flex items-center gap-1">
                           <span className="font-bold text-slate-700">{p.name}</span>
-                          <span className="text-slate-400">{p.count}人</span>
-                          {'leader' in p && p.leader && <span className="text-emerald-600">★{p.leader}</span>}
+                          <span className="text-slate-500">{p.count}人</span>
+                          {'leader' in p && p.leader && <span className="text-emerald-700">★{p.leader}</span>}
                         </span>
                       ))}
                     </div>
@@ -252,10 +252,10 @@ export default function DashboardPage() {
         <section>
           <div className="flex items-center justify-between mb-3">
             <h3 className="font-bold text-sm flex items-center gap-2">
-              <span className="w-6 h-6 bg-violet-500 text-white rounded-lg flex items-center justify-center text-[10px]">🤝</span>
+              <span className="w-6 h-6 bg-violet-600 text-white rounded-lg flex items-center justify-center text-[11px]">🤝</span>
               會議
             </h3>
-            <Link href="/dashboard/meetings" className="text-[10px] text-brand-600 font-bold no-underline">全部 →</Link>
+            <Link href="/dashboard/meetings" className="text-[11px] text-brand-600 font-bold no-underline">全部 →</Link>
           </div>
           <div className="space-y-2">
             {MEETINGS.map(m => (
@@ -266,13 +266,13 @@ export default function DashboardPage() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="font-bold text-xs">{m.title}</div>
-                    <div className="text-[10px] text-slate-400">{m.date} {m.time} · {m.location}</div>
+                    <div className="text-[11px] text-slate-500">{m.date} {m.time} · {m.location}</div>
                   </div>
                   <div className="flex items-center gap-2 flex-shrink-0">
                     {m.files > 0 && (
-                      <span className="text-[9px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded font-bold">📎 {m.files} 文件</span>
+                      <span className="text-[11px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded font-bold">📎 {m.files} 文件</span>
                     )}
-                    <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold ${m.status === 'upcoming' ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-100 text-slate-400'}`}>
+                    <span className={`text-[11px] px-1.5 py-0.5 rounded font-bold ${m.status === 'upcoming' ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
                       {m.status === 'upcoming' ? '即將進行' : '已結束'}
                     </span>
                   </div>
@@ -289,7 +289,7 @@ export default function DashboardPage() {
       {isManager && (
         <section>
           <div className="flex items-center gap-2 mb-3">
-            <span className="w-6 h-6 bg-slate-600 text-white rounded-lg flex items-center justify-center text-[10px]">🔧</span>
+            <span className="w-6 h-6 bg-slate-600 text-white rounded-lg flex items-center justify-center text-[11px]">🔧</span>
             <h3 className="font-bold text-sm">管理中心</h3>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
@@ -297,29 +297,29 @@ export default function DashboardPage() {
               <div className="bg-white rounded-2xl border border-slate-200 p-3 card-hover text-center">
                 <div className="text-2xl mb-1.5">🏢</div>
                 <div className="font-bold text-[11px]">支部管理</div>
-                <div className="text-[9px] text-slate-400 mt-0.5">成員·家長·小隊</div>
+                <div className="text-[11px] text-slate-500 mt-0.5">成員·家長·小隊</div>
               </div>
             </Link>
             <Link href="/dashboard/admin/registrations" className="no-underline text-inherit">
               <div className="bg-white rounded-2xl border border-slate-200 p-3 card-hover text-center">
                 <div className="text-2xl mb-1.5">🎫</div>
                 <div className="font-bold text-[11px]">報名管理</div>
-                <div className="text-[9px] text-slate-400 mt-0.5">內部·外部·付款</div>
+                <div className="text-[11px] text-slate-500 mt-0.5">內部·外部·付款</div>
               </div>
             </Link>
             <Link href="/dashboard/admin/applications" className="no-underline text-inherit">
               <div className="bg-white rounded-2xl border border-slate-200 p-3 card-hover text-center relative">
-                <span className="absolute -top-1 -right-1 text-[8px] bg-rose-500 text-white px-1.5 py-0.5 rounded-full font-bold">2</span>
+                <span className="absolute -top-1 -right-1 text-[11px] bg-rose-600 text-white px-1.5 py-0.5 rounded-full font-bold">2</span>
                 <div className="text-2xl mb-1.5">✅</div>
                 <div className="font-bold text-[11px]">批核中心</div>
-                <div className="text-[9px] text-slate-400 mt-0.5">帳號·成員·物資</div>
+                <div className="text-[11px] text-slate-500 mt-0.5">帳號·成員·物資</div>
               </div>
             </Link>
             <Link href="/dashboard/admin/users" className="no-underline text-inherit">
               <div className="bg-white rounded-2xl border border-slate-200 p-3 card-hover text-center">
                 <div className="text-2xl mb-1.5">👤</div>
                 <div className="font-bold text-[11px]">使用者管理</div>
-                <div className="text-[9px] text-slate-400 mt-0.5">帳號·權限·紀錄</div>
+                <div className="text-[11px] text-slate-500 mt-0.5">帳號·權限·紀錄</div>
               </div>
             </Link>
           </div>
@@ -328,19 +328,19 @@ export default function DashboardPage() {
             <Link href="/dashboard/admin/settings" className="no-underline text-inherit">
               <div className="bg-white rounded-xl border border-slate-200 p-2.5 card-hover text-center">
                 <div className="text-lg mb-1">⚙️</div>
-                <div className="font-bold text-[10px]">系統設定</div>
+                <div className="font-bold text-[11px]">系統設定</div>
               </div>
             </Link>
             <Link href="/dashboard/admin/calendar" className="no-underline text-inherit">
               <div className="bg-white rounded-xl border border-slate-200 p-2.5 card-hover text-center">
                 <div className="text-lg mb-1">📅</div>
-                <div className="font-bold text-[10px]">集會規則</div>
+                <div className="font-bold text-[11px]">集會規則</div>
               </div>
             </Link>
             <Link href="/dashboard/notices" className="no-underline text-inherit">
               <div className="bg-white rounded-xl border border-slate-200 p-2.5 card-hover text-center">
                 <div className="text-lg mb-1">📄</div>
-                <div className="font-bold text-[10px]">通告管理</div>
+                <div className="font-bold text-[11px]">通告管理</div>
               </div>
             </Link>
           </div>

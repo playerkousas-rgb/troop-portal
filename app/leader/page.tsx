@@ -28,14 +28,14 @@ export default function Leader(){
   const events = (s?.events || []).filter(e => e.status === 'published' && (e.scope === 'troop' || e.targetMemberIds.includes(myId) || e.branchId === session?.branchId));
 
   return <Auth roles={['super_admin','admin','group_leader','branch_leader','coach']}><div className="stack">
-    <section className="card stack" style={{ background: 'linear-gradient(135deg, #1a73e8 0%, #4285f4 100%)', color: '#fff' }}>
+    <section className="card stack" style={{ background: 'linear-gradient(135deg, #1557b0 0%, #1a73e8 100%)', color: '#fff' }}>
        <div className="row" style={{ justifyContent: 'space-between' }}>
           <div>
             <h2 style={{ margin: 0 }}>👤 {session?.name}</h2>
             <p style={{ opacity: 0.9, margin: 0 }}>角色：{ROLE_LABEL[session?.role || 'coach']}</p>
           </div>
           <div className="row">
-            <Link href="/profile" className="btn" style={{ background: 'rgba(255,255,255,0.2)', color: '#fff' }}>個人設定 / 改密碼</Link>
+            <Link href="/profile" className="btn" style={{ background: 'rgba(255,255,255,0.94)', color: '#0f2742' }}>個人設定 / 改密碼</Link>
           </div>
        </div>
     </section>
@@ -43,6 +43,11 @@ export default function Leader(){
     <section className="hero"><span className="badge gold">領袖控制台</span><p>管理所屬支部的活動、成員及通告。</p></section>
     {err&&<p className="badge red">{err}</p>}
     <section className="grid">
+      <a className="card feature-card" href="/admin/equipment" style={{ textDecoration: 'none' }}>
+        <h3>📦 物資借用管理</h3>
+        <p className="muted">新增／修改物資及庫存，批核成員借用申請，歸還後 Tick 已歸還即回補庫存。</p>
+        <span className="btn block">前往物資管理</span>
+      </a>
       <SummaryCard label="活動" value={stats.activities} desc="已發布活動" tone="green"/>
       <SummaryCard label="待審批" value={stats.pending} desc="等待審批申請" tone="red"/>
       <SummaryCard label="通告" value={stats.notices} desc="圖書館引入通告" tone="gold"/>

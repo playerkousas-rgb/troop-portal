@@ -121,6 +121,55 @@ export async function apiHealth() {
   return apiGet('health');
 }
 
+/**
+ * 連線診斷：一次過檢查「前端 → /api/proxy → Apps Script」整條鏈。
+ * 用原始 fetch（不經 apiGet），即使後台回 success:false 也能把錯誤內容帶回來，
+ * 讓登入頁可以顯示可執行的修復建議，而不是一句「登入失敗」。
+ */
+export async function apiDiagnose(): Promise<{
+  troopKey: string;
+  proxyOk: boolean;
+  apiKeySet?: boolean;
+  webAppOk?: boolean;
+  version?: string;
+  error?: string;
+}> {
+  const out: any = { troopKey: getTroopKey(), proxyOk: false };
+
+  if (typeof window === 'undefined') return out;
+
+  // 1) Vercel proxy + 環境變數（API Key 有沒有設）
+  try {
+    const dbgUrl = new URL('/api/proxy', window.location.origin);
+    dbgUrl.searchParams.set('action', 'proxyDebug');
+    dbgUrl.searchParams.set('troopKey', out.troopKey || 'unknown');
+    const res = await fetch(dbgUrl.toString(), { cache: 'no-store' });
+    const dbg = await res.json().catch(() => ({}));
+    out.proxyOk = !!dbg?.success || !!dbg?.debug;
+    out.apiKeySet = !!dbg?.apiKeyFound;
+    if (dbg?.error) out.error = dbg.error;
+    if (dbg?.envVarName) out.envVarName = dbg.envVarName;
+  } catch (e: any) {
+    out.error = '無法連到本站的 /api/proxy：' + (e?.message || String(e));
+    return out;
+  }
+
+  // 2) Apps Script Web App + 版本
+  try {
+    const res = await fetch(buildUrl('health'), { cache: 'no-store' });
+    const data = await res.json().catch(() => ({}));
+    out.webAppOk = !!data?.success;
+    out.version = data?.version;
+    if (!out.webAppOk && (data?.error || data?.raw)) {
+      out.error = data.error || ('Apps Script 回傳：' + String(data.raw || '').slice(0, 120));
+    }
+  } catch (e: any) {
+    out.error = '無法連到 Google Apps Script：' + (e?.message || String(e));
+  }
+
+  return out;
+}
+
 // ==================== 寫入：通用 mutate ====================
 
 async function withSubmissionLock<T>(action: string, runner: () => Promise<T>): Promise<T> {
@@ -169,6 +218,57 @@ export async function apiApplyJoin(p: { type: string; name: string; email: strin
   if (isMockMode()) return mockHandle('applyJoin', p as any);
   const res = await fetch(buildUrl('applyJoin', p as any), { cache: 'no-store' });
   return res.json();
+}
+
+// ==================== 物資（Equipment）／借用（EquipmentLoans） ====================
+
+/** 讀取物資清單 + 借用紀錄（含該角色看得到的範圍，由 GS 依角色過濾） */
+export async function apiGetEquipment() {
+  const data = await apiGet<{ success: boolean; state?: AppState; error?: string }>('getEquipment', {
+    userId: currentUser()?.userId || '',
+  });
+  if (!data.success || !data.state) throw new Error(data.error || '讀取物資失敗');
+  return data.state;
+}
+
+export function apiCreateEquipment(p: { name: string; category?: string; unit?: string; totalQty?: number | string; location?: string; note?: string; enabled?: boolean }) {
+  return apiMutate('createEquipment', p as any);
+}
+export function apiUpdateEquipment(p: { equipmentId: string; name?: string; category?: string; unit?: string; totalQty?: number | string; location?: string; note?: string; enabled?: boolean }) {
+  return apiMutate('updateEquipment', p as any);
+}
+/** 入庫（+delta）／報廢（-delta） */
+export function apiAdjustEquipmentQty(equipmentId: string, delta: number, note?: string) {
+  return apiMutate('adjustEquipmentQty', { equipmentId, delta: String(delta), note: note || '' });
+}
+export function apiDeleteEquipment(equipmentId: string) {
+  return apiMutate('deleteEquipment', { equipmentId });
+}
+
+/** 借用申請：一次可借多項（items = [{ equipmentId, qty }]） */
+export function apiRequestEquipmentLoan(p: { items: { equipmentId: string; qty: number }[]; borrowDate: string; returnDueDate: string; purpose?: string; note?: string; memberId?: string }) {
+  return apiMutate('requestEquipmentLoan', {
+    items: JSON.stringify(p.items),
+    borrowDate: p.borrowDate,
+    returnDueDate: p.returnDueDate,
+    purpose: p.purpose || '',
+    note: p.note || '',
+    memberId: p.memberId || '',
+  });
+}
+export function apiUpdateEquipmentLoan(p: { loanId: string; qty?: number; purpose?: string; borrowDate?: string; returnDueDate?: string; note?: string }) {
+  return apiMutate('updateEquipmentLoan', p as any);
+}
+export function apiCancelEquipmentLoan(loanId: string) {
+  return apiMutate('cancelEquipmentLoan', { loanId });
+}
+/** 領袖批核：approved 會即時扣庫存 */
+export function apiDecideEquipmentLoan(loanId: string, decision: 'approved' | 'rejected', note?: string) {
+  return apiMutate('decideEquipmentLoan', { loanId, decision, note: note || '' });
+}
+/** 領袖 Tick 已歸還 → 庫存回補 */
+export function apiReturnEquipmentLoan(loanId: string, note?: string) {
+  return apiMutate('returnEquipmentLoan', { loanId, note: note || '' });
 }
 
 // ==================== 成員 ====================
