@@ -2,12 +2,14 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
+import { isMockMode } from '@/lib/mock';
 
 export default function TopNav() {
   const pathname = usePathname();
   const [troop, setTroop] = useState<{ name: string; id: string } | null>(null);
   const [user, setUser] = useState<{ name: string; role: string } | null>(null);
   const [showMenu, setShowMenu] = useState(false);
+  const [mockOn, setMockOn] = useState(false);
 
   useEffect(() => {
     try {
@@ -18,7 +20,8 @@ export default function TopNav() {
       const u = JSON.parse(localStorage.getItem('scoutsystem2_current_user') || 'null');
       if (u) setUser({ name: u.name, role: u.role });
     } catch {}
-  }, []);
+    setMockOn(isMockMode());
+  }, [pathname]);
 
   const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
 
@@ -28,6 +31,9 @@ export default function TopNav() {
         {/* 左：身份 */}
         <Link href={user ? '/dashboard' : '/'} className="flex items-center gap-2 no-underline min-w-0">
           <div className="w-8 h-8 bg-scout-blue text-white rounded-xl flex items-center justify-center text-sm flex-shrink-0">⚜</div>
+          {mockOn && (
+            <span className="text-[9px] font-black bg-amber-100 text-amber-700 border border-amber-300 rounded-full px-1.5 py-0.5 flex-shrink-0">🎭 DEMO</span>
+          )}
           <div className="min-w-0">
             {user ? (
               <>

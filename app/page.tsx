@@ -2,6 +2,7 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { activeTroops } from '@/lib/troops';
+import { isMockMode, setMockMode, MOCK_TROOP } from '@/lib/mock';
 
 // ── 旅團資料（已接入旅團登記表，key 需與 /api/proxy 查詢一致） ──
 const TROOPS = activeTroops();
@@ -9,12 +10,14 @@ const TROOPS = activeTroops();
 export default function HomePage() {
   const [selectedKey, setSelectedKey] = useState('');
   const [msg, setMsg] = useState('');
+  const [mockOn, setMockOn] = useState(false);
 
   useEffect(() => {
     try {
       const t = JSON.parse(localStorage.getItem('scoutsystem2_selected_troop') || 'null');
       if (t) setSelectedKey(t.key || '');
     } catch {}
+    setMockOn(isMockMode());
   }, []);
 
   function selectTroop() {
@@ -26,7 +29,27 @@ export default function HomePage() {
     setMsg('✅ 已選擇 ' + troop.name);
   }
 
+  /** 進入全模擬 Demo 模式（純前端 mock，不碰任何真實系統） */
+  function enterDemo() {
+    setMockMode(true);
+    localStorage.setItem('scoutsystem2_selected_troop', JSON.stringify({
+      key: MOCK_TROOP.key, id: MOCK_TROOP.id, name: MOCK_TROOP.name,
+    }));
+    setSelectedKey(MOCK_TROOP.key);
+    setMockOn(true);
+    setMsg('🎭 已切換到演示模式（全模擬資料）');
+  }
+
+  function exitDemo() {
+    setMockMode(false);
+    setMockOn(false);
+    setSelectedKey('');
+    localStorage.removeItem('scoutsystem2_selected_troop');
+    setMsg('已退出演示模式');
+  }
+
   const selected = TROOPS.find(t => t.key === selectedKey);
+  const selectedDemo = mockOn && selectedKey === MOCK_TROOP.key;
 
   return (
     <div className="min-h-screen">
@@ -76,7 +99,7 @@ export default function HomePage() {
             {TROOPS.map(t => (
               <button
                 key={t.key}
-                onClick={() => { setSelectedKey(t.key); setMsg(''); }}
+                onClick={() => { setSelectedKey(t.key); setMsg(''); if (mockOn) { setMockMode(false); setMockOn(false); } }}
                 className={`
                   text-left rounded-xl border-2 p-4 transition-all cursor-pointer
                   ${selectedKey === t.key
@@ -97,20 +120,57 @@ export default function HomePage() {
                 </div>
               </button>
             ))}
+            {/* ── 全模擬 Demo（純前端，不碰真實系統） ── */}
+            <button
+              onClick={enterDemo}
+              className={`
+                text-left rounded-xl border-2 p-4 transition-all cursor-pointer
+                ${selectedDemo
+                  ? 'border-amber-400 bg-amber-50 shadow-md ring-2 ring-amber-200'
+                  : 'border-amber-200 bg-gradient-to-br from-amber-50/60 to-white hover:border-amber-300'
+                }
+              `}
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-11 h-11 bg-amber-100 rounded-xl flex items-center justify-center text-2xl">🎭</div>
+                <div className="flex-1 min-w-0">
+                  <div className="font-bold text-sm text-amber-800">演示體驗 · 全模擬</div>
+                  <div className="text-[11px] text-amber-600/80">7 種角色帳號 · 假資料 · 免後台</div>
+                </div>
+                {selectedDemo && (
+                  <div className="w-6 h-6 bg-amber-500 text-white rounded-full flex items-center justify-center text-xs font-bold">✓</div>
+                )}
+              </div>
+            </button>
           </div>
-          {selected && (
+          {(selected || selectedDemo) && (
             <div className="mt-5 flex items-center gap-3 flex-wrap">
-              <button
-                onClick={selectTroop}
-                className="bg-brand-600 text-white px-6 py-2.5 rounded-xl text-sm font-bold hover:bg-brand-700 transition shadow"
-              >
-                使用此旅團 →
-              </button>
+              {selectedDemo ? (
+                <>
+                  <Link
+                    href="/login"
+                    className="inline-flex items-center gap-2 bg-amber-500 text-white px-6 py-2.5 rounded-xl text-sm font-bold hover:bg-amber-600 transition shadow"
+                  >
+                    🎭 進入演示 →
+                  </Link>
+                  <button onClick={exitDemo} className="text-xs text-slate-500 underline underline-offset-2 hover:text-slate-700">
+                    退出演示模式
+                  </button>
+                </>
+              ) : (
+                <button
+                  onClick={selectTroop}
+                  className="bg-brand-600 text-white px-6 py-2.5 rounded-xl text-sm font-bold hover:bg-brand-700 transition shadow"
+                >
+                  使用此旅團 →
+                </button>
+              )}
               {msg && <span className="text-sm text-emerald-600 font-bold">{msg}</span>}
             </div>
           )}
           <p className="mt-4 text-[11px] text-slate-400">
             💡 看不到你的旅團？代表尚未開通，請先聯絡管理員申請接入。
+            🎭「演示體驗」用全套模擬資料展示 APP 功能，不連接任何真實後台。
           </p>
         </section>
 

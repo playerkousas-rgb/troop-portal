@@ -2,6 +2,7 @@
 import { AppState } from './store';
 import { Role } from './model';
 import { getSession } from './session';
+import { isMockMode, mockHandle } from './mock';
 
 // ==================== 取得旅團資訊 ====================
 
@@ -29,6 +30,7 @@ function buildUrl(action: string, params?: Record<string, string | undefined>): 
 }
 
 async function apiGet<T = any>(action: string, params?: Record<string, string | undefined>): Promise<T> {
+  if (isMockMode()) return Promise.resolve(mockHandle(action, params || {}) as T);
   const res = await fetch(buildUrl(action, params), { cache: 'no-store' });
   const data = await res.json();
   if (!data.success && data.error) {
@@ -38,6 +40,7 @@ async function apiGet<T = any>(action: string, params?: Record<string, string | 
 }
 
 async function apiPost<T = any>(action: string, body: Record<string, any>): Promise<T> {
+  if (isMockMode()) return Promise.resolve(mockHandle(action, { ...body, action }) as T);
   const troopKey = getTroopKey();
   const url = new URL('/api/proxy', window.location.origin);
   url.searchParams.set('action', action);
@@ -103,6 +106,7 @@ export async function apiLogin(params: {
 export async function apiForgotPassword(params: {
   identifier: string; loginType: 'account' | 'member';
 }) {
+  if (isMockMode()) return mockHandle('forgotPassword', params as any);
   const res = await fetch(buildUrl('forgotPassword', params as any), { cache: 'no-store' });
   return res.json();
 }
@@ -162,6 +166,7 @@ async function apiMutatePost(action: string, body: Record<string, any>): Promise
 // ==================== 公開 API（不需登入） ====================
 
 export async function apiApplyJoin(p: { type: string; name: string; email: string; role: string; branchId?: string; ymNumbers?: string; note?: string }) {
+  if (isMockMode()) return mockHandle('applyJoin', p as any);
   const res = await fetch(buildUrl('applyJoin', p as any), { cache: 'no-store' });
   return res.json();
 }
