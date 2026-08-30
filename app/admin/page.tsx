@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react';
 import Auth from '@/components/Auth';
 import { FeatureCard, SummaryCard } from '@/components/Cards';
-import { AppState, loadState, computeStats } from '@/lib/store';
+import { AppState, loadStateSlice, computeStats } from '@/lib/store';
 import { isAdmin, ROLE_LABEL } from '@/lib/model';
 import Link from 'next/link';
 import AttendanceCard from '@/components/AttendanceCard';
@@ -28,7 +28,8 @@ const FEATURE_DEFS: Record<string,{title:string;icon:string;text:string;href:str
 export default function Admin(){
   const [s,setS]=useState<AppState|null>(null);
   const [err,setErr]=useState('');
-  useEffect(()=>{loadState().then(setS).catch(e=>setErr(e.message))},[]);
+  // 按需載入：管理摘要（computeStats 用到 users/applications/events/bookmarks）
+  useEffect(()=>{loadStateSlice(['users','applications','events','bookmarks']).then(setS).catch(e=>setErr(e.message))},[]);
   const stats=s?computeStats(s):{users:0,pending:0,activities:0,notices:0};
   
   let features = s?.userFeatures || [];

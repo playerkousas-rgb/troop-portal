@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { AppState, loadState } from '@/lib/store';
+import { AppState, loadStateSlice } from '@/lib/store';
 import { apiDecideApplication } from '@/lib/api';
 import { ROLE_LABEL, branches } from '@/lib/model';
 
@@ -10,7 +10,7 @@ export default function Page(){
   const [popup,setPopup]=useState<{name:string;status:string}|null>(null);
   const [processingId,setProcessingId]=useState('');
 
-  useEffect(()=>{loadState().then(setS).catch(e=>setErr(e.message))},[]);
+  useEffect(()=>{loadStateSlice(['applications']).then(setS).catch(e=>setErr(e.message))},[]);
 
   async function decide(id:string,name:string,status:'approved'|'rejected'){
     setErr('');setProcessingId(id);

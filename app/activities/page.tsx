@@ -1,10 +1,10 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { AppState, loadState } from '@/lib/store';
+import { AppState, loadStateSlice } from '@/lib/store';
 import Link from 'next/link';
 export default function Activities(){
   const [s,setS]=useState<AppState|null>(null);const [err,setErr]=useState('');
-  useEffect(()=>{loadState().then(setS).catch(e=>setErr(e.message))},[]);
+  useEffect(()=>{loadStateSlice(['events']).then(setS).catch(e=>setErr(e.message))},[]);
   if(err)return <div className="card"><p className="badge red">{err}</p></div>;
   if(!s)return <div className="card">載入中...</div>;
   const published=s.events.filter(e=>e.status==='published');

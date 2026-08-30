@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { AppState, loadState } from '@/lib/store';
+import { AppState, loadState, loadStateSlice } from '@/lib/store';
 import { apiToggleRegularMeeting, apiCreateRegularMeeting, apiCreateEvent, apiDeleteRegularMeeting, apiUpdateRegularMeeting } from '@/lib/api';
 import { branches } from '@/lib/model';
 import { getSession } from '@/lib/session';
@@ -39,7 +39,7 @@ export default function Page(){
   const [spStartTime,setSpStartTime]=useState('');
   const [spEndTime,setSpEndTime]=useState('');
 
-  useEffect(()=>{loadState().then(setS).catch(e=>setErr(e.message))},[]);
+  useEffect(()=>{loadStateSlice(['events','regularMeetings']).then(setS).catch(e=>setErr(e.message))},[]);
 
   function toggleBranch(id:string,setFn:(fn:(prev:string[])=>string[])=>void){setFn(prev=>prev.includes(id)?prev.filter(x=>x!==id):[...prev,id])}
 

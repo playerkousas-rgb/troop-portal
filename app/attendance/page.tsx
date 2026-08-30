@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import Auth from '@/components/Auth';
-import { AppState, loadState, Member } from '@/lib/store';
+import { AppState, loadStateSlice, Member } from '@/lib/store';
 import { branches as BRANCH_DEFS, Role } from '@/lib/model';
 import { getSession, Session } from '@/lib/session';
 import {
@@ -87,7 +87,7 @@ export default function AttendancePage() {
   useEffect(() => {
     const current = getSession();
     setSession(current);
-    loadState()
+    loadStateSlice(['patrols','users','members','events','regularMeetings'])
       .then(st => {
         setState(st);
         const firstBranch = current?.branchId

@@ -916,7 +916,9 @@ function mapConfig_() {
  * member：只看到自己 + 自己支部活動
  * 未登入：只回 config + branches
  */
-function buildDashboard(userId) {
+function buildDashboard(userId) { return buildDashboardCore_(userId, true); }
+
+function buildDashboardCore_(userId, loadPdfs) {
   // 技術測試帳號
   var techAccounts = TECH_TEST_ACCOUNTS_;
   var isTechTest = techAccounts.indexOf(userId) >= 0;
@@ -976,7 +978,8 @@ function buildDashboard(userId) {
   try { state.userFeatures = getUserFeatures_(userId, role); } catch(e) {}
 
   // Load announcement PDFs and filter by user role
-  try {
+  // 切片模式（loadPdfs=false）跳過 Drive 呼叫，加快回應
+  if (loadPdfs) try {
     var pdfResult = apiListAnnouncementPdfs();
     if (pdfResult.success) {
       var allPdfs = pdfResult.files || [];
@@ -998,7 +1001,13 @@ function buildDashboard(userId) {
         });
       } else if (role === 'parent') {
         // Show PDFs for any branch the children belong to
-        var childBranchShorts = children.map(function(m) {
+        // （此處 children 尚未定義，需另行計算 — 修復原來的 ReferenceError）
+        var pdfParentUser = allUsers.filter(function (u) { return u.id === userId; })[0];
+        var pdfChildIds = (pdfParentUser ? pdfParentUser.childMemberIds : []) || [];
+        var pdfChildren = allMembers.filter(function (m) {
+          return pdfChildIds.indexOf(m.id) >= 0 || m.parentUserId === userId;
+        });
+        var childBranchShorts = pdfChildren.map(function(m) {
           var br = readTable_('Branches').filter(function(b){return getField_(b,'branchId')===m.branchId;})[0];
           return br ? getField_(br,'name') : m.branchId;
         });
@@ -1163,6 +1172,49 @@ function buildDashboard(userId) {
   }
 
   return state;
+}
+
+// ==================== 按需載入：資料切片（3.0 API 拆分） ====================
+
+/**
+ * buildStateSlice_(userId, keys) — 只回傳指定欄位的 AppState 切片
+ *
+ * - keys：逗號分隔的欄位名，例如 'members,patrols' 或
+ *         'regularMeetings,cancelledMeetings,events,meetings'
+ * - 角色過濾邏輯與 buildDashboard 完全相同（走同一份 buildDashboardCore_）
+ * - 未請求的欄位回傳空值（空陣列 / 空物件），前端不會因缺欄位而崩潰
+ * - config 與 userFeatures 永遠附上（每個頁面都要）
+ * - keys 不含 announcementPdfs 時跳過 Drive 呼叫（大幅加快回應）
+ *
+ * 前端經 /api/proxy 呼叫對應 action：
+ *   getBootstrap / getCalendar / getActivities / getMembers /
+ *   getEvents / getNotices / getUsers / getSettings /
+ *   getAuditLogs / getMeetings / getState?keys=...
+ */
+function buildStateSlice_(userId, keys) {
+  var keyList = String(keys || 'users,config')
+    .split(',')
+    .map(function (k) { return String(k).trim(); })
+    .filter(Boolean);
+  var needPdfs = keyList.indexOf('announcementPdfs') >= 0;
+  var full = buildDashboardCore_(userId, needPdfs);
+
+  var out = {
+    patrols: [], users: [], members: [], applications: [],
+    events: [], replies: [], bookmarks: [],
+    announcements: [], announcementPdfs: [],
+    regularMeetings: [], cancelledMeetings: [],
+    meetings: [],
+    plugins: [],
+    pluginSettings: [],
+    audits: [],
+    config: full.config || {},
+    userFeatures: full.userFeatures || []
+  };
+  keyList.forEach(function (k) {
+    if (full.hasOwnProperty(k)) out[k] = full[k];
+  });
+  return out;
 }
 
 
@@ -1355,6 +1407,33 @@ function doGet(e) {
 
       case 'getDashboard':
         return json({ success: true, state: buildDashboard(p.userId || '') });
+
+      // ---- 按需載入：per-page slices（3.0 API 拆分） ----
+      // 每個頁面只取自己需要的資料切片，不再一次下載整個 dashboard。
+      // 回傳格式與 getDashboard 相同：{ success: true, state: {...} }（state 只含所請求的欄位）。
+      case 'getBootstrap':
+        return json({ success: true, state: buildStateSlice_(p.userId || '', 'users,config,userFeatures') });
+      case 'getCalendar':
+        return json({ success: true, state: buildStateSlice_(p.userId || '', 'regularMeetings,cancelledMeetings,events,meetings') });
+      case 'getActivities':
+        return json({ success: true, state: buildStateSlice_(p.userId || '', 'events,replies,users,members,bookmarks') });
+      case 'getMembers':
+        return json({ success: true, state: buildStateSlice_(p.userId || '', 'members,patrols,users') });
+      case 'getEvents':
+        return json({ success: true, state: buildStateSlice_(p.userId || '', 'events,replies,members,users') });
+      case 'getNotices':
+        return json({ success: true, state: buildStateSlice_(p.userId || '', 'bookmarks,announcements,announcementPdfs') });
+      case 'getUsers':
+        return json({ success: true, state: buildStateSlice_(p.userId || '', 'users,members') });
+      case 'getSettings':
+        return json({ success: true, state: buildStateSlice_(p.userId || '', 'config,plugins,pluginSettings') });
+      case 'getAuditLogs':
+        return json({ success: true, state: buildStateSlice_(p.userId || '', 'audits') });
+      case 'getMeetings':
+        return json({ success: true, state: buildStateSlice_(p.userId || '', 'meetings') });
+      // 通用切片：前端傳 keys=members,patrols,... 取任意組合
+      case 'getState':
+        return json({ success: true, state: buildStateSlice_(p.userId || '', p.keys || 'users,config') });
 
       case 'getApplications':
         return json({ success: true, applications: filterApplications_(p.userId || '') });

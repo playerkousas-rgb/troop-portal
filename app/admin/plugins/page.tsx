@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { AppState, loadState, PluginCard, PluginSetting } from '@/lib/store';
+import { AppState, loadStateSlice, PluginCard, PluginSetting } from '@/lib/store';
 import { apiSavePluginSetting, apiTogglePluginStatus } from '@/lib/api';
 import Auth from '@/components/Auth';
 import { isCoreNotPlugin } from '@/lib/attendance';
@@ -11,7 +11,7 @@ export default function PluginManagementPage() {
   const [ok, setOk] = useState('');
   const [loadingId, setLoadingId] = useState<string | null>(null);
 
-  useEffect(() => { loadState().then(setS).catch(e => setErr(e.message)) }, []);
+  useEffect(() => { loadStateSlice(['plugins','pluginSettings']).then(setS).catch(e => setErr(e.message)) }, []);
 
   async function saveSettings(pluginId: string, fields: Partial<PluginSetting>) {
     setErr(''); setOk(''); setLoadingId(pluginId + '-save');

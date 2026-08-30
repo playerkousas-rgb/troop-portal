@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { AppState, loadState } from '@/lib/store';
+import { AppState, loadStateSlice } from '@/lib/store';
 import { apiToggleUser, apiCreateUser, apiUpdateUserRole, apiDeleteUser, apiGrantFeature, apiRevokeFeature, apiGetUserFeatures, apiUpdateUserPermissions, apiBatchCreateUsers, apiBatchCreateMembers } from '@/lib/api';
 import { ROLE_LABEL, branches, LEADER_ROLES } from '@/lib/model';
 import { checkEditPermission, assignableRoles } from '@/lib/permissions';
@@ -98,7 +98,7 @@ export default function Page(){
   const [isMemberPerms, setIsMemberPerms] = useState(false);
   const session=getSession();
 
-  useEffect(()=>{loadState().then(setS).catch(e=>setErr(e.message))},[]);
+  useEffect(()=>{loadStateSlice(['patrols','users','members']).then(setS).catch(e=>setErr(e.message))},[]);
   useEffect(()=>{
     if (s && typeof window !== 'undefined' && window.location.hash === '#bulk-onboard') {
       setShowBulk(true);

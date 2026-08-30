@@ -1,13 +1,10 @@
 'use client';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
+import { activeTroops } from '@/lib/troops';
 
-// ── 旅團資料（之後接 API） ──
-const TROOPS = [
-  { key: 't0082', id: '0082', name: '第82旅' },
-  { key: 't0114', id: '0114', name: '第114旅' },
-  { key: 't0045', id: '0045', name: '第45旅' },
-];
+// ── 旅團資料（已接入旅團登記表，key 需與 /api/proxy 查詢一致） ──
+const TROOPS = activeTroops();
 
 export default function HomePage() {
   const [selectedKey, setSelectedKey] = useState('');

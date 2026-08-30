@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { AppState, loadState } from '@/lib/store';
+import { AppState, loadStateSlice } from '@/lib/store';
 import { apiCreateEvent, apiPublishEvent, apiUpdateEvent, apiDeleteEvent } from '@/lib/api';
 import { branches } from '@/lib/model';
 
@@ -17,7 +17,7 @@ export default function Page(){
   const [editFee,setEditFee]=useState('');const [editScope,setEditScope]=useState<'troop'|'branch'>('troop');const [editBranchId,setEditBranchId]=useState('');
   const [editPaymentUrl,setEditPaymentUrl]=useState('');const [editDutyPatrol,setEditDutyPatrol]=useState('');
 
-  useEffect(()=>{loadState().then(setS).catch(e=>setErr(e.message))},[]);
+  useEffect(()=>{loadStateSlice(['events']).then(setS).catch(e=>setErr(e.message))},[]);
 
   async function add(){
     if(!title.trim()){setErr('請填活動標題');return;}

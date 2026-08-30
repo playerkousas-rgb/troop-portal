@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { AppState, loadState, Bookmark } from '@/lib/store';
+import { AppState, loadStateSlice, Bookmark } from '@/lib/store';
 import { apiSaveConfig, apiUpdateBookmark, apiDeleteBookmark, apiUpdatePdfTags } from '@/lib/api';
 import { getSession } from '@/lib/session';
 import { branches } from '@/lib/model';
@@ -27,7 +27,7 @@ export default function Notices(){
   const [pdfBranches,setPdfBranches]=useState<string[]>([]);
   const [pdfAudience,setPdfAudience]=useState<string[]>([]);
 
-  useEffect(()=>{loadState().then(st=>{setS(st);setFolderId(st.config.ANNOUNCEMENT_FOLDER_ID||'')}).catch(e=>setErr(e.message))},[]);
+  useEffect(()=>{loadStateSlice(['bookmarks','announcementPdfs']).then(st=>{setS(st);setFolderId(st.config.ANNOUNCEMENT_FOLDER_ID||'')}).catch(e=>setErr(e.message))},[]);
 
   async function saveFolder(){setErr('');setOk('');try{const f=await apiSaveConfig('ANNOUNCEMENT_FOLDER_ID',folderId);setS(f);setOk('✅ 已儲存')}catch(e:any){setErr(e.message)}}
   async function reload(){setErr('');setOk('');try{const {loadState}=await import('@/lib/store');const f=await loadState();setS(f);setOk('✅ 已重新讀取')}catch(e:any){setErr(e.message)}}

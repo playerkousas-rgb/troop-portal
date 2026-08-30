@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { AppState, loadState, PluginCard, PluginSetting } from '@/lib/store';
+import { AppState, loadStateSlice, PluginCard, PluginSetting } from '@/lib/store';
 import { apiSavePluginSetting } from '@/lib/api';
 import Link from 'next/link';
 
@@ -10,7 +10,7 @@ export default function PluginSettingsPage() {
   const [ok, setOk] = useState('');
   const [saving, setSaving] = useState<string | null>(null);
 
-  useEffect(() => { loadState().then(setS).catch(e => setErr(e.message)) }, []);
+  useEffect(() => { loadStateSlice(['plugins','pluginSettings']).then(setS).catch(e => setErr(e.message)) }, []);
 
   async function save(pluginId: string, fields: Partial<PluginSetting>) {
     setErr(''); setOk(''); setSaving(pluginId);

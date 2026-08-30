@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { AppState, loadState, User } from '@/lib/store';
+import { AppState, loadStateSlice, User } from '@/lib/store';
 import { apiUpdateUserPermissions } from '@/lib/api';
 
 const ALL_FEATURES = [
@@ -23,7 +23,7 @@ export default function PermissionsAdmin() {
   const [selectedUser, setSelectedId] = useState<string>('');
   const [userPerms, setUserPerms] = useState<string[]>([]);
 
-  useEffect(() => { loadState().then(setS).catch(e => setErr(e.message)) }, []);
+  useEffect(() => { loadStateSlice(['users','members']).then(setS).catch(e => setErr(e.message)) }, []);
 
   const users = s?.users.filter(u => ['admin', 'group_leader', 'branch_leader', 'coach', 'troop_super'].includes(u.role)) || [];
 
