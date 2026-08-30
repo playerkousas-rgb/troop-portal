@@ -12,6 +12,7 @@
  */
 import type { AppState } from './store';
 import type { Role } from './model';
+import { branches as modelBranches } from './model';
 
 // ==================== 模式開關 ====================
 
@@ -39,12 +40,17 @@ const seed: AppState = {
     ANNOUNCEMENT_FOLDER_ID: '',
   },
   patrols: [
+    { id: 'p01', branchId: 'b1', name: 'BEE', short: 'B', memberIds: [], enabled: true, order: 1 },
+    { id: 'p02', branchId: 'b1', name: 'ANT', short: 'A', memberIds: [], enabled: true, order: 2 },
     { id: 'p1', branchId: 'b2', name: '紅', short: 'R', memberIds: [], enabled: true, order: 1 },
     { id: 'p2', branchId: 'b2', name: '黃', short: 'Y', memberIds: [], enabled: true, order: 2 },
     { id: 'p3', branchId: 'b2', name: '藍', short: 'B', memberIds: [], enabled: true, order: 3 },
     { id: 'p10', branchId: 'b3', name: 'TIGER', short: 'T', memberIds: [], enabled: true, order: 1 },
     { id: 'p11', branchId: 'b3', name: 'SEAGULL', short: 'S', memberIds: [], enabled: true, order: 2 },
     { id: 'p12', branchId: 'b3', name: 'WOLF', short: 'W', memberIds: [], enabled: true, order: 3 },
+    { id: 'p20', branchId: 'b4', name: 'EAGLE', short: 'E', memberIds: [], enabled: true, order: 1 },
+    { id: 'p21', branchId: 'b4', name: 'FALCON', short: 'F', memberIds: [], enabled: true, order: 2 },
+    { id: 'p30', branchId: 'b5', name: 'ROVER', short: 'RV', memberIds: [], enabled: true, order: 1 },
   ],
   members: [
     { id: 'm01', ymNumber: '3000000001', name: '陳大文', branchId: 'b3', patrolId: 'p12', patrolRole: 'leader', age: 16, dateOfBirth: '2010-06-12', parentUserId: 'u5', active: true },
@@ -54,9 +60,12 @@ const seed: AppState = {
     { id: 'm05', ymNumber: '3000000005', name: '林小雨', branchId: 'b2', patrolId: 'p1', patrolRole: 'member', age: 8, dateOfBirth: '2018-05-15', parentUserId: 'u9', active: true },
     { id: 'm06', ymNumber: '3000000006', name: '黃芷晴', branchId: 'b2', patrolId: 'p2', patrolRole: 'member', age: 9, dateOfBirth: '2017-02-10', active: true },
     { id: 'm07', ymNumber: '3000000007', name: '劉琪琪', branchId: 'b2', patrolId: 'p3', patrolRole: 'member', age: 10, dateOfBirth: '2016-08-25', active: true },
-    { id: 'm08', ymNumber: '3000000008', name: '周嘉欣', branchId: 'b4', age: 19, dateOfBirth: '2007-04-30', active: true },
-    { id: 'm09', ymNumber: '3000000009', name: '吳兆康', branchId: 'b5', age: 21, dateOfBirth: '2005-01-15', active: true },
-    { id: 'm10', ymNumber: '3000000010', name: '鄭蓓蓓', branchId: 'b1', age: 6, dateOfBirth: '2020-03-03', active: true },
+    { id: 'm08', ymNumber: '3000000008', name: '周嘉欣', branchId: 'b4', patrolId: 'p20', patrolRole: 'leader', age: 19, dateOfBirth: '2007-04-30', active: true },
+    { id: 'm09', ymNumber: '3000000009', name: '吳兆康', branchId: 'b5', patrolId: 'p30', patrolRole: 'leader', age: 21, dateOfBirth: '2005-01-15', active: true },
+    { id: 'm10', ymNumber: '3000000010', name: '鄭蓓蓓', branchId: 'b1', patrolId: 'p01', patrolRole: 'member', age: 6, dateOfBirth: '2020-03-03', parentUserId: 'u9', active: true },
+    { id: 'm11', ymNumber: '3000000011', name: '黃嘉怡', branchId: 'b4', patrolId: 'p21', patrolRole: 'member', age: 19, dateOfBirth: '2007-09-18', active: true },
+    { id: 'm12', ymNumber: '3000000012', name: '陳俊傑', branchId: 'b5', patrolId: 'p30', patrolRole: 'member', age: 20, dateOfBirth: '2006-07-22', active: true },
+    { id: 'm13', ymNumber: '3000000013', name: '蔡可可', branchId: 'b1', patrolId: 'p02', patrolRole: 'member', age: 7, dateOfBirth: '2019-04-08', parentUserId: 'u9', active: true },
   ],
   users: [
     { id: 'u_admin', name: '陳堅強', email: 'admin@demo.scout', role: 'admin', approved: true },
@@ -65,7 +74,7 @@ const seed: AppState = {
     { id: 'u_bl', name: '黃志遠', email: 'bl@demo.scout', role: 'branch_leader', branchId: 'b3', approved: true },
     { id: 'u_coach', name: '何健', email: 'coach@demo.scout', role: 'coach', branchId: 'b3', approved: true },
     { id: 'u5', name: '王秀蘭', email: 'parent1@demo.scout', role: 'parent', childMemberIds: ['m01'], approved: true },
-    { id: 'u9', name: '林國雄', email: 'parent2@demo.scout', role: 'parent', childMemberIds: ['m05'], approved: true },
+    { id: 'u9', name: '林國雄', email: 'parent2@demo.scout', role: 'parent', childMemberIds: ['m05', 'm10', 'm13'], approved: true },
     { id: 'u_m1', name: '陳大文', email: 'm01@demo.scout', role: 'member', branchId: 'b3', memberId: 'm01', approved: true },
     { id: 'u_m2', name: '王小名', email: 'm02@demo.scout', role: 'member', branchId: 'b3', memberId: 'm02', approved: true },
     { id: 'u_m4', name: '張磊磊', email: 'm04@demo.scout', role: 'member', branchId: 'b3', memberId: 'm04', approved: true },
@@ -73,10 +82,12 @@ const seed: AppState = {
   ],
   events: [
     { id: 'e01', title: '九月山徑健行', date: '2026-09-12', location: '大帽山', scope: 'branch', branchId: 'b3', kind: 'activity', status: 'published', source: '手動新增', targetMemberIds: ['m01', 'm02', 'm03', 'm04'], fee: '50', paymentUrl: 'https://pay.example.com/e01' },
-    { id: 'e02', title: '童軍週末營(兩日一夜)', date: '2026-10-03', location: '青年會營地', scope: 'troop', kind: 'activity', status: 'published', source: '手動新增', targetMemberIds: ['m01', 'm02', 'm03', 'm04', 'm08', 'm09'], fee: '300', paymentUrl: 'https://pay.example.com/e02' },
+    { id: 'e02', title: '童軍週末營(兩日一夜)', date: '2026-10-03', location: '青年會營地', scope: 'troop', kind: 'activity', status: 'published', source: '手動新增', targetMemberIds: ['m01', 'm02', 'm03', 'm04', 'm08', 'm09', 'm11', 'm12'], fee: '300', paymentUrl: 'https://pay.example.com/e02' },
     { id: 'e03', title: '十一區運動會', date: '2026-10-01', location: '東區公園', scope: 'branch', branchId: 'b2', kind: 'activity', status: 'published', source: '圖書館轉入', targetMemberIds: ['m05', 'm06', 'm07'], fee: '80' },
-    { id: 'e04', title: '新領袖訓練班', date: '2026-11-08', location: '旅團會議室', scope: 'troop', kind: 'activity', status: 'draft', source: '手動新增', targetMemberIds: ['m04', 'm08', 'm09'] },
-    { id: 'e05', title: '樂行社區服務日', date: '2026-09-20', location: '觀塘邨', scope: 'branch', branchId: 'b5', kind: 'activity', status: 'published', source: '手動新增', targetMemberIds: ['m09'], fee: '0' },
+    { id: 'e04', title: '新領袖訓練班', date: '2026-11-08', location: '旅團會議室', scope: 'troop', kind: 'activity', status: 'draft', source: '手動新增', targetMemberIds: ['m04', 'm08', 'm09', 'm11', 'm12'] },
+    { id: 'e05', title: '樂行社區服務日', date: '2026-09-20', location: '觀塘邨', scope: 'branch', branchId: 'b5', kind: 'activity', status: 'published', source: '手動新增', targetMemberIds: ['m09', 'm12'], fee: '0' },
+    { id: 'e06', title: '深資遠征(兩日一夜)', date: '2026-10-10', location: '西貢麥理浩徑', scope: 'branch', branchId: 'b4', kind: 'activity', status: 'published', source: '手動新增', targetMemberIds: ['m08', 'm11'], fee: '250', paymentUrl: 'https://pay.example.com/e06' },
+    { id: 'e07', title: '小童軍親子日', date: '2026-09-13', location: '本中心園地', scope: 'branch', branchId: 'b1', kind: 'activity', status: 'published', source: '手動新增', targetMemberIds: ['m10', 'm13'], fee: '0' },
   ],
   replies: [
     { id: 'e01_m01', eventId: 'e01', memberId: 'm01', memberName: '陳大文', branchId: 'b3', parentUserId: 'u5', type: 'registered', operatedBy: 'parent', paid: true, updatedAt: '2026-08-20' },
@@ -87,6 +98,10 @@ const seed: AppState = {
     { id: 'e02_m08', eventId: 'e02', memberId: 'm08', memberName: '周嘉欣', branchId: 'b4', type: 'interested', operatedBy: 'member', updatedAt: '2026-08-24' },
     { id: 'e03_m05', eventId: 'e03', memberId: 'm05', memberName: '林小雨', branchId: 'b2', parentUserId: 'u9', type: 'registered', operatedBy: 'parent', paid: true, updatedAt: '2026-08-25' },
     { id: 'e03_m06', eventId: 'e03', memberId: 'm06', memberName: '黃芷晴', branchId: 'b2', type: 'interested', operatedBy: 'parent', updatedAt: '2026-08-25' },
+    { id: 'e06_m08', eventId: 'e06', memberId: 'm08', memberName: '周嘉欣', branchId: 'b4', type: 'registered', operatedBy: 'member', paid: false, updatedAt: '2026-08-26' },
+    { id: 'e06_m11', eventId: 'e06', memberId: 'm11', memberName: '黃嘉怡', branchId: 'b4', type: 'interested', operatedBy: 'member', updatedAt: '2026-08-26' },
+    { id: 'e07_m10', eventId: 'e07', memberId: 'm10', memberName: '鄭蓓蓓', branchId: 'b1', parentUserId: 'u9', type: 'registered', operatedBy: 'parent', updatedAt: '2026-08-27' },
+    { id: 'e07_m13', eventId: 'e07', memberId: 'm13', memberName: '蔡可可', branchId: 'b1', parentUserId: 'u9', type: 'registered', operatedBy: 'parent', paid: true, updatedAt: '2026-08-27' },
   ],
   bookmarks: [
     { id: 'bm01', title: '第 118 周年童軍週', source: '香港童軍', mode: 'informational', branchTags: ['全旅'], audienceTags: ['全旅'], status: 'published', officialDeadline: '2026-09-01', targetText: '周年紀念活動,各旅自行報名。' },
@@ -100,12 +115,15 @@ const seed: AppState = {
     { id: 'pdf02', name: '營地安全指引.pdf', url: '#', visible: true, branchTags: ['童軍'], updatedAt: '2026-08-20' },
   ],
   regularMeetings: [
-    { id: 'rm1', branchId: 'b3', title: '童軍恆常集會', weekday: 6, startTime: '14:00', endTime: '16:00', location: '本中心', enabled: true },
-    { id: 'rm2', branchId: 'b2', title: '幼童軍恆常集會', weekday: 6, startTime: '14:00', endTime: '15:30', location: '本中心', enabled: true },
     { id: 'rm3', branchId: 'b1', title: '小童軍恆常集會', weekday: 5, startTime: '19:00', endTime: '20:00', location: '本中心', enabled: true },
+    { id: 'rm2', branchId: 'b2', title: '幼童軍恆常集會', weekday: 6, startTime: '14:00', endTime: '15:30', location: '本中心', enabled: true },
+    { id: 'rm1', branchId: 'b3', title: '童軍恆常集會', weekday: 6, startTime: '14:00', endTime: '16:00', location: '本中心', enabled: true },
+    { id: 'rm4', branchId: 'b4', title: '深資恆常集會', weekday: 5, startTime: '19:00', endTime: '21:00', location: '本中心', enabled: true },
+    { id: 'rm5', branchId: 'b5', title: '樂行恆常集會', weekday: 6, startTime: '10:00', endTime: '12:00', location: '社區會堂', enabled: true },
   ],
   cancelledMeetings: [
     { id: 'cm1', branchId: 'b3', date: '2026-09-05', reason: '下雨改期', markedBy: 'u_bl', markedAt: '2026-09-01' },
+    { id: 'cm2', branchId: 'b4', date: '2026-09-18', reason: '場地衝突', markedBy: 'u_gl', markedAt: '2026-09-02' },
   ],
   meetings: [
     { id: 'mt1', title: '九月領袖會議(議程)', type: 'agenda', date: '2026-09-02', startTime: '20:00', endTime: '21:30', location: '本中心', status: 'published', targetRoles: ['leader'] },
@@ -573,7 +591,7 @@ export function mockHandle(action: string, params: Record<string, any> = {}): an
   if (action === 'getState') return { success: true, state: sliceState(buildMockState(userId || 'u_admin'), String(p.keys || 'users,config')) };
   if (action === 'getApplications') return { success: true, applications: buildMockState(userId).applications };
   if (action === 'getEventRegistrationSummary') return handleRegistrationSummary(p);
-  if (action === 'getPublicBootstrap') return { success: true, data: { config: { TROOP_CODE: store.config.TROOP_CODE, TROOP_NAME: store.config.TROOP_NAME, REGISTRY_URL: store.config.REGISTRY_URL }, branches: ['b1', 'b2', 'b3', 'b4', 'b5'].map(id => ({ id, name: '' })) } };
+  if (action === 'getPublicBootstrap') return { success: true, data: { config: { TROOP_CODE: store.config.TROOP_CODE, TROOP_NAME: store.config.TROOP_NAME, REGISTRY_URL: store.config.REGISTRY_URL }, branches: modelBranches.map(b => ({ id: b.id, name: b.name })) } };
   if (action === 'getPublicCalendarItems') return { success: true, data: buildMockState('').regularMeetings };
   if (action === 'getPublicLibraryBookmarks') return { success: true, data: buildMockState('').bookmarks };
   if (action === 'listAnnouncementPdfs') return { success: true, files: store.announcementPdfs };
