@@ -220,6 +220,57 @@ export async function apiApplyJoin(p: { type: string; name: string; email: strin
   return res.json();
 }
 
+// ==================== 物資（Equipment）／借用（EquipmentLoans） ====================
+
+/** 讀取物資清單 + 借用紀錄（含該角色看得到的範圍，由 GS 依角色過濾） */
+export async function apiGetEquipment() {
+  const data = await apiGet<{ success: boolean; state?: AppState; error?: string }>('getEquipment', {
+    userId: currentUser()?.userId || '',
+  });
+  if (!data.success || !data.state) throw new Error(data.error || '讀取物資失敗');
+  return data.state;
+}
+
+export function apiCreateEquipment(p: { name: string; category?: string; unit?: string; totalQty?: number | string; location?: string; note?: string; enabled?: boolean }) {
+  return apiMutate('createEquipment', p as any);
+}
+export function apiUpdateEquipment(p: { equipmentId: string; name?: string; category?: string; unit?: string; totalQty?: number | string; location?: string; note?: string; enabled?: boolean }) {
+  return apiMutate('updateEquipment', p as any);
+}
+/** 入庫（+delta）／報廢（-delta） */
+export function apiAdjustEquipmentQty(equipmentId: string, delta: number, note?: string) {
+  return apiMutate('adjustEquipmentQty', { equipmentId, delta: String(delta), note: note || '' });
+}
+export function apiDeleteEquipment(equipmentId: string) {
+  return apiMutate('deleteEquipment', { equipmentId });
+}
+
+/** 借用申請：一次可借多項（items = [{ equipmentId, qty }]） */
+export function apiRequestEquipmentLoan(p: { items: { equipmentId: string; qty: number }[]; borrowDate: string; returnDueDate: string; purpose?: string; note?: string; memberId?: string }) {
+  return apiMutate('requestEquipmentLoan', {
+    items: JSON.stringify(p.items),
+    borrowDate: p.borrowDate,
+    returnDueDate: p.returnDueDate,
+    purpose: p.purpose || '',
+    note: p.note || '',
+    memberId: p.memberId || '',
+  });
+}
+export function apiUpdateEquipmentLoan(p: { loanId: string; qty?: number; purpose?: string; borrowDate?: string; returnDueDate?: string; note?: string }) {
+  return apiMutate('updateEquipmentLoan', p as any);
+}
+export function apiCancelEquipmentLoan(loanId: string) {
+  return apiMutate('cancelEquipmentLoan', { loanId });
+}
+/** 領袖批核：approved 會即時扣庫存 */
+export function apiDecideEquipmentLoan(loanId: string, decision: 'approved' | 'rejected', note?: string) {
+  return apiMutate('decideEquipmentLoan', { loanId, decision, note: note || '' });
+}
+/** 領袖 Tick 已歸還 → 庫存回補 */
+export function apiReturnEquipmentLoan(loanId: string, note?: string) {
+  return apiMutate('returnEquipmentLoan', { loanId, note: note || '' });
+}
+
 // ==================== 成員 ====================
 
 export function apiCreateMember(p: { name: string; ymNumber: string; branchId: string; patrolId?: string; specialRole?: string; dateOfBirth?: string; parentUserId?: string; emergencyContactName?: string; emergencyContactPhone?: string; password?: string }) {

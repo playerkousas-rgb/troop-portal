@@ -43,6 +43,11 @@ export default function Leader(){
     <section className="hero"><span className="badge gold">領袖控制台</span><p>管理所屬支部的活動、成員及通告。</p></section>
     {err&&<p className="badge red">{err}</p>}
     <section className="grid">
+      <a className="card feature-card" href="/admin/equipment" style={{ textDecoration: 'none' }}>
+        <h3>📦 物資借用管理</h3>
+        <p className="muted">新增／修改物資及庫存，批核成員借用申請，歸還後 Tick 已歸還即回補庫存。</p>
+        <span className="btn block">前往物資管理</span>
+      </a>
       <SummaryCard label="活動" value={stats.activities} desc="已發布活動" tone="green"/>
       <SummaryCard label="待審批" value={stats.pending} desc="等待審批申請" tone="red"/>
       <SummaryCard label="通告" value={stats.notices} desc="圖書館引入通告" tone="gold"/>

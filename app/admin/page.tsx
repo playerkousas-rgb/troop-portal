@@ -22,6 +22,7 @@ const FEATURE_DEFS: Record<string,{title:string;icon:string;text:string;href:str
   users:          { title:'使用者管理', icon:'👤', text:'帳號、角色、功能權限分配。', href:'/admin/users' },
   settings:       { title:'系統設定', icon:'⚙️', text:'SystemConfig。', href:'/admin/settings' },
   plugins:        { title:'元件管理', icon:'🧩', text:'設定 2/3 級元件網址與金鑰。', href:'/admin/plugins' },
+  equipment:      { title:'物資借用管理', icon:'📦', text:'物資清單、庫存調整、借用批核及歸還。', href:'/admin/equipment' },
   audit:          { title:'審核紀錄', icon:'📜', text:'所有操作紀錄。', href:'/admin/audit' },
   calendar:       { title:'行事曆管理', icon:'📅', text:'恆常集會、特別集會。', href:'/admin/calendar' },
 };

@@ -58,6 +58,11 @@ export default function Member(){
 
       <section className="grid" style={{ marginBottom: '2rem' }}>
           <AttendanceCard description="查看自己在日常集會及旅團自辦活動的出席紀錄。" />
+          <a className="card feature-card" href="/equipment" style={{ textDecoration: 'none' }}>
+            <h3>📦 借用物資</h3>
+            <p className="muted">查看旅團現有物資及可借數量，填寫數量申請借用，待領袖批核。</p>
+            <span className="btn block">前往物資頁</span>
+          </a>
           {visiblePlugins.map(p => (
             <PluginIframeCard 
               key={p.id} 

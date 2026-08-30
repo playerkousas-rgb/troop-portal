@@ -62,6 +62,48 @@ GS `doGet` 新增以下讀取 action（回傳 `{ success, state }`，state 只�
 
 測試觀察（暫不改）：`calcAge_('')` 回 0 → 無生日成員登入顯示 age:0（18 歲 guard 走 fail-closed，安全）；deleteEvent 不會級聯刪 EventReplies 孤兒行；createMember 與 createEvent 相隔 <1 秒時，活動 targetMemberIds 可能因 Sheets 最終一致性漏掉新成員（正常使用順序不受影響）。
 
+## 2026-08-31 新功能：物資清單與借用流程（參考 member-portal `/stock`）
+
+### Sheet
+| 工作表 | 顏色 | 內容 |
+|---|---|---|
+| `Equipment`（物資清單） | 綠（可改） | `equipmentId, name, category, unit, totalQty, availableQty, location, note, enabled, updatedAt` |
+| `EquipmentLoans`（借用紀錄） | 藍（資料） | `loanId, batchRef, equipmentId, equipmentName, unit, qty, memberId, memberName, branchId, purpose, borrowDate, returnDueDate, status, requestedAt, decidedBy, decidedAt, decisionNote, returnedAt, returnedBy, note` |
+
+`status`：pending 待批核 / approved 已批核（未歸還）/ rejected 已拒絕 / returned 已歸還 / cancelled 已取消
+
+### 流程
+1. 領袖到 **控制台 → 物資借用管理**（`/admin/equipment`）新增物資、填總數（`availableQty` 自動 = 總數）
+2. 成員在 `/equipment` 看**現有物資總覽**（分類、可借／總數），在想借的物資旁填數量，一次填用途＋借還日期遞交
+3. 申請後 `status = pending`，**仍未扣庫存**
+4. 領袖按「✅ 批准」→ `status = approved` 並**即時扣除 availableQty**
+5. 成員歸還後，領袖按「✅ 已歸還（Tick）」→ `status = returned` 並**即時回補 availableQty**
+
+### 借用資格
+- 領袖角色（團長／支部領袖／教練員／管理員／超管）一律可借
+- 成員限 **童軍支部（b3）、深資童軍（b4）、樂行童軍（b5）**；小童軍／幼童軍由領袖代借
+- GS：`EQUIPMENT_BORROW_BRANCHES_ = ['b3','b4','b5']`；前端 `lib/store.ts` 的 `EQUIPMENT_BORROW_BRANCHES`
+
+### API（新增 action）
+`getEquipment`（切片）／`createEquipment`／`updateEquipment`／`adjustEquipmentQty`（入庫+／報廢−）／`deleteEquipment`／
+`requestEquipmentLoan`／`updateEquipmentLoan`／`cancelEquipmentLoan`／`decideEquipmentLoan`／`returnEquipmentLoan`
+
+- 資料切片：`buildStateSlice_` 支援 `equipment` / `equipmentLoans` 兩個 key
+- 角色過濾：管理員全看；領袖看全部物資＋自己支部／自己紀錄；成員看可借物資＋自己紀錄
+- 保護：不可重複批核、庫存不足拒批、總數不可少於已借出未還、有未完成紀錄的物資不可刪除
+
+### 前端
+- `/admin/equipment`：物資清單 CRUD、入庫／報廢調整、啟用／停用、批核與歸還（含統計卡）
+- `/equipment`：物資總覽、多項數量借用申請（一次填表，參考 member-portal）、我的借用紀錄（待批核可改數量／取消）、領袖批核／歸還區
+- 入口：控制台功能卡 `equipment`、頂欄選單「📦 借用物資」、成員頁與領袖頁各加一張卡
+
+### 測試
+- GS 邏輯（Apps Script 模擬器）：28 項全綠（資格、申請、超量、批核扣庫存、重複批核、歸還回補、拒絕不扣、增減庫存、刪除保護、角色切片）
+- 演示模式：19 項全綠（同一條流程走 mock store）
+
+> ⚠️ 旅團要把新版 `gs/SCOUTSYSTEM_2_SETUP.gs` 重新部署後才會有這兩張工作表；
+> 首次執行任何物資 action 時 `ensureEquipmentSheets_()` 亦會自動補建（舊部署未重跑 setup 也不會炸）。
+
 ## 2026-08-31 修復：超管登入 + 全站配色／字體對比度巡檢
 
 ### 1) 超管（sheep / 0728）登入

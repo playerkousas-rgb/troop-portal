@@ -10,7 +10,7 @@
  * 資料存在記憶體(重新整理會重設),任何「寫入」只改 mock store,
  * 不會 touches 任何真實 Google Sheet / Vercel 環境。
  */
-import type { AppState } from './store';
+import type { AppState, Equipment } from './store';
 import type { Role } from './model';
 import { branches as modelBranches } from './model';
 
@@ -30,6 +30,12 @@ export function setMockMode(on: boolean) {
 }
 
 // ==================== 模擬資料(演示旅團 0088) ====================
+
+const MOCK_EQUIPMENT: Equipment[] = [
+  { id: 'eq_demo1', name: '4 人營帳（示範）', category: '露營', unit: '頂', totalQty: 8, availableQty: 6, location: '旅部物資房', note: '含地布及營釘。', enabled: true },
+  { id: 'eq_demo2', name: '營燈（示範）', category: '露營', unit: '盞', totalQty: 10, availableQty: 9, location: '旅部物資房', note: '需自備電池。', enabled: true },
+  { id: 'eq_demo3', name: '急救包（示範）', category: '安全', unit: '套', totalQty: 3, availableQty: 3, location: '領袖室', note: '', enabled: true },
+];
 
 const seed: AppState = {
   config: {
@@ -138,6 +144,8 @@ const seed: AppState = {
   applications: [
     { id: 'ap01', type: 'parent', name: '趙淑芬', email: 'zhao@example.com', role: 'parent', branchId: 'b3', ymNumbers: '3000000001', status: 'pending', createdAt: '2026-08-27' },
   ],
+  equipment: MOCK_EQUIPMENT,
+  equipmentLoans: [],
   audits: [
     { id: 'log01', userId: 'u_admin', action: 'createEvent', entity: 'Events', entityId: 'e01', createdAt: '2026-08-15', detail: '九月山徑健行' },
     { id: 'log02', userId: 'u5', action: 'setReply', entity: 'EventReplies', entityId: 'e01', createdAt: '2026-08-20', detail: 'm01 → registered' },
@@ -233,6 +241,7 @@ export function buildMockState(userId: string): AppState {
     announcements: [], announcementPdfs: [],
     regularMeetings: [], cancelledMeetings: [],
     meetings: [], plugins: [], pluginSettings: [],
+    equipment: [], equipmentLoans: [],
     audits: [], config: { ...store.config }, userFeatures: FEATURES[role] || [],
   };
 
@@ -243,6 +252,14 @@ export function buildMockState(userId: string): AppState {
   else if (leaderBranch) out.members = store.members.filter(m => m.branchId === branchId);
   else if (isMember) out.members = store.members.filter(m => m.id === user!.memberId);
   else if (isParent) out.members = store.members.filter(m => (user!.childMemberIds || []).includes(m.id));
+
+  // 物資（任何已登入角色都可看總覽）
+  if (user) out.equipment = store.equipment;
+  // 借用紀錄：管理／領袖看全部，成員／家長只看自己（或子女）
+  if (admin || leaderAll) out.equipmentLoans = [...store.equipmentLoans];
+  else if (leaderBranch) out.equipmentLoans = store.equipmentLoans.filter(l => !l.branchId || l.branchId === branchId || l.memberId === userId);
+  else if (isMember) out.equipmentLoans = store.equipmentLoans.filter(l => l.memberId === userId || l.memberId === (user!.memberId || ''));
+  else if (isParent) out.equipmentLoans = store.equipmentLoans.filter(l => (user!.childMemberIds || []).includes(l.memberId));
 
   // 使用者
   if (admin || leaderAll) out.users = [...store.users];
@@ -325,6 +342,7 @@ function sliceState(full: AppState, keys: string): AppState {
     announcements: [], announcementPdfs: [],
     regularMeetings: [], cancelledMeetings: [],
     meetings: [], plugins: [], pluginSettings: [],
+    equipment: [], equipmentLoans: [],
     audits: [], config: full.config || {}, userFeatures: full.userFeatures || [],
   };
   keyList.forEach(k => {
@@ -533,6 +551,103 @@ function handleMutate(action: string, p: Record<string, any>) {
       if (i >= 0 && p.field) (store.users[i] as any)[p.field] = String(p.value ?? '');
       return S(ob);
     }
+    // 物資清單
+    case 'createEquipment':
+      store.equipment.push({
+        id: uid('eq'), name: String(p.name || ''), category: String(p.category || '其他'),
+        unit: String(p.unit || '件'), totalQty: Number(p.totalQty) || 0, availableQty: Number(p.totalQty) || 0,
+        location: String(p.location || ''), note: String(p.note || ''), enabled: p.enabled !== false,
+      });
+      return S(ob);
+    case 'updateEquipment': {
+      const i = findIdx(store.equipment, 'id', String(p.equipmentId || ''));
+      if (i >= 0) {
+        const eq = store.equipment[i];
+        const loaned = Math.max(0, eq.totalQty - eq.availableQty);
+        ['name', 'category', 'unit', 'location', 'note'].forEach(k => { if (p[k] !== undefined) (eq as any)[k] = String(p[k]); });
+        if (p.totalQty !== undefined && String(p.totalQty) !== '') {
+          eq.totalQty = Number(p.totalQty) || 0;
+          eq.availableQty = eq.totalQty - loaned;
+        }
+        if (p.enabled !== undefined) eq.enabled = p.enabled === true || p.enabled === 'true';
+      }
+      return S(ob);
+    }
+    case 'adjustEquipmentQty': {
+      const i = findIdx(store.equipment, 'id', String(p.equipmentId || ''));
+      if (i >= 0) {
+        const eq = store.equipment[i];
+        const loaned = Math.max(0, eq.totalQty - eq.availableQty);
+        eq.totalQty = Math.max(loaned, eq.totalQty + (Number(p.delta) || 0));
+        eq.availableQty = eq.totalQty - loaned;
+      }
+      return S(ob);
+    }
+    case 'deleteEquipment': store.equipment = store.equipment.filter(e => e.id !== p.equipmentId); return S(ob);
+    // 借用申請
+    case 'requestEquipmentLoan': {
+      let items: any[] = [];
+      try { items = JSON.parse(String(p.items || '[]')); } catch { items = []; }
+      const me = findUser(ob);
+      const borrower = me || { id: ob, name: '演示用家', branchId: 'b3', memberId: ob };
+      const batchRef = uid('BR');
+      items.forEach((it: any) => {
+        const eq = store.equipment.find(e => e.id === String(it.equipmentId || ''));
+        const qty = Math.floor(Number(it.qty) || 0);
+        if (!eq || !(qty > 0) || qty > eq.availableQty) return;
+        store.equipmentLoans.push({
+          id: uid('ln'), batchRef, equipmentId: eq.id, equipmentName: eq.name, unit: eq.unit, qty,
+          memberId: String(borrower.memberId || borrower.id), memberName: String(borrower.name || ''),
+          branchId: String(borrower.branchId || ''), purpose: String(p.purpose || ''),
+          borrowDate: String(p.borrowDate || ''), returnDueDate: String(p.returnDueDate || ''),
+          status: 'pending', requestedAt: new Date().toISOString(), note: String(p.note || ''),
+        });
+      });
+      return S(ob);
+    }
+    case 'updateEquipmentLoan': {
+      const i = findIdx(store.equipmentLoans, 'id', String(p.loanId || ''));
+      if (i >= 0 && store.equipmentLoans[i].status === 'pending') {
+        const l = store.equipmentLoans[i];
+        if (p.qty !== undefined && String(p.qty) !== '') l.qty = Math.floor(Number(p.qty) || l.qty);
+        ['purpose', 'borrowDate', 'returnDueDate', 'note'].forEach(k => { if (p[k] !== undefined) (l as any)[k] = String(p[k]); });
+      }
+      return S(ob);
+    }
+    case 'cancelEquipmentLoan': {
+      const i = findIdx(store.equipmentLoans, 'id', String(p.loanId || ''));
+      if (i >= 0 && store.equipmentLoans[i].status === 'pending') store.equipmentLoans[i].status = 'cancelled';
+      return S(ob);
+    }
+    case 'decideEquipmentLoan': {
+      const i = findIdx(store.equipmentLoans, 'id', String(p.loanId || ''));
+      if (i >= 0 && store.equipmentLoans[i].status === 'pending') {
+        const l = store.equipmentLoans[i];
+        const eq = store.equipment.find(e => e.id === l.equipmentId);
+        if (String(p.decision) === 'approved' && eq && l.qty <= eq.availableQty) {
+          eq.availableQty -= l.qty;
+          l.status = 'approved';
+        } else {
+          l.status = 'rejected';
+        }
+        l.decidedBy = String(ob || '演示領袖');
+        l.decidedAt = new Date().toISOString();
+        l.decisionNote = String(p.note || '');
+      }
+      return S(ob);
+    }
+    case 'returnEquipmentLoan': {
+      const i = findIdx(store.equipmentLoans, 'id', String(p.loanId || ''));
+      if (i >= 0 && store.equipmentLoans[i].status === 'approved') {
+        const l = store.equipmentLoans[i];
+        const eq = store.equipment.find(e => e.id === l.equipmentId);
+        if (eq) eq.availableQty += l.qty;
+        l.status = 'returned';
+        l.returnedAt = new Date().toISOString();
+        l.returnedBy = String(ob || '演示領袖');
+      }
+      return S(ob);
+    }
     case 'updatePassword': return S(ob);
     case 'updateUserPermissions':
     case 'grantFeature':
@@ -639,6 +754,7 @@ export function mockHandle(action: string, params: Record<string, any> = {}): an
     getSettings: 'config,plugins,pluginSettings',
     getAuditLogs: 'audits',
     getMeetings: 'meetings',
+    getEquipment: 'equipment,equipmentLoans,members',
   };
 
   if (action === 'health') return { success: true, version: 'mock-3.0', action: 'health', ready: true };
