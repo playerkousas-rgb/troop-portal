@@ -17,7 +17,7 @@ export const APPROVED_TROOPS: ApprovedTroop[] = [
     key: 'troop_0082',
     id: '0082',
     name: '第82旅（測試）',
-    webAppUrl: 'https://script.google.com/macros/s/AKfycbwATtCXH8t8bV5VOBVY-ocPJR1RgV4iQebJp_oo_NGV7-90xJZ0d4pAVlFf_f51FHYW/exec',
+    webAppUrl: 'https://script.google.com/macros/s/AKfycbzVwtGNWJFf5cG6EivlLVF2pd2zWjMx1RfYyQCWbE7sLZcPyWK4nPQe4J-b2gXrPJB_/exec',
     // API Key → 設 Vercel env var: TROOP_0082_APIKEY=ak_xxxxxxxx
     status: 'testing',
     note: '測試旅團',
