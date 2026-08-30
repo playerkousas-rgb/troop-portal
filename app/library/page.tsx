@@ -1,10 +1,10 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { AppState, loadState } from '@/lib/store';
+import { AppState, loadStateSlice } from '@/lib/store';
 import Link from 'next/link';
 export default function Library(){
   const [s,setS]=useState<AppState|null>(null);const [err,setErr]=useState('');
-  useEffect(()=>{loadState().then(setS).catch(e=>setErr(e.message))},[]);
+  useEffect(()=>{loadStateSlice(['bookmarks']).then(setS).catch(e=>setErr(e.message))},[]);
   if(err)return <div className="card"><p className="badge red">{err}</p></div>;
   if(!s)return <div className="card">載入中...</div>;
   return <div className="stack"><section className="hero"><span className="badge gold">圖書館</span><h1>通告圖書館</h1><p>這裡顯示已引入 ScoutSystem 的通告。領袖可到圖書館標記頁引入新通告。</p><Link className="btn primary" href="/library/import">📚 引入新通告</Link></section>

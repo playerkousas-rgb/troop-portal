@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { AppState, loadState, computeStats, replyStatus } from '@/lib/store';
+import { AppState, loadStateSlice, computeStats, replyStatus } from '@/lib/store';
 import { apiSetReply } from '@/lib/api';
 import Auth from '@/components/Auth';
 import { FeatureCard, SummaryCard } from '@/components/Cards';
@@ -14,7 +14,8 @@ import AttendanceCard from '@/components/AttendanceCard';
 export default function Leader(){
   const [s,setS]=useState<AppState|null>(null);const [err,setErr]=useState('');
   const [loadingId,setLoadingId]=useState('');
-  useEffect(()=>{loadState().then(setS).catch(e=>setErr(e.message))},[]);
+  // 按需載入：領袖摘要（computeStats 用到 users/applications/events/bookmarks）+ 活動回覆
+  useEffect(()=>{loadStateSlice(['events','plugins','pluginSettings','users','applications','bookmarks','replies']).then(setS).catch(e=>setErr(e.message))},[]);
   const stats=s?computeStats(s):{users:0,pending:0,activities:0,notices:0};
   const session = getSession();
   const myId = session?.userId || '';

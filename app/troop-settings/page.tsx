@@ -1,11 +1,11 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { AppState, loadState } from '@/lib/store';
+import { AppState, loadStateSlice } from '@/lib/store';
 import { apiSaveConfig } from '@/lib/api';
 import Link from 'next/link';
 export default function TroopSettings(){
   const [s,setS]=useState<AppState|null>(null);const [err,setErr]=useState('');const [ok,setOk]=useState('');
-  useEffect(()=>{loadState().then(setS).catch(e=>setErr(e.message))},[]);
+  useEffect(()=>{loadStateSlice(['config']).then(setS).catch(e=>setErr(e.message))},[]);
   async function save(k:string,v:string){setErr('');setOk('');try{const f=await apiSaveConfig(k,v);setS(f);setOk('✅ 已儲存')}catch(e:any){setErr(e.message)}}
   if(!s)return <div className="card">{err||'載入中...'}</div>;
   const editableKeys=['TROOP_CODE','TROOP_NAME'];

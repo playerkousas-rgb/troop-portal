@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { AppState, loadState } from '@/lib/store';
+import { AppState, loadState, loadStateSlice } from '@/lib/store';
 import { apiUpdateMember, apiUpdateUserField } from '@/lib/api';
 import { getSession } from '@/lib/session';
 import { branches, ROLE_LABEL, LEADER_ROLES } from '@/lib/model';
@@ -22,7 +22,7 @@ export default function Profile(){
   const [patrolRole,setPatrolRole]=useState('');
 
   useEffect(()=>{
-    loadState().then(st=>{
+    loadStateSlice(['patrols','users','members']).then(st=>{
       setS(st);
       if(!session){return}
       if(session.role==='member'){

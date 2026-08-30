@@ -1,6 +1,6 @@
 'use client';
 import { Suspense, useEffect, useState } from 'react';
-import { AppState, loadState, replyStatus } from '@/lib/store';
+import { AppState, loadState, loadStateSlice, replyStatus } from '@/lib/store';
 import { apiTogglePaid } from '@/lib/api';
 import { useSearchParams } from 'next/navigation';
 
@@ -27,7 +27,7 @@ function RegistrationsInner(){
   const [expandedBranchStatus, setExpandedBranchStatus] = useState<{ branchId: string; status: string } | null>(null);
   const [activeListTab, setActiveListTab] = useState<string>('all');
 
-  useEffect(()=>{loadState().then(st=>{setS(st);const q=search?.get('eventId');setEventId(q||st.events[0]?.id||'')}).catch(e=>setErr(e.message))},[]);
+  useEffect(()=>{loadStateSlice(['patrols','users','members','events','replies']).then(st=>{setS(st);const q=search?.get('eventId');setEventId(q||st.events[0]?.id||'')}).catch(e=>setErr(e.message))},[]);
   async function togglePaid(mid:string){setErr('');try{const f=await apiTogglePaid(eventId,mid);setS(f)}catch(e:any){setErr(e.message)}}
 
   function getIsPaid(mid: string) {

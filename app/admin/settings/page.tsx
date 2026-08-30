@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { AppState, loadState } from '@/lib/store';
+import { AppState, loadStateSlice } from '@/lib/store';
 import { apiSaveConfig } from '@/lib/api';
 import Link from 'next/link';
 
@@ -29,7 +29,7 @@ export default function Page(){
   const [err,setErr]=useState('');
   const [ok,setOk]=useState('');
   const [saving,setSaving]=useState('');
-  useEffect(()=>{loadState().then(setS).catch(e=>setErr(e.message))},[]);
+  useEffect(()=>{loadStateSlice(['config']).then(setS).catch(e=>setErr(e.message))},[]);
 
   async function save(k:string,v:string){
     setErr('');setOk('');setSaving(k);

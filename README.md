@@ -64,3 +64,13 @@ npm run build
 - API Proxy 及 Apps Script 後台加入 POST 批量寫入：`batchCreateUsers`、`batchCreateMembers`，避免大型 CSV 受 URL 長度限制。
 - 系統設定頁升級為「全前端控制中心」：提供服務鎖定、SystemConfig 編輯、支部/成員/活動/行事曆/元件快速入口。
 - 全站加入手機友善樣式：導航可橫向滑動、按鈕觸控高度提升、響應式表格在手機以卡片方式顯示。
+
+## 3.0：API 拆分 + 前端連接
+
+- GS 後台新增 per-page slice API（按需載入）：`getBootstrap` / `getCalendar` / `getActivities` / `getMembers` / `getEvents` / `getNotices` / `getUsers` / `getSettings` / `getAuditLogs` / `getMeetings` / 通用 `getState?keys=...`
+- 回傳格式與 `getDashboard` 相同（`{ success, state }`），但 state 只含所請求欄位；角色過濾集中在 `buildDashboardCore_` 一處
+- slice 不含 `announcementPdfs` 時跳過 Google Drive 呼叫，回應更快
+- 前端各頁改用 `loadStateSlice([...])`（`lib/store.ts`），寫入後仍以 `wrap_` 回傳的整包 state 更新
+- 首頁旅團列表改用 `lib/troops.ts` 登記表（修正原先 key 格式與 proxy 不一致）
+- 移除引用缺失 `mock-full/` 目錄的 `app/mock-full` 路由（Vercel build fail 原因）
+- 全站加「© 2026 Scout System」版權 footer

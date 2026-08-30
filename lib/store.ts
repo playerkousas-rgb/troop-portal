@@ -23,11 +23,29 @@ export type AppState = { patrols:Patrol[]; users:User[]; members:Member[]; appli
 
 // ==================== 載入（API） ====================
 
-import { fetchState } from './api';
+import { fetchState, apiGetSlice } from './api';
+import { getSession } from './session';
 
-/** 從 GS 後台讀取整個 AppState */
+/** 從 GS 後台讀取整個 AppState（寫入操作後重新整理用） */
 export async function loadState(): Promise<AppState> {
   return fetchState();
+}
+
+/**
+ * 按需載入：只讀取頁面需要的欄位（3.0 API 拆分）
+ *
+ * 用法：
+ *   loadStateSlice(['events', 'replies'])                    // 活動頁
+ *   loadStateSlice(['regularMeetings','cancelledMeetings','events','meetings']) // 行事曆
+ *
+ * 回傳的 AppState 只含所請求的欄位（未請求的欄位為空值），
+ * 頁面只應存取自己請求過的欄位。角色過濾邏輯與 loadState 相同。
+ */
+export async function loadStateSlice(keys: string[]): Promise<AppState> {
+  const session = getSession();
+  const data = await apiGetSlice(keys, { userId: session?.userId || '' });
+  if (!data.success || !data.state) throw new Error(data.error || '載入資料失敗');
+  return data.state;
 }
 
 // ==================== 純查詢函式（不寫入，只讀 state） ====================

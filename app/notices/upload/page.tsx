@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState, useRef } from 'react';
 import Link from 'next/link';
-import { AppState, loadState } from '@/lib/store';
+import { AppState, loadState, loadStateSlice } from '@/lib/store';
 import { apiImportBookmark } from '@/lib/api';
 import { parseNoticeText, ParsedNotice } from '@/lib/noticeParser';
 import { branches } from '@/lib/model';
@@ -26,7 +26,7 @@ export default function NoticeUpload(){
 
   const AUDIENCE_OPTIONS = ['全旅', '領袖', '成年成員', '小童軍', '幼童軍', '童軍', '深資童軍', '樂行童軍', '家長'];
 
-  useEffect(()=>{loadState().then(setS).catch(e=>setErr(e.message))},[]);
+  useEffect(()=>{loadStateSlice(['bookmarks']).then(setS).catch(e=>setErr(e.message))},[]);
 
   async function handleFile(e:React.ChangeEvent<HTMLInputElement>){
     const file=e.target.files?.[0];

@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useMemo, useState } from 'react';
-import { AppState, loadState, replyStatus, isMeetingCancelled } from '@/lib/store';
+import { AppState, loadStateSlice, replyStatus, isMeetingCancelled } from '@/lib/store';
 import { apiToggleMeetingCancel } from '@/lib/api';
 import { getSession, Session } from '@/lib/session';
 import Link from 'next/link';
@@ -87,7 +87,7 @@ export default function Calendar(){
   const [filterBranch, setFilterBranch] = useState<string>('all');
   const [filterType, setFilterType] = useState<string>('all');
 
-  useEffect(()=>{loadState().then(setS).catch(e=>setErr(e.message));setSessionState(getSession())},[]);
+  useEffect(()=>{loadStateSlice(['users','members','events','regularMeetings','cancelledMeetings','meetings','replies']).then(setS).catch(e=>setErr(e.message));setSessionState(getSession())},[]);
 
   // Compute days (always called, no conditional hooks)
   const first=new Date(base.getFullYear(),base.getMonth(),1);

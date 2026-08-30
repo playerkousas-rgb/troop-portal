@@ -63,7 +63,22 @@ function currentUser(): { userId: string; role: Role } | null {
 
 // ==================== 核心 API ====================
 
-/** 讀取 Dashboard（按角色過濾） */
+/**
+ * 讀取資料切片（3.0 按需載入）
+ * 取代整包 getDashboard：每個頁面只取自己需要的欄位（keys），
+ * 回傳的 state 只含所請求的欄位（未請求的欄位為空值），
+ * 角色過濾邏輯與 getDashboard 完全相同。
+ */
+export async function apiGetSlice(keys: string[], extra?: Record<string, string | undefined>) {
+  const user = currentUser();
+  return apiGet<{ success: boolean; state?: AppState; error?: string }>('getState', {
+    keys: keys.join(','),
+    userId: user?.userId || '',
+    ...extra,
+  });
+}
+
+/** 讀取 Dashboard（按角色過濾，整包 — 寫入後重新整理時用） */
 export async function fetchState(): Promise<AppState> {
   const user = currentUser();
   const data = await apiGet<{ success: boolean; state?: AppState; error?: string }>('getDashboard', {

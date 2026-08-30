@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { AppState, loadState } from '@/lib/store';
+import { AppState, loadState, loadStateSlice } from '@/lib/store';
 import { apiCreateMember, apiLinkParent, apiUpdateMember, apiDeleteMember } from '@/lib/api';
 import { branches } from '@/lib/model';
 
@@ -24,7 +24,7 @@ export default function Page(){
   const [eEmergencyName,setEEmergencyName]=useState('');const [eParent,setEParent]=useState('');const [ePw,setEPw]=useState('');
   const [eEmail,setEEmail]=useState('');const [eSpecialRole,setESpecialRole]=useState('');
 
-  useEffect(()=>{loadState().then(setS).catch(e=>setErr(e.message))},[]);
+  useEffect(()=>{loadStateSlice(['patrols','users','members']).then(setS).catch(e=>setErr(e.message))},[]);
 
   function patrolName(id?:string){return s?.patrols.find(p=>p.id===id)?.name||'不適用 / 未分隊'}
 

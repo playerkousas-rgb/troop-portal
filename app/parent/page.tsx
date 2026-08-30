@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { AppState, loadState, replyStatus } from '@/lib/store';
+import { AppState, loadStateSlice, replyStatus } from '@/lib/store';
 import { apiSetReply } from '@/lib/api';
 import { getSession } from '@/lib/session';
 import Collapsible from '@/components/Collapsible';
@@ -10,7 +10,8 @@ import Link from 'next/link';
 export default function Parent(){
   const [s,setS]=useState<AppState|null>(null);const [err,setErr]=useState('');
   const [loadingId,setLoadingId]=useState('');
-  useEffect(()=>{loadState().then(setS).catch(e=>setErr(e.message))},[]);
+  // 按需載入：家長空間（replyStatus 用到 replies）
+  useEffect(()=>{loadStateSlice(['users','members','events','replies']).then(setS).catch(e=>setErr(e.message))},[]);
   const session=getSession();
   if(err)return <div className="card"><p className="badge red">{err}</p></div>;
   if(!s)return <div className="card">載入中...</div>;

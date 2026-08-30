@@ -1,6 +1,6 @@
 'use client';
 import { branches } from '@/lib/model';
-import { AppState, loadState } from '@/lib/store';
+import { AppState, loadStateSlice } from '@/lib/store';
 import { apiCreatePatrol, apiTogglePatrol, apiDeletePatrol } from '@/lib/api';
 import { useEffect, useState } from 'react';
 function branchHint(id:string){ if(id==='b1') return '小童軍預設沒有分隊。'; if(id==='b2') return '幼童軍按九種顏色分隊（紅、黃、藍、白、灰、綠、棕、黑、橙）。'; if(id==='b3') return '童軍按動物名稱小隊。'; return '此支部預設沒有分隊，如需要可自行新增。'; }
@@ -8,7 +8,7 @@ export default function Page(){
   const [s,setS]=useState<AppState|null>(null);const [err,setErr]=useState('');
   const [loadingId,setLoadingId]=useState('');
   const [selected,setSelected]=useState('b3');const [name,setName]=useState('');const [short,setShort]=useState('');
-  useEffect(()=>{loadState().then(setS).catch(e=>setErr(e.message))},[]);
+  useEffect(()=>{loadStateSlice(['patrols','members']).then(setS).catch(e=>setErr(e.message))},[]);
   function memberName(id?:string){return s?.members.find(m=>m.id===id)?.name||'未指定'}
   async function add(){if(!name.trim())return;setErr('');setLoadingId('add');try{const f=await apiCreatePatrol({branchId:selected,name,short});setS(f);setName('');setShort('')}catch(e:any){setErr(e.message)}finally{setLoadingId('')}}
   async function toggle(id:string){setErr('');setLoadingId(id);try{const f=await apiTogglePatrol(id);setS(f)}catch(e:any){setErr(e.message)}finally{setLoadingId('')}}

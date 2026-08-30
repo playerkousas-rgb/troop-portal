@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { AppState, loadState, Bookmark } from '@/lib/store';
+import { AppState, loadState, loadStateSlice, Bookmark } from '@/lib/store';
 import { apiImportBookmark, apiUpdateBookmark, apiDeleteBookmark } from '@/lib/api';
 import { branches } from '@/lib/model';
 import { getSession } from '@/lib/session';
@@ -48,7 +48,7 @@ function ImportInner(){
   const [eMode,setEMode]=useState<'informational'|'troop_participation'>('informational');
 
   useEffect(()=>{
-    loadState().then(setS).catch(e=>setErr(e.message));
+    loadStateSlice(['bookmarks']).then(setS).catch(e=>setErr(e.message));
     // 從 URL 參數讀取圖書館資料
     const pTitle=searchParams?.get('title')||'';
     const pSource=searchParams?.get('sourceSite')||searchParams?.get('source')||'';

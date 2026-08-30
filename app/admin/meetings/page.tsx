@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { AppState, loadState } from '@/lib/store';
+import { AppState, loadStateSlice } from '@/lib/store';
 import { apiCreateMeeting, apiPublishMeeting, apiDeleteMeeting, apiUpdateMeeting } from '@/lib/api';
 import { branches } from '@/lib/model';
 
@@ -21,7 +21,7 @@ export default function MeetingsAdmin() {
   const [branchId, setBranchId] = useState('');
   const [url, setUrl] = useState('');
 
-  useEffect(() => { loadState().then(setS).catch(e => setErr(e.message)) }, []);
+  useEffect(() => { loadStateSlice(['meetings']).then(setS).catch(e => setErr(e.message)) }, []);
 
   async function add() {
     if (!title.trim() || !date) { setErr('請填寫標題和日期'); return; }
