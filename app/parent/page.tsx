@@ -25,14 +25,14 @@ export default function Parent(){
 
   return (
     <div className="stack">
-      <section className="card stack" style={{ background: 'linear-gradient(135deg, #7b1fa2 0%, #9c27b0 100%)', color: '#fff' }}>
+      <section className="card stack" style={{ background: 'linear-gradient(135deg, #6a1b9a 0%, #8e24aa 100%)', color: '#fff' }}>
         <div className="row" style={{ justifyContent: 'space-between' }}>
             <div>
               <h2 style={{ margin: 0 }}>👤 {parent.name}</h2>
               <p style={{ opacity: 0.9, margin: 0 }}>身份：家長</p>
             </div>
             <div className="row">
-              <Link href="/profile" className="btn" style={{ background: 'rgba(255,255,255,0.2)', color: '#fff' }}>個人設定 / 改密碼</Link>
+              <Link href="/profile" className="btn" style={{ background: 'rgba(255,255,255,0.94)', color: '#0f2742' }}>個人設定 / 改密碼</Link>
             </div>
         </div>
       </section>

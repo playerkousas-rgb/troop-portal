@@ -141,7 +141,7 @@ export default function Onboard(){
           {sending ? '⏳ 正在傳送…' : '📧 傳送接入資料'}
         </button>
         {!canSubmit && <p className="muted" style={{fontSize:12,color:'#d93025'}}>請填寫所有必填欄位（旅團名稱、旅團號、/exec 網址、API Key）</p>}
-        {sent==='ok' && <p className="muted" style={{fontSize:13,color:'#34a853',fontWeight:600}}>✅ {resultMsg}</p>}
+        {sent==='ok' && <p className="muted" style={{fontSize:13,color:'#137333',fontWeight:600}}>✅ {resultMsg}</p>}
         {(sent==='' && resultMsg) && <p className="muted" style={{fontSize:13,color:'#d93025',fontWeight:600}}>⚠️ {resultMsg}</p>}
         <button className="btn" onClick={()=>setStep(4)}>← 上一步</button>
       </>

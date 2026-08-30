@@ -92,7 +92,7 @@ export default function Page(){
         ):(
           <>
             <p className="muted">{e.date} · {e.location||'待定'} · {e.scope}{e.fee?` · ${e.fee}`:''}</p>
-            {e.paymentUrl && <p className="muted" style={{color: 'gold'}}>💳 已設收款連結</p>}
+            {e.paymentUrl && <p className="muted" style={{ color: '#b06000' }}>💳 已設收款連結</p>}
             {e.dutyPatrol && <p className="muted" style={{color: 'purple'}}>🪖 值日：{e.dutyPatrol}</p>}
             <p className="muted">{e.source||'—'}</p>
             <div className="row" style={{flexWrap:'wrap'}}>

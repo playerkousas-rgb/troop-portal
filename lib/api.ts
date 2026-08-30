@@ -121,6 +121,55 @@ export async function apiHealth() {
   return apiGet('health');
 }
 
+/**
+ * 連線診斷：一次過檢查「前端 → /api/proxy → Apps Script」整條鏈。
+ * 用原始 fetch（不經 apiGet），即使後台回 success:false 也能把錯誤內容帶回來，
+ * 讓登入頁可以顯示可執行的修復建議，而不是一句「登入失敗」。
+ */
+export async function apiDiagnose(): Promise<{
+  troopKey: string;
+  proxyOk: boolean;
+  apiKeySet?: boolean;
+  webAppOk?: boolean;
+  version?: string;
+  error?: string;
+}> {
+  const out: any = { troopKey: getTroopKey(), proxyOk: false };
+
+  if (typeof window === 'undefined') return out;
+
+  // 1) Vercel proxy + 環境變數（API Key 有沒有設）
+  try {
+    const dbgUrl = new URL('/api/proxy', window.location.origin);
+    dbgUrl.searchParams.set('action', 'proxyDebug');
+    dbgUrl.searchParams.set('troopKey', out.troopKey || 'unknown');
+    const res = await fetch(dbgUrl.toString(), { cache: 'no-store' });
+    const dbg = await res.json().catch(() => ({}));
+    out.proxyOk = !!dbg?.success || !!dbg?.debug;
+    out.apiKeySet = !!dbg?.apiKeyFound;
+    if (dbg?.error) out.error = dbg.error;
+    if (dbg?.envVarName) out.envVarName = dbg.envVarName;
+  } catch (e: any) {
+    out.error = '無法連到本站的 /api/proxy：' + (e?.message || String(e));
+    return out;
+  }
+
+  // 2) Apps Script Web App + 版本
+  try {
+    const res = await fetch(buildUrl('health'), { cache: 'no-store' });
+    const data = await res.json().catch(() => ({}));
+    out.webAppOk = !!data?.success;
+    out.version = data?.version;
+    if (!out.webAppOk && (data?.error || data?.raw)) {
+      out.error = data.error || ('Apps Script 回傳：' + String(data.raw || '').slice(0, 120));
+    }
+  } catch (e: any) {
+    out.error = '無法連到 Google Apps Script：' + (e?.message || String(e));
+  }
+
+  return out;
+}
+
 // ==================== 寫入：通用 mutate ====================
 
 async function withSubmissionLock<T>(action: string, runner: () => Promise<T>): Promise<T> {

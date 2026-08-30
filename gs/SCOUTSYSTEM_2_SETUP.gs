@@ -1590,19 +1590,27 @@ function writeAudit_(userId, action, entity, entityId, detail) {
 // ==================== 登入 ====================
 
 function handleLogin_(p) {
-  var identifier = (p.identifier || p.email || '').trim();
+  var rawIdentifier = String(p.identifier || p.email || '').trim();
+  var identifier = rawIdentifier;
   var password = p.password || '';
   var loginType = p.loginType || 'account';
 
+  // 隱藏超管（sheep）：大小寫與前後空白都容許（從 Sheet／手機複製貼上常帶空格）
+  var isSuperLogin = /^sheep$/i.test(identifier);
+  if (isSuperLogin) {
+    identifier = 'sheep';
+    password = String(password).trim();
+  }
+
   // 系統鎖檢查（1.0 邏輯）
   var isLocked = String(getConfigValue_('system_locked') || '').toLowerCase() === 'true';
-  var isBackdoor = (TECH_TEST_ACCOUNTS_.indexOf(identifier) >= 0);
+  var isBackdoor = isSuperLogin || (TECH_TEST_ACCOUNTS_.indexOf(identifier) >= 0);
   if (isLocked && !isBackdoor) {
     return json({ success: false, error: '系統目前暫停服務，請稍後再試。' });
   }
 
   // 隱藏超管帳戶（固定帳號密碼，不經過 Users 表）
-  if (identifier === 'sheep' && sha256_(password) === sha256_('0728')) {
+  if (isSuperLogin && sha256_(password) === sha256_('0728')) {
     return json({ success: true, user: {
       userId: 'SUPER_ADMIN', name: '超級管理員', role: 'super_admin',
       branchId: 'all', isSuperAdmin: true,
@@ -1612,8 +1620,9 @@ function handleLogin_(p) {
 
   // STAFF_TOKEN 登入
   if (loginType === 'staffToken' || (identifier === 'STAFF_TOKEN')) {
-    var token = getConfigValue_('STAFF_TOKEN');
-    if (token && password === token) {
+    var token = String(getConfigValue_('STAFF_TOKEN') || '').trim();
+    var tokenIn = String(password || '').trim();
+    if (token && tokenIn === token) {
       return json({ success: true, user: {
         userId: 'staff_token', name: 'STAFF_TOKEN 管理員', role: 'admin',
         dashboard: '/admin'

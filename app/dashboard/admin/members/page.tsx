@@ -39,8 +39,8 @@ export default function MembersPage() {
       {tab === 'members' && (
         <div className="space-y-2">
           <div className="flex justify-between items-center">
-            <span className="text-[10px] text-slate-400">{filtered.length} 位成員</span>
-            <button className="text-[10px] bg-brand-600 text-white px-3 py-1 rounded-lg font-bold">+ 新增成員</button>
+            <span className="text-[11px] text-slate-500">{filtered.length} 位成員</span>
+            <button className="text-[11px] bg-brand-600 text-white px-3 py-1 rounded-lg font-bold">+ 新增成員</button>
           </div>
           {filtered.map(m => (
             <div key={m.id} className="bg-white rounded-xl border border-slate-200 p-3 flex items-center gap-3">
@@ -48,13 +48,13 @@ export default function MembersPage() {
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-1.5">
                   <span className="font-bold text-xs">{m.name}</span>
-                  <span className={`text-[8px] px-1 py-0.5 rounded font-bold ${m.active ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-400'}`}>{m.active ? '活躍' : '停用'}</span>
-                  {m.patrolRole && <span className="text-[8px] bg-amber-100 text-amber-700 px-1 py-0.5 rounded font-bold">★{m.patrolRole}</span>}
+                  <span className={`text-[11px] px-1 py-0.5 rounded font-bold ${m.active ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>{m.active ? '活躍' : '停用'}</span>
+                  {m.patrolRole && <span className="text-[11px] bg-amber-100 text-amber-700 px-1 py-0.5 rounded font-bold">★{m.patrolRole}</span>}
                 </div>
-                <div className="text-[9px] text-slate-400">{m.branch} · {m.patrol || '無小隊'} · YMIS {m.ymNumber} · {m.age}歲</div>
-                <div className="text-[9px] text-slate-400">家長：{m.parentName} ({m.parentEmail})</div>
+                <div className="text-[11px] text-slate-500">{m.branch} · {m.patrol || '無小隊'} · YMIS {m.ymNumber} · {m.age}歲</div>
+                <div className="text-[11px] text-slate-500">家長：{m.parentName} ({m.parentEmail})</div>
               </div>
-              <button className="text-[9px] text-brand-600 font-bold flex-shrink-0">編輯 →</button>
+              <button className="text-[11px] text-brand-600 font-bold flex-shrink-0">編輯 →</button>
             </div>
           ))}
         </div>
@@ -62,14 +62,14 @@ export default function MembersPage() {
 
       {tab === 'parents' && (
         <div className="space-y-2">
-          <span className="text-[10px] text-slate-400">{PARENTS.length} 位家長</span>
+          <span className="text-[11px] text-slate-500">{PARENTS.length} 位家長</span>
           {PARENTS.map(p => (
             <div key={p.id} className="bg-white rounded-xl border border-slate-200 p-3 flex items-center gap-3">
               <div className="w-9 h-9 bg-emerald-100 rounded-xl flex items-center justify-center text-sm flex-shrink-0">👨‍👩‍👧</div>
               <div className="flex-1 min-w-0">
                 <div className="font-bold text-xs">{p.name}</div>
-                <div className="text-[9px] text-slate-400">{p.email}</div>
-                <div className="text-[9px] text-slate-500">子女：{p.children}</div>
+                <div className="text-[11px] text-slate-500">{p.email}</div>
+                <div className="text-[11px] text-slate-500">子女：{p.children}</div>
               </div>
             </div>
           ))}
@@ -86,10 +86,10 @@ export default function MembersPage() {
               <div className="font-bold text-xs mb-2">{b.branch}</div>
               <div className="flex gap-1.5 flex-wrap">
                 {b.patrols.map((p, j) => (
-                  <div key={j} className="bg-slate-50 rounded-lg px-2.5 py-1.5 text-[10px] border border-slate-100">
+                  <div key={j} className="bg-slate-50 rounded-lg px-2.5 py-1.5 text-[11px] border border-slate-100">
                     <span className="font-bold">{p.name}</span>
-                    <span className="text-slate-400 ml-1">{p.members}</span>
-                    {p.leader && <div className="text-[8px] text-emerald-600">★ {p.leader}</div>}
+                    <span className="text-slate-500 ml-1">{p.members}</span>
+                    {p.leader && <div className="text-[11px] text-emerald-700">★ {p.leader}</div>}
                   </div>
                 ))}
               </div>

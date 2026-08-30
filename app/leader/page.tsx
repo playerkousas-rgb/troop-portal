@@ -28,14 +28,14 @@ export default function Leader(){
   const events = (s?.events || []).filter(e => e.status === 'published' && (e.scope === 'troop' || e.targetMemberIds.includes(myId) || e.branchId === session?.branchId));
 
   return <Auth roles={['super_admin','admin','group_leader','branch_leader','coach']}><div className="stack">
-    <section className="card stack" style={{ background: 'linear-gradient(135deg, #1a73e8 0%, #4285f4 100%)', color: '#fff' }}>
+    <section className="card stack" style={{ background: 'linear-gradient(135deg, #1557b0 0%, #1a73e8 100%)', color: '#fff' }}>
        <div className="row" style={{ justifyContent: 'space-between' }}>
           <div>
             <h2 style={{ margin: 0 }}>👤 {session?.name}</h2>
             <p style={{ opacity: 0.9, margin: 0 }}>角色：{ROLE_LABEL[session?.role || 'coach']}</p>
           </div>
           <div className="row">
-            <Link href="/profile" className="btn" style={{ background: 'rgba(255,255,255,0.2)', color: '#fff' }}>個人設定 / 改密碼</Link>
+            <Link href="/profile" className="btn" style={{ background: 'rgba(255,255,255,0.94)', color: '#0f2742' }}>個人設定 / 改密碼</Link>
           </div>
        </div>
     </section>

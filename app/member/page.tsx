@@ -37,14 +37,14 @@ export default function Member(){
   
   return (
     <div className="stack">
-      <section className="card stack" style={{ background: 'linear-gradient(135deg, #34a853 0%, #2e7d32 100%)', color: '#fff' }}>
+      <section className="card stack" style={{ background: 'linear-gradient(135deg, #166534 0%, #15803d 100%)', color: '#fff' }}>
         <div className="row" style={{ justifyContent: 'space-between' }}>
             <div>
               <h2 style={{ margin: 0 }}>👤 {member.name}</h2>
               <p style={{ opacity: 0.9, margin: 0 }}>身份：成員 {member.specialRole ? `(${member.specialRole})` : ''}</p>
             </div>
             <div className="row">
-              <Link href="/profile" className="btn" style={{ background: 'rgba(255,255,255,0.2)', color: '#fff' }}>個人設定 / 改密碼</Link>
+              <Link href="/profile" className="btn" style={{ background: 'rgba(255,255,255,0.94)', color: '#0f2742' }}>個人設定 / 改密碼</Link>
             </div>
         </div>
       </section>

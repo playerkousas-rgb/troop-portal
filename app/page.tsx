@@ -112,10 +112,10 @@ export default function HomePage() {
                   <div className="w-11 h-11 bg-slate-100 rounded-xl flex items-center justify-center text-2xl">⚜</div>
                   <div className="flex-1 min-w-0">
                     <div className="font-bold text-sm text-slate-800">{t.name}</div>
-                    <div className="text-[11px] text-slate-400">編號 {t.id}</div>
+                    <div className="text-[11px] text-slate-500">編號 {t.id}</div>
                   </div>
                   {selectedKey === t.key && (
-                    <div className="w-6 h-6 bg-brand-500 text-white rounded-full flex items-center justify-center text-xs font-bold">✓</div>
+                    <div className="w-6 h-6 bg-brand-600 text-white rounded-full flex items-center justify-center text-xs font-bold">✓</div>
                   )}
                 </div>
               </button>
@@ -135,10 +135,10 @@ export default function HomePage() {
                 <div className="w-11 h-11 bg-amber-100 rounded-xl flex items-center justify-center text-2xl">🎭</div>
                 <div className="flex-1 min-w-0">
                   <div className="font-bold text-sm text-amber-800">演示體驗 · 全模擬</div>
-                  <div className="text-[11px] text-amber-600/80">7 種角色帳號 · 假資料 · 免後台</div>
+                  <div className="text-[11px] text-amber-700/80">7 種角色帳號 · 假資料 · 免後台</div>
                 </div>
                 {selectedDemo && (
-                  <div className="w-6 h-6 bg-amber-500 text-white rounded-full flex items-center justify-center text-xs font-bold">✓</div>
+                  <div className="w-6 h-6 bg-amber-500 text-slate-900 rounded-full flex items-center justify-center text-xs font-bold">✓</div>
                 )}
               </div>
             </button>
@@ -149,7 +149,7 @@ export default function HomePage() {
                 <>
                   <Link
                     href="/login"
-                    className="inline-flex items-center gap-2 bg-amber-500 text-white px-6 py-2.5 rounded-xl text-sm font-bold hover:bg-amber-600 transition shadow"
+                    className="inline-flex items-center gap-2 bg-amber-700 text-white px-6 py-2.5 rounded-xl text-sm font-bold hover:bg-amber-800 transition shadow"
                   >
                     🎭 進入演示 →
                   </Link>
@@ -165,10 +165,10 @@ export default function HomePage() {
                   使用此旅團 →
                 </button>
               )}
-              {msg && <span className="text-sm text-emerald-600 font-bold">{msg}</span>}
+              {msg && <span className="text-sm text-emerald-700 font-bold">{msg}</span>}
             </div>
           )}
-          <p className="mt-4 text-[11px] text-slate-400">
+          <p className="mt-4 text-[11px] text-slate-500">
             💡 看不到你的旅團？代表尚未開通，請先聯絡管理員申請接入。
             🎭「演示體驗」用全套模擬資料展示 APP 功能，不連接任何真實後台。
           </p>
@@ -191,7 +191,7 @@ export default function HomePage() {
                 <div className="bg-white rounded-2xl border border-slate-200 p-4 card-hover h-full">
                   <div className="w-9 h-9 bg-slate-100 rounded-xl flex items-center justify-center text-xl mb-2.5 group-hover:bg-brand-100 transition">{item.icon}</div>
                   <h4 className="font-bold text-xs text-slate-800">{item.title}</h4>
-                  <p className="text-[10px] text-slate-500 mt-1 leading-relaxed">{item.desc}</p>
+                  <p className="text-[11px] text-slate-500 mt-1 leading-relaxed">{item.desc}</p>
                 </div>
               </Link>
             ))}

@@ -136,6 +136,19 @@ https://troop-portal.vercel.app/api/proxy?troopKey=troop_0084&action=health
 | `Apps Script 未公開(請確認 Deploy → Anyone)` | Web App 部署為「我」 | 旅團重新部署,選「任何人」 |
 | `未知旅團,請確認已開通` | troopKey 不在 troops.ts | 確認 Step 2 的 key 格式(`troop_0084`)與首頁下拉值一致 |
 | 旅團登入後全部空白 | 帳號角色 / 資料問題 | 用 sheep/0728(技術測試帳號)登入檢查;看 AuditLogs |
+| **超管 sheep/0728 登入不了** | ①沒選旅團 ②瀏覽器還在演示模式 ③Vercel API Key 未設/不符 ④GS 未更新到 3.0-live | 見下方「超管登入不了」排查順序 |
+| 已登入但「後台沒有回傳任何資料」紅色警告 | 舊版 GS 不認 `SUPER_ADMIN` / `staff_token` 身份,把超管當訪客 | 重新部署 GS 到 3.0-live;過渡期前端已改以 `sheep` 作 userId,舊版也能拿到全部資料 |
+| 版面顏色／字體怪怪的(某些文字像隱形) | 舊設計系統 `.card/.btn/.muted` 與 Tailwind utilities 打架 | 已於 2026-08-31 修正(見 HANDOVER):legacy CSS 全數收進 `@layer components`,次要文字統一 slate-500,最小字級 11px |
+
+### 超管登入不了:排查順序
+
+1. **選旅團** — `/login` 顯示「請先選擇旅團」就代表還沒選;所有帳號(含超管)都屬於某個旅團的後台。
+2. **退出演示模式** — 登入頁若出現「🎭 正在演示模式」黃色警告,真實帳號不會生效,先按「退出演示模式」。
+3. **按「🩺 連線檢查」** — 會一次顯示:旅團 key、Vercel API Key 有沒有設、Apps Script 連不連得到、**後台版本**。
+   - API Key 未設 → Step 4 重做
+   - Apps Script 連線失敗 → 重新部署(Who has access = **Anyone**)
+   - 版本不是 `3.0-live` → 重新貼 `gs/SCOUTSYSTEM_2_SETUP.gs` 並新增版本
+4. **超管帳號**:`sheep` / `0728`(大小寫、前後空白已容許)。超管不在 Users 表,不能用「忘記密碼」。
 
 ## 安全提醒
 

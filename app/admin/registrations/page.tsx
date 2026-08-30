@@ -5,13 +5,13 @@ import { apiTogglePaid } from '@/lib/api';
 import { useSearchParams } from 'next/navigation';
 
 const GROUP_DEFS = [
-  { id: 'b1', name: '🎒 小童軍', full: '小童軍支部', color: '#ff9800', border: '#ffe0b2' },
-  { id: 'b2', name: '🐺 幼童軍', full: '幼童軍支部', color: '#fbc02d', border: '#fff9c4' },
-  { id: 'b3', name: '⚜️ 童軍', full: '童軍支部', color: '#34a853', border: '#ceead6' },
-  { id: 'b4', name: '🧭 深資童軍', full: '深資童軍支部', color: '#ea4335', border: '#fad2cf' },
-  { id: 'b5', name: '🚶 樂行童軍', full: '樂行童軍支部', color: '#1a73e8', border: '#d2e3fc' },
-  { id: 'leader', name: '👔 領袖', full: '旅團領袖與統籌', color: '#9c27b0', border: '#e1bee7' },
-  { id: 'parent', name: '👨‍👩‍👧 家長', full: '家長團隊', color: '#00897b', border: '#b2dfdb' }
+  { id: 'b1', name: '🎒 小童軍', full: '小童軍支部', color: '#ff9800', text: '#b06000', border: '#ffe0b2' },
+  { id: 'b2', name: '🐺 幼童軍', full: '幼童軍支部', color: '#fbc02d', text: '#b06000', border: '#fff9c4' },
+  { id: 'b3', name: '⚜️ 童軍', full: '童軍支部', color: '#34a853', text: '#0d652d', border: '#ceead6' },
+  { id: 'b4', name: '🧭 深資童軍', full: '深資童軍支部', color: '#ea4335', text: '#a50e0e', border: '#fad2cf' },
+  { id: 'b5', name: '🚶 樂行童軍', full: '樂行童軍支部', color: '#1a73e8', text: '#174ea6', border: '#d2e3fc' },
+  { id: 'leader', name: '👔 領袖', full: '旅團領袖與統籌', color: '#9c27b0', text: '#6a1b9a', border: '#e1bee7' },
+  { id: 'parent', name: '👨‍👩‍👧 家長', full: '家長團隊', color: '#00897b', text: '#00695c', border: '#b2dfdb' }
 ];
 
 function RegistrationsInner(){
@@ -211,7 +211,7 @@ function RegistrationsInner(){
           const isExp = expandedGroup === g.id;
           return (
             <div className="card stack" key={g.id} style={{ padding: 12, borderTop: `5px solid ${g.color}`, background: isExp ? '#fffef0' : '#fff' }}>
-              <div style={{ fontWeight: 'bold', fontSize: '1rem', color: g.color }}>{g.name}</div>
+              <div style={{ fontWeight: 'bold', fontSize: '1rem', color: g.text || g.color }}>{g.name}</div>
               <div className="muted" style={{ fontSize: '0.82rem' }}>共 {grpMembers.length} 人</div>
               <div style={{ fontSize: '0.88rem', lineHeight: '1.9', margin: '4px 0' }}>
                 <div style={{cursor:'pointer', padding:'1px 4px', borderRadius:4, background:expandedBranchStatus?.branchId===g.id&&expandedBranchStatus.status==='registered'?'#e6f4ea':'transparent'}} onClick={()=>setExpandedBranchStatus(expandedBranchStatus?.branchId===g.id&&expandedBranchStatus.status==='registered'?null:{branchId:g.id,status:'registered'})}>
@@ -242,7 +242,7 @@ function RegistrationsInner(){
       {expandedBranchStatus && (
         <div className="card stack" style={{ background: '#fffef0', border: `2px solid ${GROUP_DEFS.find(g=>g.id===expandedBranchStatus.branchId)?.color}`, marginTop: 8 }}>
           <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
-            <strong style={{ fontSize: '1.02rem', color: GROUP_DEFS.find(g=>g.id===expandedBranchStatus.branchId)?.color }}>
+            <strong style={{ fontSize: '1.02rem', color: GROUP_DEFS.find(g=>g.id===expandedBranchStatus.branchId)?.text || GROUP_DEFS.find(g=>g.id===expandedBranchStatus.branchId)?.color }}>
               🔍 {GROUP_DEFS.find(g=>g.id===expandedBranchStatus.branchId)?.name} · {expandedBranchStatus.status==='registered'?'✅ 確定參加':expandedBranchStatus.status==='declined'?'❌ 婉拒不參加':expandedBranchStatus.status==='interested'?'❤️ 有興趣':expandedBranchStatus.status==='paid'?'💰 已完成付款':'⚠️ 尚未回覆'}名單：
             </strong>
             <button className="btn" onClick={() => setExpandedBranchStatus(null)}>✕ 關閉</button>

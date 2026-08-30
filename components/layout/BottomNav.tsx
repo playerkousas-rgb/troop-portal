@@ -25,11 +25,11 @@ export default function BottomNav() {
               key={item.href}
               href={item.href}
               className={`flex-1 flex flex-col items-center gap-0.5 py-2.5 transition no-underline ${
-                active ? 'text-brand-700' : 'text-slate-400 hover:text-slate-600'
+                active ? 'text-brand-700' : 'text-slate-500 hover:text-slate-600'
               }`}
             >
               <span className={`text-xl transition-transform ${active ? 'scale-110' : ''}`}>{item.icon}</span>
-              <span className={`text-[10px] font-bold ${active ? 'text-brand-700' : ''}`}>{item.label}</span>
+              <span className={`text-[11px] font-bold ${active ? 'text-brand-700' : ''}`}>{item.label}</span>
               {active && <div className="w-4 h-0.5 bg-brand-600 rounded-full mt-0.5" />}
             </Link>
           );

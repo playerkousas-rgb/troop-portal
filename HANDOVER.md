@@ -62,8 +62,48 @@ GS `doGet` 新增以下讀取 action（回傳 `{ success, state }`，state 只�
 
 測試觀察（暫不改）：`calcAge_('')` 回 0 → 無生日成員登入顯示 age:0（18 歲 guard 走 fail-closed，安全）；deleteEvent 不會級聯刪 EventReplies 孤兒行；createMember 與 createEvent 相隔 <1 秒時，活動 targetMemberIds 可能因 Sheets 最終一致性漏掉新成員（正常使用順序不受影響）。
 
+## 2026-08-31 修復：超管登入 + 全站配色／字體對比度巡檢
+
+### 1) 超管（sheep / 0728）登入
+
+| 問題 | 處理 |
+|---|---|
+| 舊版 GS 認得 `SUPER_ADMIN` 登入，但 `buildDashboardCore_` 不認這個 userId → 登入成功卻全頁空白 | 前端登入後改用**實際輸入的帳號（`sheep`）**作為 session userId。`sheep` 在新舊版 GS 都屬 `TECH_TEST_ACCOUNTS_`（最高權限），**不必等 82 旅重新部署 GS 就能用** |
+| 複製貼上帶了空白／大小寫 → 密碼永遠不對 | GS `handleLogin_` 對 `sheep` 做 `trim` + 不分大小寫；STAFF_TOKEN 亦先 `trim` 再比對 |
+| 瀏覽器停留在演示模式時，輸入 sheep/0728 只會進去 mock 資料 | 登入頁新增黃色警告卡「🎭 正在演示模式：真實帳號（含超級管理員）不會生效」+ 一鍵退出 |
+| 未選旅團 | 「請先選擇旅團」文案補充：超管也屬於某個旅團後台 |
+| 登入失敗只有一句「登入失敗」 | 新增 `explainError()`：API Key 不符／未設、Apps Script 未公開、網路錯誤各有可執行的修復建議 |
+| 無從判斷後台版本 | 新增 `lib/api.ts → apiDiagnose()`；登入頁「🩺 連線檢查」一次顯示：旅團 key、Vercel API Key 是否已設、**GS 版本**（非 3.0-live 會提示重新部署） |
+| 已登入但資料全空，畫面看起來像沒登入 | `/admin` 新增紅色警告卡，直接列出重新部署三步 |
+
+同時把 `public/downloads/SCOUTSYSTEM_2_SETUP.gs.txt` 與 `gs/SCOUTSYSTEM_2_SETUP.gs` 同步（之前少了家長開戶連結子女、createUser 等改動，管理員下載到的會是舊版）。
+
+### 2) 配色／字體全面巡檢（對照 WCAG）
+
+以腳本掃描全部 tsx 的 className 與 inline style，套用 Tailwind v4 實際產生的顏色值計算對比度：
+
+- **低對比文字**：`text-slate-400`（白底僅 **2.63:1**）共 66 處 → 全部改 `text-slate-500`（4.77:1）
+- **白色字配亮色底**（最嚴重、等於隱形）：
+  - `/admin` 控制台身份卡：白字 + 金黃漸層 `#f9ab00→#ffc107` = **1.63:1** → 改 `#7a4f01→#a16207`（4.9:1）
+  - 該卡內「個人設定」按鈕：`rgba(255,255,255,.2)` 底 + 白字 = **1.0:1** → 改 `.94` 白底 + 深色字（`/admin`、`/leader`、`/member`、`/parent` 四張卡）
+  - `/member` 綠色漸層（3.06:1）、`/leader` 藍色（3.56:1）→ 一併調深至 ≥4.5:1
+  - `bg-amber-400/500 + text-white`（1.73 / 2.16:1）→ 小標籤改深字、按鈕改 `amber-700`
+  - `bg-emerald-500/600 + text-white`、`bg-rose-500`、`bg-blue-500`、`bg-violet-500`、`bg-brand-500` → 全部升一級（≥4.7:1）
+  - 報名管理支部標題用 `#fbc02d`（**1.66:1**）/`#ff9800`（2.16:1）→ `GROUP_DEFS` 新增 `text` 欄位（4.65–9.4:1）
+  - 活動管理「💳 已設收款連結」`color: 'gold'`（1.16:1）→ `#b06000`
+- **字級過小**：`text-[7px]`×5、`text-[8px]`×39、`text-[9px]`×102、`text-[10px]`×96 → 統一最低 **11px**
+- **CSS 層級打架**（改了 Tailwind class 卻沒反應）：legacy 設計系統原本寫在 unlayered，會反過來蓋掉 utilities（`a{color:inherit}`、`label{font-size:13px}`、`input{width:100%}` 等）。已全部收進 `@layer base` / `@layer components`，utilities 現在一定生效。
+- **缺樣式的 class**：`.topbar` / `.topbar-inner` / `.brand` / `.nav` / `.collapsible*` / `.plugin-card` / `.tab` / `.attendance-page|rollcall|legend|table` 原本完全沒定義 → 全部補上
+- **簽到狀態鈕全變灰色**：`.btn` 寫在 `.att-status-*` 之後，蓋掉了狀態底色 → 補 `.btn.att-status-*` 規則
+- **字體**：補齊中文 fallback（`Noto Sans CJK TC` / `Source Han Sans TC` / `PingFang TC` / `Heiti TC`），避免 Android／Linux 出現缺字豆腐
+- `.container` 與 Tailwind v4 的 `container` utility 撞名 → 版面改用 `.page-container`
+
+巡檢後剩餘項目皆為 hover 態或已 ≥3.8:1；`npm run build` 全綠。
+
 ## 待完成（下一階段）
-1. **82 旅重新部署 GS** — 把本 repo 的 `gs/SCOUTSYSTEM_2_SETUP.gs` 貼回 82 旅 Script Editor → Deploy → 管理部署 → 新增版本；部署後用 `?action=health&apiKey=...` 確認 version=3.0-live，並複測超管登入
+1. **82 旅重新部署 GS** — 把本 repo 的 `gs/SCOUTSYSTEM_2_SETUP.gs`（或 `public/downloads/SCOUTSYSTEM_2_SETUP.gs.txt`）貼回 82 旅 Script Editor → Deploy → 管理部署 → 新增版本；部署後用 `?action=health&apiKey=...` 確認 version=3.0-live，並複測超管登入。
+   （過渡期：前端已改以 `sheep` 作 userId，未重新部署也能拿到全部資料；但仍建議盡快部署，才有 `publicConfig_` 敏感值剝除等修正）
+6. **安全待辦** — 技術測試帳號 `sheep` / `0728` 目前「免密碼」即可登入並取得 `super_admin`（寫死在 GS `handleLogin_`）。建議確認完超管流程後，改成只接受超管密碼或加白名單 IP。
 2. **/onboard 第 6 步實測** — 走一次表單提交，確認管理員 Sheet「申請記錄」有新記錄 + 收到通知 email
 3. **旅團部署** — 新旅團接入流程（收到自動寄信 → `DEPLOY_ADMIN_GUIDE.md` 五步）
 4. **`/dashboard/*` demo 樹** — 仍是內嵌 mock 的展示頁（帶 Demo 角色切換），非真實登入頁；確認不再需要可刪

@@ -22,10 +22,10 @@ export default function SettingsPage() {
             { key: 'system_lock', label: '系統鎖定', value: '否' },
           ].map((c, i) => (
             <div key={i} className="bg-white rounded-xl border border-slate-200 p-3">
-              <label className="text-[9px] font-bold text-slate-500 uppercase">{c.label}</label>
+              <label className="text-[11px] font-bold text-slate-500 uppercase">{c.label}</label>
               <div className="flex gap-2 mt-1">
                 <input defaultValue={c.value} className="flex-1 rounded-lg border border-slate-200 px-2 py-1.5 text-xs" />
-                <button className="text-[10px] bg-brand-600 text-white px-3 py-1.5 rounded-lg font-bold">儲存</button>
+                <button className="text-[11px] bg-brand-600 text-white px-3 py-1.5 rounded-lg font-bold">儲存</button>
               </div>
             </div>
           ))}
@@ -39,7 +39,7 @@ export default function SettingsPage() {
           ].map((s, i) => (
             <div key={i} className="flex items-center justify-between py-1">
               <span className="text-[11px] font-medium">{s.label}</span>
-              <span className={`text-[9px] px-2 py-0.5 rounded-full font-bold ${s.status === 'ok' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+              <span className={`text-[11px] px-2 py-0.5 rounded-full font-bold ${s.status === 'ok' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
                 {s.status === 'ok' ? '✅ 正常' : '⚠️ 注意'}
               </span>
             </div>
@@ -51,13 +51,13 @@ export default function SettingsPage() {
         <div className="space-y-2">
           <div className="bg-white rounded-xl border border-slate-200 p-4">
             <h3 className="font-bold text-xs mb-2">🔧 修復家長子女連結</h3>
-            <p className="text-[10px] text-slate-500 mb-3">自動檢查及修復家長與子女之間的連結。</p>
-            <button className="text-[10px] bg-amber-600 text-white px-3 py-1.5 rounded-lg font-bold">執行修復</button>
+            <p className="text-[11px] text-slate-500 mb-3">自動檢查及修復家長與子女之間的連結。</p>
+            <button className="text-[11px] bg-amber-700 text-white px-3 py-1.5 rounded-lg font-bold">執行修復</button>
           </div>
           <div className="bg-white rounded-xl border border-slate-200 p-4">
             <h3 className="font-bold text-xs mb-2">🔄 重新生成 API Key</h3>
-            <p className="text-[10px] text-slate-500 mb-3">舊 Key 會立即失效。</p>
-            <button className="text-[10px] bg-rose-600 text-white px-3 py-1.5 rounded-lg font-bold">重新生成</button>
+            <p className="text-[11px] text-slate-500 mb-3">舊 Key 會立即失效。</p>
+            <button className="text-[11px] bg-rose-600 text-white px-3 py-1.5 rounded-lg font-bold">重新生成</button>
           </div>
         </div>
       )}

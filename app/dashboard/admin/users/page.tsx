@@ -112,7 +112,7 @@ export default function UsersPage() {
           ═══════════════════════════════════════════ */}
       {tab === 'leaders' && (
         <section className="space-y-2">
-          <p className="text-[10px] text-slate-500">
+          <p className="text-[11px] text-slate-500">
             顯示所有領袖。團長/支部領袖可開放自己支部給其他領袖查看。教練員需授權才能看資料。
           </p>
           {filteredLeaders.map(l => (
@@ -123,12 +123,12 @@ export default function UsersPage() {
                   <div>
                     <div className="font-bold text-xs flex items-center gap-1.5">
                       {l.name}
-                      <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold ${ROLE_COLOR[l.role]}`}>{ROLE_LABEL[l.role]}</span>
+                      <span className={`text-[11px] px-1.5 py-0.5 rounded font-bold ${ROLE_COLOR[l.role]}`}>{ROLE_LABEL[l.role]}</span>
                     </div>
-                    <div className="text-[10px] text-slate-400">{l.email} · {l.branchName}</div>
+                    <div className="text-[11px] text-slate-500">{l.email} · {l.branchName}</div>
                   </div>
                 </div>
-                <span className={`text-[9px] px-2 py-0.5 rounded-full font-bold ${l.active ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-400'}`}>
+                <span className={`text-[11px] px-2 py-0.5 rounded-full font-bold ${l.active ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>
                   {l.active ? '啟用' : '停用'}
                 </span>
               </div>
@@ -139,10 +139,10 @@ export default function UsersPage() {
                   {/* 他已被開放看其他支部 */}
                   {l.crossBranchAccess && l.crossBranchAccess.length > 0 && (
                     <div>
-                      <span className="text-[9px] font-bold text-slate-500">👁️ 已獲授權查看</span>
+                      <span className="text-[11px] font-bold text-slate-500">👁️ 已獲授權查看</span>
                       <div className="flex gap-1.5 flex-wrap mt-1">
                         {l.crossBranchAccess.map((cb, i) => (
-                          <span key={i} className="text-[9px] bg-blue-50 border border-blue-200 text-blue-700 px-2 py-0.5 rounded-lg font-bold">
+                          <span key={i} className="text-[11px] bg-blue-50 border border-blue-200 text-blue-700 px-2 py-0.5 rounded-lg font-bold">
                             {cb.branchName}（由 {cb.grantedBy} 開放）
                           </span>
                         ))}
@@ -153,28 +153,28 @@ export default function UsersPage() {
                   {/* 開放自己支部給其他人看的按鈕 */}
                   <div>
                     <div className="flex items-center justify-between">
-                      <span className="text-[9px] font-bold text-slate-500">🔓 開放 {l.branchName} 給其他領袖</span>
-                      <button className="text-[9px] bg-brand-600 text-white px-2 py-0.5 rounded font-bold">+ 邀請</button>
+                      <span className="text-[11px] font-bold text-slate-500">🔓 開放 {l.branchName} 給其他領袖</span>
+                      <button className="text-[11px] bg-brand-600 text-white px-2 py-0.5 rounded font-bold">+ 邀請</button>
                     </div>
-                    <span className="text-[9px] text-slate-400">邀請其他團長/領袖查看你的 {l.branchName} 活動及資料</span>
+                    <span className="text-[11px] text-slate-500">邀請其他團長/領袖查看你的 {l.branchName} 活動及資料</span>
                   </div>
 
                   {/* 深資/樂行特殊設定：可指定成員看其他支部活動 */}
                   {['b4', 'b5'].includes(l.branchId) && l.crossBranchAccess && l.crossBranchAccess.length > 0 && (
                     <div className="bg-violet-50 border border-violet-200 rounded-xl p-2.5 mt-1">
                       <div className="flex items-center justify-between mb-1.5">
-                        <span className="text-[9px] font-bold text-violet-700">🌟 指定成員查看外支部活動</span>
-                        <button className="text-[9px] bg-violet-600 text-white px-2 py-0.5 rounded font-bold">+ 指定</button>
+                        <span className="text-[11px] font-bold text-violet-700">🌟 指定成員查看外支部活動</span>
+                        <button className="text-[11px] bg-violet-600 text-white px-2 py-0.5 rounded font-bold">+ 指定</button>
                       </div>
-                      <p className="text-[9px] text-violet-600 mb-2">
+                      <p className="text-[11px] text-violet-600 mb-2">
                         你已獲授權查看其他支部。可指定你的成員也看到，讓他們知道有什麼活動可以幫忙。
                       </p>
                       <div className="space-y-1">
-                        <div className="flex items-center justify-between bg-white rounded-lg px-2 py-1.5 text-[9px]">
+                        <div className="flex items-center justify-between bg-white rounded-lg px-2 py-1.5 text-[11px]">
                           <span className="font-bold">張大偉 → 可看童軍活動</span>
                           <span className="bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded font-bold">✓ 已指定</span>
                         </div>
-                        <div className="flex items-center justify-between bg-white rounded-lg px-2 py-1.5 text-[9px]">
+                        <div className="flex items-center justify-between bg-white rounded-lg px-2 py-1.5 text-[11px]">
                           <span className="font-bold">李美玲 → 可看幼童軍活動</span>
                           <span className="bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded font-bold">✓ 已指定</span>
                         </div>
@@ -187,7 +187,7 @@ export default function UsersPage() {
               {/* 教練員授權提示 */}
               {l.role === 'coach' && (
                 <div className="border-t border-slate-100 pt-2 mt-2">
-                  <span className="text-[9px] text-amber-700 bg-amber-50 px-2 py-0.5 rounded-lg font-bold border border-amber-200">
+                  <span className="text-[11px] text-amber-700 bg-amber-50 px-2 py-0.5 rounded-lg font-bold border border-amber-200">
                     ⚠️ 教練員需由支部/管理員授權才能查看資料
                   </span>
                 </div>
@@ -210,10 +210,10 @@ export default function UsersPage() {
                 </div>
                 <div>
                   <div className="font-bold text-[11px]">{m.name}</div>
-                  <div className="text-[9px] text-slate-400">{m.branchName} {m.patrol ? `· ${m.patrol}` : ''}</div>
+                  <div className="text-[11px] text-slate-500">{m.branchName} {m.patrol ? `· ${m.patrol}` : ''}</div>
                 </div>
               </div>
-              <span className={`text-[9px] px-2 py-0.5 rounded font-bold ${ROLE_COLOR[m.role]}`}>{ROLE_LABEL[m.role]}</span>
+              <span className={`text-[11px] px-2 py-0.5 rounded font-bold ${ROLE_COLOR[m.role]}`}>{ROLE_LABEL[m.role]}</span>
             </div>
           ))}
         </section>
@@ -225,10 +225,10 @@ export default function UsersPage() {
       {tab === 'bulk' && (
         <section className="bg-white rounded-2xl border border-slate-200 p-4 space-y-3">
           <h3 className="font-bold text-sm">📥 批量開戶</h3>
-          <p className="text-[10px] text-slate-500">下載 CSV 範本，填好後上傳，系統會自動建立帳號及成員。</p>
+          <p className="text-[11px] text-slate-500">下載 CSV 範本，填好後上傳，系統會自動建立帳號及成員。</p>
           <div className="grid grid-cols-2 gap-2">
             <button className="bg-brand-600 text-white py-2.5 rounded-xl text-xs font-bold">📥 下載 CSV 範本</button>
-            <button className="bg-emerald-600 text-white py-2.5 rounded-xl text-xs font-bold">📤 上傳 CSV</button>
+            <button className="bg-emerald-700 text-white py-2.5 rounded-xl text-xs font-bold">📤 上傳 CSV</button>
           </div>
         </section>
       )}
@@ -239,13 +239,13 @@ export default function UsersPage() {
       {tab === 'permissions' && (
         <section className="bg-white rounded-2xl border border-slate-200 p-4 space-y-3">
           <h3 className="font-bold text-sm">🔐 權限管理</h3>
-          <p className="text-[10px] text-slate-500">
+          <p className="text-[11px] text-slate-500">
             每位團長/支部領袖管理自己支部。可開放自己支部的活動給其他領袖查看。
           </p>
           <div className="space-y-2">
             <div className="bg-slate-50 rounded-xl p-3">
               <div className="font-bold text-[11px] mb-1">權限規則</div>
-              <ul className="text-[10px] text-slate-600 space-y-1 list-disc pl-4">
+              <ul className="text-[11px] text-slate-600 space-y-1 list-disc pl-4">
                 <li>管理員：可看全旅所有支部資料</li>
                 <li>團長：可看所屬支部 + 開放自己支部給其他領袖</li>
                 <li>支部領袖：可看所屬支部 + 授權教練員</li>
@@ -257,8 +257,8 @@ export default function UsersPage() {
             {/* 深資/樂行特殊設定 */}
             <div className="bg-violet-50 border border-violet-200 rounded-xl p-3">
               <div className="font-bold text-[11px] text-violet-800 mb-1">🌟 深資 / 樂行特殊設定</div>
-              <p className="text-[10px] text-violet-700 mb-2">深資和樂行成員年紀較大，經常被邀請到其他支部幫忙。</p>
-              <div className="text-[10px] text-violet-700 space-y-1">
+              <p className="text-[11px] text-violet-700 mb-2">深資和樂行成員年紀較大，經常被邀請到其他支部幫忙。</p>
+              <div className="text-[11px] text-violet-700 space-y-1">
                 <div className="flex gap-2">
                   <span className="font-bold text-violet-800 whitespace-nowrap">①</span>
                   <span>其他支部領袖（如幼童軍/童軍）開放自己的支部給深資/樂行領袖</span>
@@ -272,7 +272,7 @@ export default function UsersPage() {
                   <span>被指定的成員便能看到該支部的活動，知道自己可以去幫忙</span>
                 </div>
               </div>
-              <p className="text-[9px] text-violet-500 mt-2">
+              <p className="text-[11px] text-violet-700 mt-2">
                 💡 因為深資/樂行領袖就是成員的領袖，所以不需要「雙方同意」— 領袖自己決定給誰看就行。
               </p>
             </div>
