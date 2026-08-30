@@ -17,7 +17,7 @@
  *   4. 把 /exec URL 和 API Key 提交到前端「申請接入」頁面
  */
 
-var SCOUTSYSTEM_VERSION = '2.0-live';
+var SCOUTSYSTEM_VERSION = '3.0-live';
 var TECH_TEST_ACCOUNTS_ = ['sheep', '0728'];
 
 // ==================== 顏色 / 分頁設定 ====================
@@ -465,18 +465,19 @@ function regenerateApiKeyMenu() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var newKey = regenerateApiKey_(ss);
   if (newKey) {
-    SpreadsheetApp.getUi().alert(
-      '🔑 新 API Key 已生成',
-      '新 API Key（只顯示一次，請即複製）：\\n'
-      + '───────────────────────\\n'
-      + newKey
-      + '\\n───────────────────────\\n\\n'
-      + '⚠️ 複製時只取上下橫線之間的文字，不要包含空格或換行！\\n\\n'
-      + '舊 Key 即刻失效！'
-      + '\\n請把新 Key 交給平台管理員更新。'
-      + '\\nSystemConfig 只存雜湊值，無法還原。',
-      SpreadsheetApp.getUi().ButtonSet.OK
-    );
+    var msg = [
+      '新 API Key（只顯示一次，請立刻複製）：',
+      '',
+      '    ' + newKey,
+      '',
+      '⚠️ 請「雙擊」上面的 key 選取整行再複製，',
+      '不要包含任何空白、換行或其他字元。',
+      '',
+      '舊 Key 會立即失效。',
+      '請把新 Key 交給平台管理員，更新 Vercel 環境變數。',
+      'SystemConfig 只存雜湊值，無法還原。'
+    ].join('\n');
+    SpreadsheetApp.getUi().alert('🔑 新 API Key 已生成', msg, SpreadsheetApp.getUi().ButtonSet.OK);
   } else {
     SpreadsheetApp.getUi().alert('錯誤', '找不到 API_KEY_HASH 設定行。');
   }
@@ -904,6 +905,23 @@ function mapConfig_() {
   return cfg;
 }
 
+/**
+ * 敏感設定绝不回傳前端（含未登入的公開視圖）。
+ * 管理員如需查看 / 修改，直接看 Sheet 的 SystemConfig 表。
+ */
+var SENSITIVE_CONFIG_KEYS_ = ['STAFF_TOKEN', 'API_KEY_HASH', 'API_KEY', 'SUPER_ADMIN_USER', 'SUPER_ADMIN_HASH', 'INITIAL_ADMIN_USER', 'INITIAL_ADMIN_PW'];
+
+function publicConfig_(cfg) {
+  var out = {};
+  Object.keys(cfg || {}).forEach(function (k) {
+    if (SENSITIVE_CONFIG_KEYS_.indexOf(k) >= 0) return;
+    // 未來新增的敏感欄位（token / hash / 密碼 / 密鑰）一併擋下
+    if (/(TOKEN|_HASH$|_PW$|PASSWORD|SECRET|API_KEY)/i.test(k)) return;
+    out[k] = cfg[k];
+  });
+  return out;
+}
+
 // ==================== ★ 角色過濾 Dashboard（取代 getState） ====================
 
 /**
@@ -928,6 +946,12 @@ function buildDashboardCore_(userId, loadPdfs) {
   var user = null;
   if (isTechTest) {
     user = { id: userId, name: userId + '（技術測試）', role: 'super_admin', branchId: '', memberId: '', approved: true, techTest: true };
+  } else if (userId === 'SUPER_ADMIN') {
+    // 隱藏超管（sheep）登入後回傳的 userId，不在 Users 表，固定最高權限
+    user = { id: userId, name: '超級管理員', role: 'super_admin', branchId: '', memberId: '', approved: true, techTest: true };
+  } else if (userId === 'staff_token') {
+    // STAFF_TOKEN 登入，不在 Users 表
+    user = { id: userId, name: 'STAFF_TOKEN 管理員', role: 'admin', branchId: '', memberId: '', approved: true };
   } else {
     user = allUsers.filter(function (u) { return u.id === userId; })[0] || null;
   }
@@ -971,7 +995,7 @@ function buildDashboardCore_(userId, loadPdfs) {
     meetings: [],
     plugins: [],
     pluginSettings: [],
-    audits: [], config: config,
+    audits: [], config: publicConfig_(config),
     userFeatures: []  // 當前用戶的功能權限
   };
   // Fill userFeatures for current user
@@ -1266,12 +1290,19 @@ function getUserFeatures_(userId, role) {
   return result;
 }
 
+/** 系統內建的高權限操作者（不在 Users 表，跳過角色校驗） */
+function isPrivilegedOperator_(id) {
+  if (!id) return false;
+  if (id === 'system' || id === 'staff_token' || id === 'SUPER_ADMIN') return true;
+  return TECH_TEST_ACCOUNTS_.indexOf(id) >= 0;
+}
+
 function handleGrantFeature_(p) {
   var operatedBy = p.operatedBy || 'system';
   var targetUserId = p.targetUserId;
   var feature = p.feature;
   
-  if (TECH_TEST_ACCOUNTS_.indexOf(operatedBy) < 0 && operatedBy !== 'system' && operatedBy !== 'staff_token') {
+  if (!isPrivilegedOperator_(operatedBy)) {
     var users = mapUsers_();
     var operator = users.filter(function(u){return u.id === operatedBy;})[0];
     var opRole = operator ? operator.role : '';
@@ -1379,6 +1410,9 @@ function handleGetUserFeatures_(p) {
 
 function doGet(e) {
   var p = (e && e.parameter) || {};
+
+  // 防呆：複製 API Key 時常連帶換行 / 空白，先 trim 再比對
+  if (p.apiKey !== undefined && p.apiKey !== null) p.apiKey = String(p.apiKey).trim();
 
   // ★★★ API Key 認證：保護所有數據 ★★★
   // 新版：比對 API_KEY_HASH（SHA-256），明文不存於 Sheet
@@ -2177,8 +2211,7 @@ function parseRowsParam_(rows) {
 }
 
 function canBatchManage_(operatedBy) {
-  if (!operatedBy || operatedBy === 'system' || operatedBy === 'staff_token') return true;
-  if (TECH_TEST_ACCOUNTS_.indexOf(operatedBy) >= 0) return true;
+  if (!operatedBy || isPrivilegedOperator_(operatedBy)) return true;
   var users = mapUsers_();
   var operator = users.filter(function (u) { return u.id === operatedBy; })[0];
   if (!operator) return false;

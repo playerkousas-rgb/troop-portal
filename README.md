@@ -19,6 +19,11 @@
 
 完整接入及資料邊界見 [`ATTENDANCE_INTEGRATION.md`](ATTENDANCE_INTEGRATION.md)。
 
+## 平台管理員
+
+新旅團接入、Vercel 環境變數設定、換 Key / 停用旅團,照 [`DEPLOY_ADMIN_GUIDE.md`](DEPLOY_ADMIN_GUIDE.md) 做。
+新旅團在 `/onboard` 按「傳送接入資料」後,資料會提交到管理員的接收端(記入管理員 Sheet 並 Email 通知),旅團端看不到管理員 email、也不會從旅團帳號寄信。
+
 ## 開發
 
 ```bash

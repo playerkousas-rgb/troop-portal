@@ -17,7 +17,7 @@
  *   4. 把 /exec URL 和 API Key 提交到前端「申請接入」頁面
  */
 
-var SCOUTSYSTEM_VERSION = '2.0-live';
+var SCOUTSYSTEM_VERSION = '3.0-live';
 var TECH_TEST_ACCOUNTS_ = ['sheep', '0728'];
 
 // ==================== 顏色 / 分頁設定 ====================
@@ -465,18 +465,19 @@ function regenerateApiKeyMenu() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var newKey = regenerateApiKey_(ss);
   if (newKey) {
-    SpreadsheetApp.getUi().alert(
-      '🔑 新 API Key 已生成',
-      '新 API Key（只顯示一次，請即複製）：\\n'
-      + '───────────────────────\\n'
-      + newKey
-      + '\\n───────────────────────\\n\\n'
-      + '⚠️ 複製時只取上下橫線之間的文字，不要包含空格或換行！\\n\\n'
-      + '舊 Key 即刻失效！'
-      + '\\n請把新 Key 交給平台管理員更新。'
-      + '\\nSystemConfig 只存雜湊值，無法還原。',
-      SpreadsheetApp.getUi().ButtonSet.OK
-    );
+    var msg = [
+      '新 API Key（只顯示一次，請立刻複製）：',
+      '',
+      '    ' + newKey,
+      '',
+      '⚠️ 請「雙擊」上面的 key 選取整行再複製，',
+      '不要包含任何空白、換行或其他字元。',
+      '',
+      '舊 Key 會立即失效。',
+      '請把新 Key 交給平台管理員，更新 Vercel 環境變數。',
+      'SystemConfig 只存雜湊值，無法還原。'
+    ].join('\n');
+    SpreadsheetApp.getUi().alert('🔑 新 API Key 已生成', msg, SpreadsheetApp.getUi().ButtonSet.OK);
   } else {
     SpreadsheetApp.getUi().alert('錯誤', '找不到 API_KEY_HASH 設定行。');
   }
@@ -904,6 +905,23 @@ function mapConfig_() {
   return cfg;
 }
 
+/**
+ * 敏感設定绝不回傳前端（含未登入的公開視圖）。
+ * 管理員如需查看 / 修改，直接看 Sheet 的 SystemConfig 表。
+ */
+var SENSITIVE_CONFIG_KEYS_ = ['STAFF_TOKEN', 'API_KEY_HASH', 'API_KEY', 'SUPER_ADMIN_USER', 'SUPER_ADMIN_HASH', 'INITIAL_ADMIN_USER', 'INITIAL_ADMIN_PW'];
+
+function publicConfig_(cfg) {
+  var out = {};
+  Object.keys(cfg || {}).forEach(function (k) {
+    if (SENSITIVE_CONFIG_KEYS_.indexOf(k) >= 0) return;
+    // 未來新增的敏感欄位（token / hash / 密碼 / 密鑰）一併擋下
+    if (/(TOKEN|_HASH$|_PW$|PASSWORD|SECRET|API_KEY)/i.test(k)) return;
+    out[k] = cfg[k];
+  });
+  return out;
+}
+
 // ==================== ★ 角色過濾 Dashboard（取代 getState） ====================
 
 /**
@@ -928,6 +946,12 @@ function buildDashboardCore_(userId, loadPdfs) {
   var user = null;
   if (isTechTest) {
     user = { id: userId, name: userId + '（技術測試）', role: 'super_admin', branchId: '', memberId: '', approved: true, techTest: true };
+  } else if (userId === 'SUPER_ADMIN') {
+    // 隱藏超管（sheep）登入後回傳的 userId，不在 Users 表，固定最高權限
+    user = { id: userId, name: '超級管理員', role: 'super_admin', branchId: '', memberId: '', approved: true, techTest: true };
+  } else if (userId === 'staff_token') {
+    // STAFF_TOKEN 登入，不在 Users 表
+    user = { id: userId, name: 'STAFF_TOKEN 管理員', role: 'admin', branchId: '', memberId: '', approved: true };
   } else {
     user = allUsers.filter(function (u) { return u.id === userId; })[0] || null;
   }
@@ -971,7 +995,7 @@ function buildDashboardCore_(userId, loadPdfs) {
     meetings: [],
     plugins: [],
     pluginSettings: [],
-    audits: [], config: config,
+    audits: [], config: publicConfig_(config),
     userFeatures: []  // 當前用戶的功能權限
   };
   // Fill userFeatures for current user
@@ -1266,12 +1290,19 @@ function getUserFeatures_(userId, role) {
   return result;
 }
 
+/** 系統內建的高權限操作者（不在 Users 表，跳過角色校驗） */
+function isPrivilegedOperator_(id) {
+  if (!id) return false;
+  if (id === 'system' || id === 'staff_token' || id === 'SUPER_ADMIN') return true;
+  return TECH_TEST_ACCOUNTS_.indexOf(id) >= 0;
+}
+
 function handleGrantFeature_(p) {
   var operatedBy = p.operatedBy || 'system';
   var targetUserId = p.targetUserId;
   var feature = p.feature;
   
-  if (TECH_TEST_ACCOUNTS_.indexOf(operatedBy) < 0 && operatedBy !== 'system' && operatedBy !== 'staff_token') {
+  if (!isPrivilegedOperator_(operatedBy)) {
     var users = mapUsers_();
     var operator = users.filter(function(u){return u.id === operatedBy;})[0];
     var opRole = operator ? operator.role : '';
@@ -1380,6 +1411,9 @@ function handleGetUserFeatures_(p) {
 function doGet(e) {
   var p = (e && e.parameter) || {};
 
+  // 防呆：複製 API Key 時常連帶換行 / 空白，先 trim 再比對
+  if (p.apiKey !== undefined && p.apiKey !== null) p.apiKey = String(p.apiKey).trim();
+
   // ★★★ API Key 認證：保護所有數據 ★★★
   // 新版：比對 API_KEY_HASH（SHA-256），明文不存於 Sheet
   // 舊版兼容：如果只有 API_KEY 明文，也比對
@@ -1485,7 +1519,11 @@ function doGet(e) {
       case 'updateUserRole': return wrap_(handleUpdateUserRole_(p), p);
       case 'updateUserField': return wrap_(handleUpdateUserField_(p), p);
       case 'deleteUser': return wrap_(handleDeleteUser_(p), p);
-      case 'createUser': return wrap_(handleCreateUser_(p), p);
+      case 'createUser': {
+        var cu = handleCreateUser_(p);
+        if (cu.success === false) return json(cu);
+        return json({ success: true, state: buildDashboard(p.operatedBy || p.userId || ''), linked: cu.linked || [], created: cu.created || [] });
+      }
       case 'batchCreateUsers': return wrap_(handleBatchCreateUsers_(p), p);
       case 'batchCreateMembers': return wrap_(handleBatchCreateMembers_(p), p);
       case 'createPatrol': return wrap_(handleCreatePatrol_(p), p);
@@ -2159,7 +2197,60 @@ function handleCreateUser_(p) {
     approved: true, createdAt: now_(), note: '由 ' + (p.operatedBy || 'system') + ' 建立'
   });
   writeAudit_(p.operatedBy || 'system', 'createUser', 'Users', id, (p.name || '') + ' ' + (p.role || ''));
-  return { success: true };
+
+  // 家長開戶：連結子女（填 SCOUT ID 或中文姓名；小童軍可能未有 SCOUT ID，可只填姓名）
+  // 找不到的子女會建成員紀錄（不建登入帳號 — 小童軍由家長帳號看資訊及代報名）
+  var childResult = { linked: [], created: [] };
+  if (String(p.role || '').toLowerCase() === 'parent' || p.children) {
+    childResult = linkChildrenToParent_(id, p.children, p.operatedBy || 'system');
+  }
+  return { success: true, linked: childResult.linked, created: childResult.created };
+}
+
+/**
+ * 連結子女到家長帳號（parentUserId 寫入 Members 表，childMemberIds 由 mapUsers_ 自動派生）
+ * children：陣列 [ {ymNumber?, name?, branchId?, dateOfBirth?} ] 或字串（; , 分隔的 SCOUT ID / 姓名）
+ */
+function linkChildrenToParent_(parentId, children, operator) {
+  var linked = [], created = [];
+  var list = [];
+  if (Array.isArray(children)) {
+    children.forEach(function (c) {
+      if (typeof c === 'string') String(c).split(/[;；,，\n|]+/).forEach(function (s) { if (s.trim()) list.push(s); });
+      else if (c) list.push(c);
+    });
+  } else if (children) {
+    String(children).split(/[;；,，\n|]+/).forEach(function (s) { if (s.trim()) list.push(s); });
+  }
+  list.forEach(function (c) {
+    var cObj = (typeof c === 'object' && c) ? c : {};
+    var ym = String(cObj.ymNumber || cObj.ymis || '').trim();
+    var nm = String(cObj.name || '').trim();
+    if (!nm && typeof c === 'string') { nm = c.trim(); }
+    if (!ym && /^\d{7,12}$/.test(nm)) { ym = nm; nm = ''; }
+    if (!ym && !nm) return;
+    var members = readTable_('Members');
+    var m = null;
+    if (ym) m = members.filter(function (x) { return String(getField_(x, 'ymNumber')).trim() === ym; })[0] || null;
+    if (!m && nm) m = members.filter(function (x) { return String(getField_(x, 'name')).trim() === nm; })[0] || null;
+    if (m) {
+      var mid = getField_(m, 'memberId');
+      if (String(getField_(m, 'parentUserId')) !== parentId) updateCellByName_('Members', 'memberId', mid, 'parentUserId', parentId);
+      if (cObj.dateOfBirth && !getField_(m, 'dateOfBirth')) updateCellByName_('Members', 'memberId', mid, 'dateOfBirth', String(cObj.dateOfBirth));
+      linked.push(getField_(m, 'name') || ym);
+    } else {
+      appendRowByHeaders_('Members', {
+        memberId: uid_('m'), ymNumber: ym, password: ym, name: nm || ('成員 ' + ym), email: '',
+        branchId: String(cObj.branchId || 'b1'), patrolId: '', patrolRole: '', specialRole: '',
+        dateOfBirth: String(cObj.dateOfBirth || ''), parentUserId: parentId,
+        emergencyContactName: '', emergencyContactPhone: '', active: true,
+        note: ym ? '經家長開戶建立（預設密碼=SCOUT ID，請提醒成員更改）' : '經家長開戶建立（無 SCOUT ID，無登入帳號，由家長代報名）'
+      });
+      created.push(nm || ym);
+    }
+  });
+  if (linked.length || created.length) writeAudit_(operator || 'system', 'linkChildren', 'Members', parentId, linked.join(',') + ' | 新建: ' + created.join(','));
+  return { linked: linked, created: created };
 }
 
 function parseRowsParam_(rows) {
@@ -2177,8 +2268,7 @@ function parseRowsParam_(rows) {
 }
 
 function canBatchManage_(operatedBy) {
-  if (!operatedBy || operatedBy === 'system' || operatedBy === 'staff_token') return true;
-  if (TECH_TEST_ACCOUNTS_.indexOf(operatedBy) >= 0) return true;
+  if (!operatedBy || isPrivilegedOperator_(operatedBy)) return true;
   var users = mapUsers_();
   var operator = users.filter(function (u) { return u.id === operatedBy; })[0];
   if (!operator) return false;
@@ -2204,7 +2294,7 @@ function handleBatchCreateUsers_(p) {
   });
 
   var allowedRoles = ['troop_super', 'admin', 'group_leader', 'branch_leader', 'coach', 'parent', 'member'];
-  var created = 0, skipped = 0;
+  var created = 0, skipped = 0, linkedChildren = 0, createdChildren = 0;
   var errors = [];
 
   rows.forEach(function (raw, idx) {
@@ -2231,10 +2321,18 @@ function handleBatchCreateUsers_(p) {
     existingEmails[emailKey] = true;
     existingIds[id] = true;
     created++;
+
+    // 家長行：連結子女（SCOUT ID 或姓名；找不到就建成員紀錄，不建登入帳號）
+    if (role === 'parent' && raw.children) {
+      var cr = linkChildrenToParent_(id, raw.children, operatedBy);
+      linkedChildren += cr.linked.length;
+      createdChildren += cr.created.length;
+      if (cr.linked.length || cr.created.length) errors.push('第 ' + rowNo + ' 行：已連結子女 — 原有 ' + cr.linked.join('、') + (cr.created.length ? '，新建 ' + cr.created.join('、') : ''));
+    }
   });
 
-  writeAudit_(operatedBy, 'batchCreateUsers', 'Users', '', 'created=' + created + ', skipped=' + skipped);
-  return { success: true, created: created, skipped: skipped, errors: errors.slice(0, 30) };
+  writeAudit_(operatedBy, 'batchCreateUsers', 'Users', '', 'created=' + created + ', skipped=' + skipped + ', linkedChildren=' + linkedChildren + ', createdChildren=' + createdChildren);
+  return { success: true, created: created, skipped: skipped, linkedChildren: linkedChildren, createdChildren: createdChildren, errors: errors.slice(0, 30) };
 }
 
 function handleBatchCreateMembers_(p) {

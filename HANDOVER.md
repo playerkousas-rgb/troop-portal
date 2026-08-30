@@ -48,10 +48,24 @@ GS `doGet` 新增以下讀取 action（回傳 `{ success, state }`，state 只�
 - 通告 `/notices`：bookmarks, announcementPdfs（config 恆附上）
 - 其餘（audit / meetings / settings / plugins / users / permissions / branches / library / attendance / profile / troop-settings）：各取所需
 
+## 2026-08-30 實際 E2E 測試（82 旅 live 環境）
+
+已完成：proxy→GS 連線、login（超管/成員/帳號）、全部 slice（修剪驗證通過）、角色過濾（admin 全量/成員自見/guest 空）、寫入回路（create/publish/update/setReply/togglePaid/delete 全通過）、報名統計、審計日誌。
+
+測試中發現並已在 repo 修復（待 82 旅重新部署 GS 生效）：
+1. **🔴 SUPER_ADMIN 角色斷裂** — sheep 登入回傳 userId `SUPER_ADMIN`，但 `buildDashboardCore_` 只在 `TECH_TEST_ACCOUNTS_(['sheep','0728'])` 認技術帳號，導致超管（及 `staff_token`）登入後被當 guest、全頁空白，grantFeature / 批量開戶權限校驗也拒絕。已加內建帳號解析 + `isPrivilegedOperator_`。
+2. **🔴 config 洩漏敏感值** — 所有回傳 state 的 `config` 含 `STAFF_TOKEN`、`INITIAL_ADMIN_PW` 明文、`API_KEY_HASH`、`SUPER_ADMIN_HASH`、`SUPER_ADMIN_USER`（未登入也可见）。已加 `publicConfig_()` 集中剝除（敏感 key 表 + 正則兜底）。
+3. **🟡 API Key 複製防呆** — 「重新生成 API Key」彈窗字串雙重轉義（`\\\\n` → 顯示成字面 `\n`），選 key 時容易連同前面的 `n` 一起複製（本次實際事故）。已改用真換行 +「雙擊 key」提示；`doGet` 對 `apiKey` 先 `trim` 再比對。
+4. **🟡 新旅團接入提交** — `/onboard` 第 6 步由 mailto 改為直接 POST 到管理員的接收端 Apps Script（舊版 Scout Admin APP 的接收端，`AKfycbxj5BDD...`），寫入管理員 Sheet「申請記錄」+ Email 通知。旅團端看不到管理員 email，也不會從旅團帳號寄信（不會留對方寄件紀錄）。接收端通知信箱為 `ADMIN_EMAIL`（目前 playerkousas@hotmail.com，可在接收端腳本改）。
+5. 版本號已升 `3.0-live`（部署後 health 可驗證）。
+6. 管理員操作手冊：`DEPLOY_ADMIN_GUIDE.md`（開通 / 換 Key / 停用 / 故障對照）。
+
+測試觀察（暫不改）：`calcAge_('')` 回 0 → 無生日成員登入顯示 age:0（18 歲 guard 走 fail-closed，安全）；deleteEvent 不會級聯刪 EventReplies 孤兒行；createMember 與 createEvent 相隔 <1 秒時，活動 targetMemberIds 可能因 Sheets 最終一致性漏掉新成員（正常使用順序不受影響）。
+
 ## 待完成（下一階段）
-1. **端到端測試** — 部署新版 GS 到 82 旅測試環境，逐頁驗證 slice 行為
-2. **旅團部署** — 新旅團接入流程（/onboard → 審核 → lib/troops.ts + Vercel env）
-3. **GS 版本號** — 部署後建議把 `SCOUTSYSTEM_VERSION` 升到 `3.0-live`
+1. **82 旅重新部署 GS** — 把本 repo 的 `gs/SCOUTSYSTEM_2_SETUP.gs` 貼回 82 旅 Script Editor → Deploy → 管理部署 → 新增版本；部署後用 `?action=health&apiKey=...` 確認 version=3.0-live，並複測超管登入
+2. **/onboard 第 6 步實測** — 走一次表單提交，確認管理員 Sheet「申請記錄」有新記錄 + 收到通知 email
+3. **旅團部署** — 新旅團接入流程（收到自動寄信 → `DEPLOY_ADMIN_GUIDE.md` 五步）
 4. **`/dashboard/*` demo 樹** — 仍是內嵌 mock 的展示頁（帶 Demo 角色切換），非真實登入頁；確認不再需要可刪
 5. **README 死鏈** — `ATTENDANCE_INTEGRATION.md` 未隨 repo 上傳，README 的連結失效（可補檔或刪連結）
 
