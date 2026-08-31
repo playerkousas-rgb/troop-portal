@@ -62,7 +62,7 @@ export default function Downloads() {
 
       {/* 通告：兩種方法（各旅團有自己的通告模樣，所以唔強制用模板）*/}
       <section className="bg-white rounded-2xl border border-slate-200 p-4 space-y-2.5">
-        <h2 className="font-bold text-xs text-slate-800 m-0">📎 活動通告：兩種方法，任揀</h2>
+        <h2 className="font-bold text-xs text-slate-800 m-0">📎 活動通告：三種方法，任揀</h2>
         <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-3">
           <div className="font-bold text-[11px] text-slate-700">方法一 · 用自己嘅通告（建議）</div>
           <p className="text-[11px] text-slate-500 mt-1 m-0 leading-relaxed">
@@ -74,6 +74,13 @@ export default function Downloads() {
           <div className="font-bold text-[11px] text-slate-700">方法二 · 用平台模板</div>
           <p className="text-[11px] text-slate-500 mt-1 m-0 leading-relaxed">
             未有自己格式嘅旅團，可以用上面嘅「活動通告格式」模板，填好再上傳。
+          </p>
+        </div>
+        <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-3">
+          <div className="font-bold text-[11px] text-slate-700">方法三 · 直接喺 APP 內建內容</div>
+          <p className="text-[11px] text-slate-500 mt-1 m-0 leading-relaxed">
+            打破「一定要出一張通告」嘅框框：領袖直接喺活動入面輸入通告內容（日期、地點、費用、要帶咩、集合時間…），
+            成員喺 APP 即刻睇到，唔使開檔案、唔使下載。適合簡單活動或臨時改動。
           </p>
         </div>
       </section>

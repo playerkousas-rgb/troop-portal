@@ -303,10 +303,16 @@ export default function CalendarPage() {
                       <button onClick={() => deleteEvent(item.id)} className="text-[11px] text-rose-600 px-1.5 py-0.5 rounded hover:bg-rose-50" title="刪除">🗑</button>
                     </>
                   ) : (
-                    <button onClick={() => toggleCancel(item.date, item.title)}
-                      className={`text-[11px] px-1.5 py-0.5 rounded font-bold ${item.cancelled ? 'bg-emerald-100 text-emerald-700' : 'text-slate-600 hover:bg-slate-100'}`}>
-                      {item.cancelled ? '↺ 恢復' : '✕ 取消呢日'}
-                    </button>
+                    <>
+                      <button onClick={() => toggleCancel(item.date, item.title)}
+                        className={`text-[11px] px-1.5 py-0.5 rounded font-bold ${item.cancelled ? 'bg-emerald-100 text-emerald-700' : 'text-slate-600 hover:bg-slate-100'}`}>
+                        {item.cancelled ? '↺ 恢復' : '✕ 取消呢日'}
+                      </button>
+                    </>
+                  )}
+                  {/* 行事曆只係標記當日有乜；會議文件同紀錄喺「會議」頁保存 */}
+                  {item.tag === '會議' && (
+                    <a href="/dashboard/meetings" className="text-[11px] text-slate-600 px-1.5 py-0.5 rounded hover:bg-slate-100 no-underline" title="會議文件及紀錄">📄 紀錄</a>
                   )}
                 </div>
               )}
@@ -342,7 +348,7 @@ export default function CalendarPage() {
               </div>
             ))}
           </div>
-          <p className="text-[11px] text-slate-500 m-0">💡 個別日子唔使集會：到「清單」視圖按該日集會嘅「✕ 取消呢日」。</p>
+          <p className="text-[11px] text-slate-500 m-0">💡 個別日子唔使集會：到「清單」視圖按該日集會嘅「✕ 取消呢日」。行事曆只係標記當日有乜；會議文件及紀錄喺「🤝 會議」頁保存。</p>
         </section>
       )}
 
