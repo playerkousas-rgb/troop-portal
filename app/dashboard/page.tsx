@@ -72,6 +72,26 @@ export default function DashboardPage() {
   return (
     <main className="max-w-6xl mx-auto px-4 py-4 pb-24 space-y-5">
 
+      {/* ── MOCK 導覽（純前端預覽，唔接 GS）── */}
+      <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3">
+        <div className="text-[11px] font-bold text-amber-800 mb-2">🎨 MOCK 版預覽 · 全部假資料 · 唔會觸碰 GS／真實頁面</div>
+        <div className="flex gap-1.5 flex-wrap">
+          {[
+            { href: '/dashboard/login', label: '🔑 登入頁' },
+            { href: '/dashboard', label: '📊 控制台' },
+            { href: '/dashboard/calendar', label: '📅 行事曆' },
+            { href: '/dashboard/notices', label: '📢 公告' },
+            { href: '/dashboard/activities', label: '🎯 活動' },
+            { href: '/dashboard/profile', label: '👤 我的' },
+            { href: '/dashboard/admin/members', label: '🛠 管理後台' },
+          ].map(l => (
+            <Link key={l.href + l.label} href={l.href} className="text-[11px] font-bold px-2.5 py-1.5 rounded-lg bg-white border border-amber-200 text-amber-800 no-underline hover:bg-amber-100 transition">
+              {l.label}
+            </Link>
+          ))}
+        </div>
+      </div>
+
       {/* ── Demo 切換 ── */}
       <div className="flex gap-1.5 flex-wrap">
         <span className="text-[11px] text-slate-500 mr-1 self-center">Demo：</span>
