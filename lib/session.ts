@@ -1,6 +1,18 @@
 'use client';
 import { Role } from './model';
-export type Session = { userId: string; name: string; role: Role; troopCode: string; troopName: string; branchId?: string; memberId?: string; age?: number };
+export type Session = { userId: string; name: string; role: Role; troopCode: string; troopName: string; branchId?: string; memberId?: string; age?: number; dashboard?: string };
+
+/** 角色 → 登入後的首頁。與 /login 原本的導向規則完全一致，只是抽出來共用，
+ *  讓「已登入再開 APP」能回到同一個頁面。 */
+export function dashboardFor(role: Role): string {
+  switch (role) {
+    case 'parent': return '/parent';
+    case 'member': return '/member';
+    case 'admin':
+    case 'super_admin': return '/admin';
+    default: return '/leader';
+  }
+}
 export const SESSION_KEY = 'scoutsystem2_current_user';
 export function getSession(): Session | null {
   if (typeof window === 'undefined') return null;

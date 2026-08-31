@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { setSession } from '@/lib/session';
+import { setSession, dashboardFor } from '@/lib/session';
 import { apiLogin, apiDiagnose } from '@/lib/api';
 import { isMockMode, setMockMode, MOCK_TROOP, DEMO_ACCOUNTS, mockHandle } from '@/lib/mock';
 import Link from 'next/link';
@@ -52,12 +52,13 @@ export default function Login() {
       const data = mockHandle('login', { identifier: userId, loginType: 'account' });
       if (!data.success) throw new Error(data.error);
       const u = data.user;
+      const dash = dashboard || dashboardFor(u.role);
       setSession({
         userId: u.userId, name: u.name, role: u.role,
         troopCode: MOCK_TROOP.id, troopName: MOCK_TROOP.name,
-        branchId: u.branchId, memberId: u.memberId, age: u.age
+        branchId: u.branchId, memberId: u.memberId, age: u.age, dashboard: dash
       });
-      router.push(dashboard);
+      router.push(dash);
     } catch (e: any) {
       setMsg('❌ ' + (e?.message || String(e)));
     } finally {
@@ -108,13 +109,14 @@ export default function Login() {
       const sessionUserId = isHiddenSuperAdmin
         ? (tab === 'member' ? (u.userId || id) : id)
         : (u.userId || u.id);
+      const dash = u.dashboard || dashboardFor(u.role);
 
       setSession({
         userId: sessionUserId, name: u.name, role: u.role,
         troopCode: t.id, troopName: t.name,
-        branchId: u.branchId, memberId: u.memberId, age: u.age
+        branchId: u.branchId, memberId: u.memberId, age: u.age, dashboard: dash
       });
-      router.push(u.dashboard || (u.role === 'parent' ? '/parent' : u.role === 'member' ? '/member' : u.role === 'admin' || u.role === 'super_admin' ? '/admin' : '/leader'));
+      router.push(dash);
     } catch (e: any) {
       setMsg('❌ ' + explainError(e?.message || String(e)));
     } finally {
