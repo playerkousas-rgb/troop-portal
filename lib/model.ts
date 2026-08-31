@@ -20,6 +20,16 @@ export const MANAGER_ROLES: Role[] = ['super_admin', 'troop_super', 'admin'];
 export const LEADER_ROLES: Role[] = ['group_leader', 'branch_leader', 'coach'];
 export const CAN_MARK_LIBRARY: Role[] = ['super_admin', 'troop_super', 'admin', 'group_leader', 'branch_leader', 'coach'];
 
+/**
+ * 未登入可唔可以睇公開資料 —— 由旅團管理員喺 SystemConfig 的 PUBLIC_VIEW 決定。
+ * 未設定（舊 GS 冇呢個欄位）→ 維持開放；設成 FALSE / 0 / OFF → 必須登入先睇到。
+ */
+export function publicViewEnabled(config: any): boolean {
+  const v = String(config?.PUBLIC_VIEW ?? '').trim().toLowerCase();
+  if (!v) return true;
+  return !['false', '0', 'off', 'no', 'n', '否', '關閉', 'disable', 'disabled'].includes(v);
+}
+
 export function isAdmin(role?: Role) { return role === 'super_admin' || role === 'troop_super' || role === 'admin'; }
 export function isLeaderOrAbove(role?: Role) { return !!role && ['super_admin','troop_super','admin','group_leader','branch_leader','coach'].includes(role); }
 export function canSeeRole(viewer: Role, target: Role) {

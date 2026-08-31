@@ -4,7 +4,7 @@ import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { isMockMode } from '@/lib/mock';
 import { isAdmin, ROLE_LABEL, Role } from '@/lib/model';
-import { clearSession } from '@/lib/session';
+import { clearSession, getSession } from '@/lib/session';
 
 export default function TopNav() {
   const pathname = usePathname();
@@ -18,14 +18,16 @@ export default function TopNav() {
       const t = JSON.parse(localStorage.getItem('scoutsystem2_selected_troop') || 'null');
       if (t) setTroop({ name: t.name, id: t.id });
     } catch {}
-    try {
-      const u = JSON.parse(localStorage.getItem('scoutsystem2_current_user') || 'null');
-      if (u) setUser({ name: u.name, role: u.role });
-    } catch {}
+    // 用 getSession()（會檢查有效期），過期嘅 session 唔會再顯示成「已登入」
+    const u = getSession();
+    if (u) setUser({ name: u.name, role: u.role });
     setMockOn(isMockMode());
   }, [pathname]);
 
   const admin = isAdmin(user?.role as Role);
+  // 首頁（登入旅團頁）同 /login 本身都係登入頁：
+  // 頂欄只顯示 Scout System，右邊唔顯示登入／帳戶選單（成頁都係登入，再放登入鈕好怪）
+  const isLanding = pathname === '/' || pathname === '/login' || pathname === '/dashboard/login';
 
   // 已登入 → 回到該角色的真實控制台（不是 /dashboard 的 mock 展示樹）
   const home =
@@ -35,6 +37,8 @@ export default function TopNav() {
     '/calendar';
 
   function logout() {
+    // 防呆：登出前確認，避免誤按直接踢走
+    if (!window.confirm('確定登出？登出後要重新選擇旅團及登入。')) return;
     clearSession();
     window.location.href = '/';
   }
@@ -58,14 +62,15 @@ export default function TopNav() {
               </>
             ) : (
               <>
-                <div className="font-bold text-xs text-scout-blue truncate">{troop?.name || '旅團管理系統'}</div>
-                <div className="text-[11px] text-slate-500 font-semibold">2026 Scout System</div>
+                <div className="font-bold text-xs text-scout-blue truncate">{isLanding ? 'Scout System' : troop?.name || '旅團管理系統'}</div>
+                {!isLanding && <div className="text-[11px] text-slate-500 font-semibold">2026 Scout System</div>}
               </>
             )}
           </div>
         </Link>
 
-        {/* 右：操作 */}
+        {/* 右：操作（首頁隱藏） */}
+        {!isLanding && (
         <div className="flex items-center gap-1 flex-shrink-0">
           {admin && (
             <>
@@ -75,6 +80,17 @@ export default function TopNav() {
               <Link href="/admin/plugins" className="w-7 h-7 flex items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-600 transition" title="元件管理">
                 <span className="text-sm">🧩</span>
               </Link>
+            </>
+          )}
+          {/* 已登入：恆常顯示「改密碼」＋「登出」icon（唔使撳開選單先搵到） */}
+          {user && (
+            <>
+              <Link href="/profile" className="w-7 h-7 flex items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-600 transition" title="改密碼">
+                <span className="text-sm">🔑</span>
+              </Link>
+              <button onClick={logout} className="w-7 h-7 flex items-center justify-center rounded-lg text-slate-500 hover:bg-rose-50 hover:text-rose-600 transition bg-transparent border-0 cursor-pointer" title="登出">
+                <span className="text-sm">🚪</span>
+              </button>
             </>
           )}
           {user ? (
@@ -121,6 +137,7 @@ export default function TopNav() {
             </Link>
           )}
         </div>
+        )}
       </div>
     </header>
   );

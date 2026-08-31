@@ -21,7 +21,7 @@ export default function PluginIframeCard({
       if (e.data?.type === 'resize' && e.data?.height) {
         setHeight(e.data.height + 'px');
       }
-    };
+    }
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
   }, []);
@@ -53,40 +53,59 @@ export default function PluginIframeCard({
     if (!baseUrl) return '';
 
     return baseUrl.includes('?') ? `${baseUrl}&${params.toString()}` : `${baseUrl}?${params.toString()}`;
-  };
+  }
 
   const pluginUrl = buildUrl();
 
   if (!isEmbed) {
     return (
-      <a href={pluginUrl} target="_blank" rel="noopener noreferrer" className="card feature-card">
-        <h3>{plugin.icon} {plugin.title}</h3>
-        <p className="muted">點擊開啟新分頁</p>
-        <span className="btn block">進入</span>
+      <a
+        href={pluginUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="no-underline text-inherit rounded-xl border border-violet-200 bg-violet-50/60 hover:bg-white hover:border-violet-300 hover:shadow-sm transition p-2.5 flex items-center gap-2.5"
+      >
+        <span className="text-lg leading-none flex-shrink-0" aria-hidden>{plugin.icon}</span>
+        <span className="min-w-0 flex-1">
+          <span className="block font-bold text-xs text-slate-800 leading-tight truncate">{plugin.title}</span>
+          <span className="block text-[11px] text-slate-500">點擊開啟新分頁 ↗</span>
+        </span>
       </a>
     );
   }
 
   return (
-    <div className={`card stack plugin-card ${expanded ? 'expanded' : ''}`} style={{ gridColumn: expanded ? '1 / -1' : 'auto' }}>
-      <div 
-        onClick={() => setExpanded(!expanded)} 
-        className="row" 
-        style={{ cursor: 'pointer', justifyContent: 'space-between', alignItems: 'center' }}
+    <div
+      className={`rounded-xl border border-violet-200 bg-white overflow-hidden ${expanded ? 'shadow-sm' : ''}`}
+      style={{ gridColumn: expanded ? '1 / -1' : 'auto' }}
+    >
+      <button
+        type="button"
+        onClick={() => setExpanded(!expanded)}
+        aria-expanded={expanded}
+        className="w-full flex items-center justify-between gap-2 px-2.5 py-2.5 bg-white hover:bg-violet-50/60 transition text-left cursor-pointer"
       >
-        <h3 style={{ margin: 0 }}>{plugin.icon} {plugin.title}</h3>
-        <span>{expanded ? '▲ 收合' : '▼ 展開'}</span>
-      </div>
-      
+        <span className="flex items-center gap-2.5 min-w-0">
+          <span className="text-lg leading-none flex-shrink-0" aria-hidden>{plugin.icon}</span>
+          <span className="min-w-0">
+            <span className="block font-bold text-xs text-slate-800 leading-tight truncate">{plugin.title}</span>
+            <span className="block text-[11px] text-slate-500">內嵌開啟</span>
+          </span>
+        </span>
+        <span className="text-[11px] font-bold text-violet-700 whitespace-nowrap flex-shrink-0">
+          {expanded ? '▲ 收合' : '▼ 展開'}
+        </span>
+      </button>
+
       {expanded && (
-        <div style={{ marginTop: '1rem', width: '100%' }}>
+        <div className="px-2.5 pb-2.5">
           <iframe
             src={pluginUrl}
             style={{ 
               width: '100%', 
               height: height, 
-              border: '1px solid #eee', 
-              borderRadius: '8px',
+              border: '1px solid #e9d5ff', 
+              borderRadius: '10px',
               background: '#fff' 
             }}
             allow="clipboard-write"

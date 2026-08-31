@@ -1,203 +1,196 @@
 'use client';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { activeTroops } from '@/lib/troops';
 import { isMockMode, setMockMode, MOCK_TROOP } from '@/lib/mock';
+import { getSession, clearSession, dashboardFor } from '@/lib/session';
+import { ROLE_LABEL, Role } from '@/lib/model';
 
-// ── 旅團資料（已接入旅團登記表，key 需與 /api/proxy 查詢一致） ──
-const TROOPS = activeTroops();
+// 旅團登記表（MOCK 排最前，其餘旅團按旅團號碼由細到大排）
+const TROOPS = [...activeTroops()].sort(
+  (a, b) => (parseInt(a.id, 10) || 0) - (parseInt(b.id, 10) || 0)
+);
+const TROOP_KEY = 'scoutsystem2_selected_troop';
 
 export default function HomePage() {
-  const [selectedKey, setSelectedKey] = useState('');
-  const [msg, setMsg] = useState('');
+  const router = useRouter();
+  const [ready, setReady] = useState(false);
+  // 已登入 → 一開 APP 直接返回自己的帳戶（要登出才會再見到旅團選擇頁）
+  const [resume, setResume] = useState<{ name: string; role: Role; troopName: string; dash: string } | null>(null);
   const [mockOn, setMockOn] = useState(false);
+  const [msg, setMsg] = useState('');
 
   useEffect(() => {
-    try {
-      const t = JSON.parse(localStorage.getItem('scoutsystem2_selected_troop') || 'null');
-      if (t) setSelectedKey(t.key || '');
-    } catch {}
+    const s = getSession();
+    if (s) {
+      setResume({
+        name: s.name,
+        role: s.role,
+        troopName: s.troopName,
+        dash: s.dashboard || dashboardFor(s.role),
+      });
+      router.replace(s.dashboard || dashboardFor(s.role));
+      return;
+    }
     setMockOn(isMockMode());
-  }, []);
+    setReady(true);
+  }, [router]);
 
-  function selectTroop() {
-    const troop = TROOPS.find(t => t.key === selectedKey);
-    if (!troop) { setMsg('請先選擇旅團'); return; }
-    localStorage.setItem('scoutsystem2_selected_troop', JSON.stringify({
-      key: troop.key, id: troop.id, name: troop.name,
-    }));
-    setMsg('✅ 已選擇 ' + troop.name);
+  /** 一按旅團 → 直接進入「填帳戶／開帳戶」頁（該旅團的後台已連通） */
+  function goTroop(t: { key: string; id: string; name: string }) {
+    setMockMode(false);
+    localStorage.setItem(TROOP_KEY, JSON.stringify({ key: t.key, id: t.id, name: t.name }));
+    router.push('/login');
   }
 
-  /** 進入全模擬 Demo 模式（純前端 mock，不碰任何真實系統） */
+  /** 演示旅團：同樣一按即進入（模擬登入頁） */
   function enterDemo() {
     setMockMode(true);
-    localStorage.setItem('scoutsystem2_selected_troop', JSON.stringify({
-      key: MOCK_TROOP.key, id: MOCK_TROOP.id, name: MOCK_TROOP.name,
-    }));
-    setSelectedKey(MOCK_TROOP.key);
-    setMockOn(true);
-    setMsg('🎭 已切換到演示模式（全模擬資料）');
+    localStorage.setItem(TROOP_KEY, JSON.stringify({ key: MOCK_TROOP.key, id: MOCK_TROOP.id, name: MOCK_TROOP.name }));
+    router.push('/login');
   }
 
   function exitDemo() {
     setMockMode(false);
+    localStorage.removeItem(TROOP_KEY);
     setMockOn(false);
-    setSelectedKey('');
-    localStorage.removeItem('scoutsystem2_selected_troop');
     setMsg('已退出演示模式');
   }
 
-  const selected = TROOPS.find(t => t.key === selectedKey);
-  const selectedDemo = mockOn && selectedKey === MOCK_TROOP.key;
+  /** 唔想開帳戶，只睇公開資料：唔建 session，直接去公開行事曆 */
+  function browsePublic() {
+    let t: any = null;
+    try { t = JSON.parse(localStorage.getItem(TROOP_KEY) || 'null'); } catch {}
+    if (!t?.key) { setMsg('請先撳一個旅團，再撳「只睇公開資料」。'); return; }
+    router.push('/calendar');
+  }
+
+  function logoutAndStay() {
+    clearSession();
+    setResume(null);
+    setMockOn(isMockMode());
+    setReady(true);
+  }
+
+  /* ── 已登入：顯示返回中，並由 useEffect 導向自己的帳戶 ── */
+  if (resume) {
+    return (
+      <div className="max-w-md mx-auto px-4 py-16 text-center">
+        <div className="text-6xl text-brand-600 mb-3" aria-hidden>⚜</div>
+        <h1 className="text-2xl font-black text-brand-700 m-0 mb-2">正在返回你的帳戶…</h1>
+        <p className="text-sm text-slate-500 m-0 mb-6">
+          {resume.name} · {ROLE_LABEL[resume.role] || resume.role} · {resume.troopName}
+        </p>
+        <div className="flex items-center justify-center gap-3 flex-wrap">
+          <Link href={resume.dash} className="inline-flex items-center justify-center bg-brand-600 text-white font-bold px-6 py-3 rounded-xl no-underline hover:bg-brand-700 transition">繼續 →</Link>
+          <button type="button" onClick={logoutAndStay} className="text-xs font-bold text-slate-500 bg-transparent border-0 cursor-pointer underline underline-offset-2">登出並選擇其他旅團</button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!ready) {
+    return (
+      <div className="max-w-md mx-auto px-4 py-16 text-center">
+        <div className="text-6xl text-brand-600 mb-3 animate-pulse" aria-hidden>⚜</div>
+        <p className="text-sm text-slate-500 m-0">載入中…</p>
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-screen">
-      {/* ── Hero ── */}
-      <section className="hero-gradient text-white px-6 py-14 sm:py-20 relative overflow-hidden rounded-3xl">
-        <div className="absolute right-4 bottom-4 text-[10rem] opacity-[0.06] pointer-events-none select-none leading-none">⚜</div>
-        <div className="max-w-5xl mx-auto relative z-10">
-          <span className="inline-flex items-center gap-1.5 bg-white/15 text-[11px] font-semibold px-3 py-1 rounded-full border border-white/25">
-            🌐 2026 Scout System · 多旅團共用平台
-          </span>
-          <h1 className="text-3xl sm:text-5xl font-black mt-4 leading-tight tracking-tight">
-            旅團管理系統
-          </h1>
-          <p className="mt-3 text-white/70 text-sm sm:text-base leading-relaxed max-w-2xl">
-            選擇你的旅團，即可查看公開行事曆及活動資訊。<br className="hidden sm:block" />
-            登入後可回覆活動、查看出席紀錄及管理旅團事務。
-          </p>
-          <div className="flex gap-2.5 mt-6 flex-wrap">
-            {selected && (
-              <Link
-                href="/login"
-                className="inline-flex items-center gap-2 bg-white text-scout-blue px-5 py-2.5 rounded-xl text-sm font-bold hover:bg-brand-50 transition shadow-lg"
-              >
-                🔑 登入 {selected.name}
-              </Link>
-            )}
-            <Link
-              href="/setup"
-              className="inline-flex items-center gap-2 bg-white/10 text-white px-4 py-2.5 rounded-xl text-sm font-bold border border-white/20 hover:bg-white/20 transition"
-            >
-              📖 接入教學
-            </Link>
-          </div>
-        </div>
+    <div className="max-w-3xl mx-auto px-4 py-6 pb-24 space-y-5">
+
+      {/* ── 右上：新旅團申請及教學 ── */}
+      <div className="flex justify-end">
+        <Link
+          href="/setup"
+          className="no-underline text-[11px] font-bold bg-violet-600 text-white px-3 py-1.5 rounded-full hover:bg-violet-700 transition flex items-center gap-1"
+        >
+          📖 新旅團申請及教學
+        </Link>
+      </div>
+
+      {/* ── 頁首（簡單）── */}
+      <section className="text-center">
+        <div className="text-5xl text-brand-600 mb-2" aria-hidden>⚜</div>
+        <h1 className="text-2xl sm:text-3xl font-black text-brand-700 leading-tight m-0">2026 童軍系統</h1>
+        <p className="text-[12px] text-slate-500 mt-2 mb-0 leading-relaxed">
+          選擇你的旅團，即可查看公開行事曆及活動資訊；登入後可回覆活動及管理旅團事務。
+        </p>
       </section>
 
-      {/* ── Content ── */}
-      <main className="max-w-5xl mx-auto px-4 py-10 space-y-10">
+      {/* ── 選擇旅團（MOCK 放前，其餘旅團排後面）：一按即進入登入頁 ── */}
+      <section className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 sm:p-5">
+        <h2 className="font-bold text-sm flex items-center gap-2 mt-0 mb-3">
+          <span className="w-7 h-7 bg-brand-600 text-white rounded-lg flex items-center justify-center text-sm">🏠</span>
+          選擇旅團
+        </h2>
 
-        {/* ── 選擇旅團 ── */}
-        <section className="bg-white rounded-2xl p-6 sm:p-8 border border-slate-200 shadow-sm">
-          <h2 className="font-bold text-lg flex items-center gap-2.5 mb-5">
-            <span className="w-8 h-8 bg-brand-600 text-white rounded-xl flex items-center justify-center text-sm">🏠</span>
-            選擇旅團
-          </h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {TROOPS.map(t => (
-              <button
-                key={t.key}
-                onClick={() => { setSelectedKey(t.key); setMsg(''); if (mockOn) { setMockMode(false); setMockOn(false); } }}
-                className={`
-                  text-left rounded-xl border-2 p-4 transition-all cursor-pointer
-                  ${selectedKey === t.key
-                    ? 'border-brand-500 bg-brand-50 shadow-md ring-2 ring-brand-200'
-                    : 'border-slate-200 bg-white hover:border-brand-300 hover:bg-slate-50'
-                  }
-                `}
-              >
-                <div className="flex items-center gap-3">
-                  <div className="w-11 h-11 bg-slate-100 rounded-xl flex items-center justify-center text-2xl">⚜</div>
-                  <div className="flex-1 min-w-0">
-                    <div className="font-bold text-sm text-slate-800">{t.name}</div>
-                    <div className="text-[11px] text-slate-500">編號 {t.id}</div>
-                  </div>
-                  {selectedKey === t.key && (
-                    <div className="w-6 h-6 bg-brand-600 text-white rounded-full flex items-center justify-center text-xs font-bold">✓</div>
-                  )}
-                </div>
-              </button>
-            ))}
-            {/* ── 全模擬 Demo（純前端，不碰真實系統） ── */}
-            <button
-              onClick={enterDemo}
-              className={`
-                text-left rounded-xl border-2 p-4 transition-all cursor-pointer
-                ${selectedDemo
-                  ? 'border-amber-400 bg-amber-50 shadow-md ring-2 ring-amber-200'
-                  : 'border-amber-200 bg-gradient-to-br from-amber-50/60 to-white hover:border-amber-300'
-                }
-              `}
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-11 h-11 bg-amber-100 rounded-xl flex items-center justify-center text-2xl">🎭</div>
-                <div className="flex-1 min-w-0">
-                  <div className="font-bold text-sm text-amber-800">演示體驗 · 全模擬</div>
-                  <div className="text-[11px] text-amber-700/80">7 種角色帳號 · 假資料 · 免後台</div>
-                </div>
-                {selectedDemo && (
-                  <div className="w-6 h-6 bg-amber-500 text-slate-900 rounded-full flex items-center justify-center text-xs font-bold">✓</div>
-                )}
-              </div>
-            </button>
-          </div>
-          {(selected || selectedDemo) && (
-            <div className="mt-5 flex items-center gap-3 flex-wrap">
-              {selectedDemo ? (
-                <>
-                  <Link
-                    href="/login"
-                    className="inline-flex items-center gap-2 bg-amber-700 text-white px-6 py-2.5 rounded-xl text-sm font-bold hover:bg-amber-800 transition shadow"
-                  >
-                    🎭 進入演示 →
-                  </Link>
-                  <button onClick={exitDemo} className="text-xs text-slate-500 underline underline-offset-2 hover:text-slate-700">
-                    退出演示模式
-                  </button>
-                </>
-              ) : (
-                <button
-                  onClick={selectTroop}
-                  className="bg-brand-600 text-white px-6 py-2.5 rounded-xl text-sm font-bold hover:bg-brand-700 transition shadow"
-                >
-                  使用此旅團 →
-                </button>
-              )}
-              {msg && <span className="text-sm text-emerald-700 font-bold">{msg}</span>}
+        <div className="grid gap-2">
+          {/* MOCK 放最前 */}
+          <button
+            type="button"
+            onClick={enterDemo}
+            className={`text-left rounded-xl border-2 p-3.5 transition cursor-pointer hover:shadow-sm ${
+              mockOn ? 'border-amber-400 bg-amber-50' : 'border-amber-200 bg-amber-50/40 hover:border-amber-300'
+            }`}
+          >
+            <div className="flex items-center gap-3">
+              <span className="w-10 h-10 bg-amber-100 rounded-xl flex items-center justify-center text-xl flex-shrink-0">🎭</span>
+              <span className="flex-1 min-w-0">
+                <span className="block font-bold text-sm text-amber-800">演示體驗 · 全模擬（MOCK）</span>
+                <span className="block text-[11px] text-amber-700/80">7 種角色帳號 · 假資料 · 免後台 · 睇晒成個 UI</span>
+              </span>
+              <span className="text-amber-600 font-black text-base flex-shrink-0">→</span>
+            </div>
+          </button>
+          {mockOn && (
+            <div className="flex items-center gap-2 -mt-0.5 pl-1">
+              <span className="text-[11px] font-bold text-amber-700">🎭 演示模式開啟中</span>
+              <button type="button" onClick={exitDemo} className="text-[11px] text-slate-500 underline underline-offset-2 bg-transparent border-0 cursor-pointer">退出演示模式</button>
             </div>
           )}
-          <p className="mt-4 text-[11px] text-slate-500">
-            💡 看不到你的旅團？代表尚未開通，請先聯絡管理員申請接入。
-            🎭「演示體驗」用全套模擬資料展示 APP 功能，不連接任何真實後台。
-          </p>
-        </section>
 
-        {/* ── 平台資訊 ── */}
-        <section>
-          <h2 className="font-bold text-lg flex items-center gap-2.5 mb-4">
-            <span className="w-8 h-8 bg-slate-100 text-slate-600 rounded-xl flex items-center justify-center text-sm">📚</span>
-            平台資訊
-          </h2>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            {[
-              { icon: '🧩', title: '接入教學', desc: '由建立 Sheet 到提交申請', href: '/setup' },
-              { icon: '⬇️', title: '模板下載', desc: '下載 Apps Script 模板', href: '/downloads' },
-              { icon: '📢', title: '更新公告', desc: '平台及元件更新紀錄', href: '/updates' },
-              { icon: '🌏', title: '已接入旅團', desc: '查看所有旅團', href: '/troops' },
-            ].map((item, i) => (
-              <Link key={i} href={item.href} className="no-underline text-inherit group">
-                <div className="bg-white rounded-2xl border border-slate-200 p-4 card-hover h-full">
-                  <div className="w-9 h-9 bg-slate-100 rounded-xl flex items-center justify-center text-xl mb-2.5 group-hover:bg-brand-100 transition">{item.icon}</div>
-                  <h4 className="font-bold text-xs text-slate-800">{item.title}</h4>
-                  <p className="text-[11px] text-slate-500 mt-1 leading-relaxed">{item.desc}</p>
-                </div>
-              </Link>
-            ))}
-          </div>
-        </section>
-      </main>
+          {/* 真實旅團（排喺 MOCK 後面） */}
+          {TROOPS.map(t => (
+            <button
+              key={t.key}
+              type="button"
+              onClick={() => goTroop(t)}
+              className="text-left rounded-xl border-2 border-slate-200 bg-white p-3.5 transition cursor-pointer hover:border-brand-400 hover:shadow-sm"
+            >
+              <div className="flex items-center gap-3">
+                <span className="w-10 h-10 bg-slate-100 rounded-xl flex items-center justify-center text-xl flex-shrink-0">⚜</span>
+                <span className="flex-1 min-w-0">
+                  <span className="block font-bold text-sm text-slate-800">{t.name}</span>
+                  <span className="block text-[11px] text-slate-500">編號 {t.id}</span>
+                </span>
+                <span className="text-slate-400 font-black text-base flex-shrink-0">→</span>
+              </div>
+            </button>
+          ))}
+        </div>
+
+        <div className="mt-3 pt-3 border-t border-slate-100">
+          <button
+            type="button"
+            onClick={browsePublic}
+            className="text-[11px] font-bold text-slate-600 bg-slate-100 border-0 rounded-lg px-3 py-2 cursor-pointer hover:bg-slate-200 transition"
+          >
+            👀 只睇公開資料（唔使開帳戶）
+          </button>
+          <p className="text-[11px] text-slate-400 mt-1.5 m-0 leading-relaxed">
+            揀咗旅團之後，可以直接睇公開行事曆／公告／活動，唔使登入。
+          </p>
+        </div>
+
+        {msg && <p className="mt-3 text-[12px] text-slate-500 font-bold m-0">{msg}</p>}
+        <p className="mt-3 text-[11px] text-slate-500 m-0">
+          💡 看不到你的旅團？代表尚未開通，請用右上角「新旅團申請及教學」。
+        </p>
+      </section>
     </div>
   );
 }

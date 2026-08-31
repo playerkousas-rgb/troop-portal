@@ -1,21 +1,21 @@
 @import "tailwindcss";
 
 @theme {
-  --color-brand-50: #f0f7ff;
-  --color-brand-100: #e0effe;
-  --color-brand-200: #b9dffd;
-  --color-brand-300: #7cc5fb;
-  --color-brand-400: #36a9f6;
-  --color-brand-500: #0c8de7;
-  --color-brand-600: #006fc5;
-  --color-brand-700: #0158a0;
-  --color-brand-800: #064b84;
-  --color-brand-900: #0b3f6e;
-  --color-brand-950: #07284a;
+  --color-brand-50: #f0fdf4;
+  --color-brand-100: #dcfce7;
+  --color-brand-200: #bbf7d0;
+  --color-brand-300: #86efac;
+  --color-brand-400: #4ade80;
+  --color-brand-500: #22c55e;
+  --color-brand-600: #16a34a;
+  --color-brand-700: #15803d;
+  --color-brand-800: #166534;
+  --color-brand-900: #14532d;
+  --color-brand-950: #052e16;
 
-  --color-scout-blue: #003366;
+  --color-scout-blue: #15803d;
   --color-scout-gold: #c5930a;
-  --color-scout-green: #17803d;
+  --color-scout-green: #16a34a;
   --color-scout-purple: #6d28d9;
 }
 
@@ -24,13 +24,13 @@
    —— 次要文字一律 ≥ 4.5:1，不再使用 slate-400 / 8~10px 級數
    ════════════════════════════════════════════════════════════ */
 :root {
-  --blue: #003366;
-  --blue2: #0b5cab;
-  --bg: #f3f6fa;
-  --line: #d8e4f0;
+  --blue: #15803d;
+  --blue2: #16a34a;
+  --bg: #f9fafb;
+  --line: #e5e7eb;
   --muted: #5c6b7a;      /* 白底 4.9:1 */
   --muted-strong: #45556c;
-  --green: #17803d;
+  --green: #16a34a;
   --red: #c62828;
   --gold: #9a6a00;
   --gold-deep: #7a5200;
@@ -179,7 +179,7 @@
   .tab.active { background: var(--blue); border-color: var(--blue); color: #fff; }
 
   /* ── Hero 漸層 / 卡片懸浮 ── */
-  .hero-gradient { background: linear-gradient(135deg, #003366 0%, #0158a0 55%, #0c8de7 100%); }
+  .hero-gradient { background: linear-gradient(135deg, #14532d 0%, #15803d 55%, #16a34a 100%); }
   .card-hover { transition: all 0.22s ease; }
   .card-hover:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0, 35, 80, 0.1); }
 

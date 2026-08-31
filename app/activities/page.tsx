@@ -3,11 +3,17 @@ import { useEffect, useState } from 'react';
 import EmptyState from '@/components/ui/EmptyState';
 import { AppState, loadStateSlice } from '@/lib/store';
 import Link from 'next/link';
+import { getSession } from '@/lib/session';
+import { publicViewEnabled } from '@/lib/model';
+import PublicLocked from '@/components/ui/PublicLocked';
 export default function Activities(){
   const [s,setS]=useState<AppState|null>(null);const [err,setErr]=useState('');
   useEffect(()=>{loadStateSlice(['events']).then(setS).catch(e=>setErr(e.message))},[]);
   if(err)return <div className="card"><p className="badge red">{err}</p></div>;
   if(!s)return <div className="card">載入中...</div>;
+  const session=getSession();
+  // 旅團管理員可以關閉公開瀏覽 → 未登入乜都睇唔到
+  if(!session && !publicViewEnabled(s.config)) return <PublicLocked troopName={s.config?.TROOP_NAME} />;
   const published=s.events.filter(e=>e.status==='published');
   return <div className="stack">
     <section className="hero">

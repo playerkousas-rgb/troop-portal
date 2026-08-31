@@ -4,7 +4,8 @@ import Link from 'next/link';
 import { AppState, loadStateSlice, Bookmark } from '@/lib/store';
 import { apiSaveConfig, apiUpdateBookmark, apiDeleteBookmark, apiUpdatePdfTags } from '@/lib/api';
 import { getSession } from '@/lib/session';
-import { branches } from '@/lib/model';
+import { branches, publicViewEnabled } from '@/lib/model';
+import PublicLocked from '@/components/ui/PublicLocked';
 
 const ACTIVITY_TYPES = ['訓練班', '比賽', '服務', '工作坊', '活動', '其他'];
 const AUDIENCE_OPTIONS = ['全旅', '領袖', '成年成員', '小童軍', '幼童軍', '童軍', '深資童軍', '樂行童軍', '家長'];
@@ -84,6 +85,8 @@ export default function Notices(){
 
   if(err&&!s)return <div className="card"><p className="badge red">{err}</p></div>;
   if(!s)return <div className="card">載入中...</div>;
+  // 旅團管理員可以關閉公開瀏覽 → 未登入乜都睇唔到
+  if(!session && !publicViewEnabled(s.config)) return <PublicLocked troopName={s.config?.TROOP_NAME} />;
 
   const pdfs=s.announcementPdfs||[];
 

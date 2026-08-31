@@ -67,11 +67,11 @@ export default function Onboard(){
         <ol className="muted">
           <li>在 Google Sheet → 擴充功能 → Apps Script</li>
           <li>把預設代碼全部刪掉</li>
-          <li>到 <Link href="/downloads">模板下載</Link> 下載 GS 模板</li>
-          <li>打開它，全選複製，貼到 Apps Script</li>
-          <li>按儲存（💾 圖示）</li>
+          <li>撳下面按鈕下載 GS 模組（全選複製，貼到 Apps Script）</li>
+          <li>貼好後按儲存（💾 圖示）</li>
         </ol>
-        <div className="row">
+        <a className="btn primary" href="/downloads/SCOUTSYSTEM_2_SETUP.gs.txt" download>⬇️ 下載 GS 模組（必要）</a>
+        <div className="row" style={{marginTop:10}}>
           <button className="btn" onClick={()=>setStep(0)}>← 上一步</button>
           <button className="btn primary" onClick={()=>setStep(2)}>下一步 →</button>
         </div>
@@ -151,6 +151,8 @@ export default function Onboard(){
   const current = steps[step]
 
   return <div className="stack">
+    {/* 返回：唔使人估「撳右上 LOGO 先返到出去」 */}
+    <Link href="/" style={{fontSize:12,fontWeight:700,textDecoration:'none',color:'#45556c'}}>← 返回首頁</Link>
     <section className="hero">
       <span className="badge gold">🧩 旅團接入</span>
       <h1>接入 2026 Scout System</h1>

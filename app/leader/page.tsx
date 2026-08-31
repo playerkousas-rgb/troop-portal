@@ -1,15 +1,29 @@
 'use client';
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
+import Auth from '@/components/Auth';
+import ConsoleHeader from '@/components/ui/ConsoleHeader';
+import StatStrip from '@/components/ui/StatStrip';
+import ToolGroup, { ConsoleTool } from '@/components/ui/ToolGroup';
+import Panel from '@/components/ui/Panel';
+import EmptyState from '@/components/ui/EmptyState';
+import EventReplyRow from '@/components/ui/EventReplyRow';
+import PluginIframeCard from '@/components/PluginCard';
 import { AppState, loadStateSlice, computeStats, replyStatus } from '@/lib/store';
 import { apiSetReply } from '@/lib/api';
-import Auth from '@/components/Auth';
-import { FeatureCard, SummaryCard } from '@/components/Cards';
-import PluginIframeCard from '@/components/PluginCard';
-import Collapsible from '@/components/Collapsible';
 import { getSession } from '@/lib/session';
 import { ROLE_LABEL } from '@/lib/model';
-import Link from 'next/link';
-import AttendanceCard from '@/components/AttendanceCard';
+
+// 領袖常用功能：全部歸入一張大卡（可收合）
+const LEADER_TOOLS: ConsoleTool[] = [
+  { id: 'members', icon: '👥', label: '成員資料庫', desc: '查看及管理所屬支部成員。', href: '/admin/members' },
+  { id: 'events', icon: '🗓️', label: '活動管理', desc: '新增、發布及管理活動。', href: '/admin/events' },
+  { id: 'registrations', icon: '📋', label: '報名管理', desc: '查看報名狀態及匯出。', href: '/admin/registrations' },
+  { id: 'equipment', icon: '📦', label: '物資借用管理', desc: '物資清單、批核借用、歸還回補庫存。', href: '/admin/equipment' },
+  { id: 'applications', icon: '✅', label: '審核申請', desc: '審核家長／成員申請。', href: '/admin/applications' },
+  { id: 'library', icon: '📚', label: '圖書館標記', desc: '由通告圖書館引入通告。', href: '/library/import' },
+  { id: 'calendar', icon: '📅', label: '行事曆', desc: '查看及管理行事曆。', href: '/calendar' },
+];
 
 export default function Leader(){
   const [s,setS]=useState<AppState|null>(null);const [err,setErr]=useState('');
@@ -26,100 +40,85 @@ export default function Leader(){
   }
 
   const events = (s?.events || []).filter(e => e.status === 'published' && (e.scope === 'troop' || e.targetMemberIds.includes(myId) || e.branchId === session?.branchId));
+  const plugins = (s?.plugins || []).filter(p => p.id !== 'troop_attendance');
 
-  return <Auth roles={['super_admin','admin','group_leader','branch_leader','coach']}><div className="stack">
-    <section className="card stack" style={{ background: 'linear-gradient(135deg, #1557b0 0%, #1a73e8 100%)', color: '#fff' }}>
-       <div className="row" style={{ justifyContent: 'space-between' }}>
-          <div>
-            <h2 style={{ margin: 0 }}>👤 {session?.name}</h2>
-            <p style={{ opacity: 0.9, margin: 0 }}>角色：{ROLE_LABEL[session?.role || 'coach']}</p>
-          </div>
-          <div className="row">
-            <Link href="/profile" className="btn" style={{ background: 'rgba(255,255,255,0.94)', color: '#0f2742' }}>個人設定 / 改密碼</Link>
-          </div>
-       </div>
-    </section>
+  return <Auth roles={['super_admin','admin','group_leader','branch_leader','coach']}><div className="space-y-3">
+    <ConsoleHeader
+      icon="🧭"
+      name={session?.name || '領袖'}
+      roleLabel={ROLE_LABEL[session?.role || 'coach']}
+      tone="blue"
+      tagline="管理所屬支部的活動、成員及通告。"
+      action={
+        <Link href="/profile" className="no-underline text-[11px] font-bold bg-white/95 text-slate-800 px-3 py-2 rounded-xl hover:bg-white transition whitespace-nowrap">
+          👤 個人設定
+        </Link>
+      }
+    />
 
-    <section className="hero"><span className="badge gold">領袖控制台</span><p>管理所屬支部的活動、成員及通告。</p></section>
-    {err&&<p className="badge red">{err}</p>}
-    <section className="grid">
-      <a className="card feature-card" href="/admin/equipment" style={{ textDecoration: 'none' }}>
-        <h3>📦 物資借用管理</h3>
-        <p className="muted">新增／修改物資及庫存，批核成員借用申請，歸還後 Tick 已歸還即回補庫存。</p>
-        <span className="btn block">前往物資管理</span>
-      </a>
-      <SummaryCard label="活動" value={stats.activities} desc="已發布活動" tone="green"/>
-      <SummaryCard label="待審批" value={stats.pending} desc="等待審批申請" tone="red"/>
-      <SummaryCard label="通告" value={stats.notices} desc="圖書館引入通告" tone="gold"/>
-    </section>
-
-    {s?.plugins && s.plugins.length > 0 && (
-      <section className="stack">
-        <h3>擴充元件</h3>
-        <div className="grid">
-          {s.plugins.filter(p => p.id !== 'troop_attendance').map(p => (
-            <PluginIframeCard 
-              key={p.id} 
-              plugin={p} 
-              unitCode={session?.troopCode || ''} 
-              settings={s.pluginSettings?.find(ps => ps.pluginId === p.id)}
-            />
-          ))}
-        </div>
+    {err && (
+      <section className="bg-rose-50 border border-rose-200 rounded-2xl p-4">
+        <p className="text-xs text-rose-700 font-bold m-0 whitespace-pre-wrap leading-relaxed">{err}</p>
       </section>
     )}
 
-    <Collapsible title="📢 待回覆與出席活動 (領袖個人報名與確認)" defaultOpen={true}>
-      <p className="muted">作為領袖或統籌人員，你可在此點選出席旅團通告與集會活動，方便旅長與團隊掌握出席人力。</p>
-      <div className="stack">
-        {events.length===0?<div className="card"><p className="muted">暫無待確認或待出席的活動通告。</p></div>:
-          events.map(e=>{
-            const r=replyStatus(s,e.id,myId);
-            return (
-              <div className="event-line event-blue" key={e.id}>
-                <div>
-                  <strong>{e.title}</strong>
-                  <div className="muted">{e.date} · {e.location}{e.fee?` · ${e.fee}`:''}</div>
-                </div>
-                <div className="row" style={{ flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
-                  {(() => {
-                    const st = r?.type;
-                    if (st === 'registered') return <span className="badge green" style={{fontSize: '0.85rem', padding: '4px 8px', fontWeight: 'bold'}}>✅ 狀態：確定出席</span>;
-                    if (st === 'declined') return <span className="badge red" style={{fontSize: '0.85rem', padding: '4px 8px', fontWeight: 'bold'}}>❌ 狀態：不能出席</span>;
-                    if (st === 'interested') return <span className="badge gold" style={{fontSize: '0.85rem', padding: '4px 8px', fontWeight: 'bold'}}>❤️ 狀態：有興趣出席</span>;
-                    return <span className="badge" style={{fontSize: '0.85rem', padding: '4px 8px', background: '#fff9c4', color: '#555', border: '1px solid #fbc02d'}}>⚠️ 狀態：尚未確認</span>;
-                  })()}
-                  <button
-                    className="btn"
-                    disabled={loadingId===e.id+'registered'}
-                    style={r?.type === 'registered' ? { background: '#2e7d32', color: '#fff', border: '2px solid #1b5e20', fontWeight: 'bold' } : {}}
-                    onClick={()=>act(e.id,'registered')}
-                  >
-                    {r?.type === 'registered' ? '【已確認】✅ 確定出席' : '✅ 確定出席'}
-                  </button>
-                  <button
-                    className="btn"
-                    disabled={loadingId===e.id+'declined'}
-                    style={r?.type === 'declined' ? { background: '#d32f2f', color: '#fff', border: '2px solid #b71c1c', fontWeight: 'bold' } : {}}
-                    onClick={()=>act(e.id,'declined')}
-                  >
-                    {r?.type === 'declined' ? '【已婉拒】❌ 不能出席' : '❌ 不能出席'}
-                  </button>
-                </div>
-              </div>
-            );
-          })}
-      </div>
-    </Collapsible>
+    <StatStrip stats={[
+      { label: '活動', value: stats.activities, desc: '已發布活動', tone: 'green', href: '/admin/events' },
+      { label: '待審批', value: stats.pending, desc: '等待審批申請', tone: 'red', href: '/admin/applications' },
+      { label: '通告', value: stats.notices, desc: '圖書館引入通告', tone: 'gold', href: '/notices' },
+      { label: '用戶', value: stats.users, desc: '總登記人數', tone: 'blue', href: '/admin/users' },
+    ]} />
 
-    <section className="grid" style={{ marginTop: '2rem' }}>
-      <AttendanceCard />
-      <FeatureCard title="成員資料庫" icon="👥" text="查看及管理所屬支部成員。" href="/admin/members"/>
-      <FeatureCard title="活動管理" icon="🗓️" text="新增、發布及管理活動。" href="/admin/events"/>
-      <FeatureCard title="報名管理" icon="📋" text="查看報名狀態及匯出。" href="/admin/registrations"/>
-      <FeatureCard title="圖書館標記" icon="📚" text="引入通告。" href="/library/import"/>
-      <FeatureCard title="行事曆" icon="📅" text="查看及管理行事曆。" href="/calendar"/>
-      <FeatureCard title="審核" icon="✅" text="審核家長申請。" href="/admin/applications"/>
-    </section>
+    <Panel
+      icon="📢"
+      title="待回覆與出席活動"
+      subtitle="領袖個人報名與確認"
+      tone="blue"
+      count={`${events.length} 個`}
+    >
+      <p className="text-[11px] text-slate-500 leading-relaxed mt-0 mb-2.5">
+        作為領袖或統籌人員，你可在此點選出席旅團通告與集會活動，方便旅長與團隊掌握出席人力。
+      </p>
+      <div className="grid gap-2">
+        {events.length === 0 ? (
+          <EmptyState icon="🏕️" title="暫無待確認或待出席的活動通告" desc="領袖發布活動後，這裡會顯示需要你確認出席的活動。" />
+        ) : (
+          events.map(e => {
+            const r = replyStatus(s!, e.id, myId);
+            return (
+              <EventReplyRow
+                key={e.id}
+                event={e}
+                status={r?.type}
+                labels={{ registered: '✅ 狀態：確定出席', declined: '❌ 狀態：不能出席', interested: '❤️ 狀態：有興趣出席', unresponded: '⚠️ 狀態：尚未確認' }}
+                actions={[
+                  { type: 'registered', idle: '✅ 確定出席', active: '【已確認】✅ 確定出席' },
+                  { type: 'declined', idle: '❌ 不能出席', active: '【已婉拒】❌ 不能出席' },
+                ]}
+                loading={loadingId === e.id + 'registered' || loadingId === e.id + 'declined'}
+                onAct={t => act(e.id, t)}
+              />
+            );
+          })
+        )}
+      </div>
+    </Panel>
+
+    <ToolGroup icon="🧰" title="管理工具" subtitle="成員 · 活動 · 報名 · 物資 · 通告" tone="emerald" tools={LEADER_TOOLS} />
+
+    {plugins.length > 0 && (
+      <Panel icon="🧩" title="擴充元件" subtitle="旅團已啟用的 2／3 級元件" tone="violet" count={`${plugins.length} 個`} bodyClass="pt-3" defaultOpen={false}>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          {plugins.map(p => (
+            <PluginIframeCard
+              key={p.id}
+              plugin={p}
+              unitCode={session?.troopCode || ''}
+              settings={s?.pluginSettings?.find(ps => ps.pluginId === p.id)}
+            />
+          ))}
+        </div>
+      </Panel>
+    )}
   </div></Auth>;
 }
