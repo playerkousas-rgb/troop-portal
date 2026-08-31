@@ -20,6 +20,21 @@ const DEMO_ITEMS: Item[] = [
   { icon: '🎯', label: '活動', href: '/dashboard/activities' },
 ];
 
+// 領袖身份：底部 4 個按鈕同成員／家長唔同（行事曆 · 公告 · 點名 · 管理中心）
+const LEADER_ROLES = ['super_admin', 'troop_super', 'admin', 'group_leader', 'branch_leader', 'coach'];
+const LEADER_ITEMS: Item[] = [
+  { icon: '📅', label: '行事曆', href: '/calendar' },
+  { icon: '📢', label: '公告', href: '/notices' },
+  { icon: '📝', label: '點名', href: '/attendance' },
+  { icon: '🔧', label: '管理中心', href: '/admin' },
+];
+const DEMO_LEADER_ITEMS: Item[] = [
+  { icon: '📅', label: '行事曆', href: '/dashboard/calendar' },
+  { icon: '📢', label: '公告', href: '/dashboard/notices' },
+  { icon: '📝', label: '點名', href: '/dashboard/attendance' },
+  { icon: '🔧', label: '管理中心', href: '/dashboard/admin' },
+];
+
 // 平台資訊／接入流程頁面唔需要 tab bar
 const HIDDEN_PATHS = ['/', '/setup', '/onboard', '/downloads', '/troops', '/updates', '/marketplace', '/connectors'];
 
@@ -33,6 +48,7 @@ export default function BottomNav() {
   const pathname = usePathname();
   const [hasTroop, setHasTroop] = useState(false);
   const [loggedIn, setLoggedIn] = useState(false);
+  const [role, setRole] = useState<string | null>(null);
 
   useEffect(() => {
     try {
@@ -41,11 +57,16 @@ export default function BottomNav() {
       setHasTroop(false);
     }
     try {
-      setLoggedIn(!!JSON.parse(localStorage.getItem('scoutsystem2_current_user') || 'null'));
+      const u = JSON.parse(localStorage.getItem('scoutsystem2_current_user') || 'null');
+      setLoggedIn(!!u);
+      setRole(u?.role || null);
     } catch {
       setLoggedIn(false);
+      setRole(null);
     }
   }, [pathname]);
+
+  const isLeader = !!role && LEADER_ROLES.includes(role);
 
   const isDemo = !!pathname?.startsWith('/dashboard');
   // 首頁（登入旅團頁）：底部就係平台資訊 tab —— 模板下載／更新公告
@@ -60,6 +81,8 @@ export default function BottomNav() {
         { icon: '⬇️', label: '模板下載', href: '/downloads' },
         { icon: '📢', label: '更新公告', href: '/updates' },
       ]
+    : isLeader
+    ? (isDemo ? DEMO_LEADER_ITEMS : LEADER_ITEMS)
     : [
         ...(isDemo ? DEMO_ITEMS : REAL_ITEMS),
         { icon: '👤', label: '我的', href: isDemo ? '/dashboard/profile' : loggedIn ? '/profile' : '/login' },

@@ -92,6 +92,7 @@ const seed: AppState = {
     { id: 'u_m8', name: '周嘉欣', email: 'm08@demo.scout', role: 'member', branchId: 'b4', memberId: 'm08', approved: true },
   ],
   events: [
+    { id: 'e00', title: '八月童軍技能日', date: '2026-08-16', location: '旅團部', scope: 'branch', branchId: 'b3', kind: 'activity', status: 'published', source: '手動新增', targetMemberIds: ['m01', 'm02', 'm03', 'm04'], fee: '0' },
     { id: 'e01', title: '九月山徑健行', date: '2026-09-12', location: '大帽山', scope: 'branch', branchId: 'b3', kind: 'activity', status: 'published', source: '手動新增', targetMemberIds: ['m01', 'm02', 'm03', 'm04'], fee: '50', paymentUrl: 'https://pay.example.com/e01' },
     { id: 'e02', title: '童軍週末營(兩日一夜)', date: '2026-10-03', location: '青年會營地', scope: 'troop', kind: 'activity', status: 'published', source: '手動新增', targetMemberIds: ['m01', 'm02', 'm03', 'm04', 'm08', 'm09', 'm11', 'm12'], fee: '300', paymentUrl: 'https://pay.example.com/e02' },
     { id: 'e03', title: '十一區運動會', date: '2026-10-01', location: '東區公園', scope: 'branch', branchId: 'b2', kind: 'activity', status: 'published', source: '圖書館轉入', targetMemberIds: ['m05', 'm06', 'm07'], fee: '80' },
@@ -161,10 +162,27 @@ const seed: AppState = {
 // 點名紀錄(獨立存,不屬於 AppState)
 type AttRec = { id: string; memberId: string; ymNumber: string; name: string; branchId: string; patrolId?: string; date: string; status: 'P' | 'A' | 'L' | 'E' | 'S' | ''; note?: string; sessionType: 'meeting' | 'activity'; eventId?: string; markedBy?: string; markedAt?: string };
 let mockAttendance: AttRec[] = [
+  // 童軍（b3）恆常集會（星期六）—— 多星期，方便展示後補／期間統計
   { id: 'a1', memberId: 'm01', ymNumber: '3000000001', name: '陳大文', branchId: 'b3', patrolId: 'p12', date: '2026-08-29', status: 'P', sessionType: 'meeting', markedBy: 'u_bl', markedAt: '2026-08-29' },
   { id: 'a2', memberId: 'm02', ymNumber: '3000000002', name: '王小名', branchId: 'b3', patrolId: 'p11', date: '2026-08-29', status: 'A', sessionType: 'meeting', markedBy: 'u_bl', markedAt: '2026-08-29' },
   { id: 'a3', memberId: 'm03', ymNumber: '3000000003', name: '李浩浩', branchId: 'b3', patrolId: 'p10', date: '2026-08-29', status: 'P', sessionType: 'meeting', markedBy: 'u_bl', markedAt: '2026-08-29' },
-  { id: 'a4', memberId: 'm04', ymNumber: '3000000004', name: '張磊磊', branchId: 'b3', patrolId: 'p10', date: '2026-08-22', status: 'P', sessionType: 'meeting', markedBy: 'u_bl', markedAt: '2026-08-22' },
+  { id: 'a4', memberId: 'm04', ymNumber: '3000000004', name: '張磊磊', branchId: 'b3', patrolId: 'p10', date: '2026-08-29', status: 'L', sessionType: 'meeting', markedBy: 'u_bl', markedAt: '2026-08-29' },
+  { id: 'a5', memberId: 'm01', ymNumber: '3000000001', name: '陳大文', branchId: 'b3', patrolId: 'p12', date: '2026-08-22', status: 'P', sessionType: 'meeting', markedBy: 'u_bl', markedAt: '2026-08-22' },
+  { id: 'a6', memberId: 'm02', ymNumber: '3000000002', name: '王小名', branchId: 'b3', patrolId: 'p11', date: '2026-08-22', status: 'P', sessionType: 'meeting', markedBy: 'u_bl', markedAt: '2026-08-22' },
+  { id: 'a7', memberId: 'm03', ymNumber: '3000000003', name: '李浩浩', branchId: 'b3', patrolId: 'p10', date: '2026-08-22', status: 'E', sessionType: 'meeting', markedBy: 'u_bl', markedAt: '2026-08-22' },
+  { id: 'a8', memberId: 'm04', ymNumber: '3000000004', name: '張磊磊', branchId: 'b3', patrolId: 'p10', date: '2026-08-22', status: 'P', sessionType: 'meeting', markedBy: 'u_bl', markedAt: '2026-08-22' },
+  { id: 'a9', memberId: 'm01', ymNumber: '3000000001', name: '陳大文', branchId: 'b3', patrolId: 'p12', date: '2026-08-15', status: 'P', sessionType: 'meeting', markedBy: 'u_bl', markedAt: '2026-08-15' },
+  { id: 'a10', memberId: 'm02', ymNumber: '3000000002', name: '王小名', branchId: 'b3', patrolId: 'p11', date: '2026-08-15', status: 'S', sessionType: 'meeting', markedBy: 'u_bl', markedAt: '2026-08-15' },
+  { id: 'a11', memberId: 'm03', ymNumber: '3000000003', name: '李浩浩', branchId: 'b3', patrolId: 'p10', date: '2026-08-15', status: 'P', sessionType: 'meeting', markedBy: 'u_bl', markedAt: '2026-08-15' },
+  { id: 'a12', memberId: 'm04', ymNumber: '3000000004', name: '張磊磊', branchId: 'b3', patrolId: 'p10', date: '2026-08-15', status: 'A', sessionType: 'meeting', markedBy: 'u_bl', markedAt: '2026-08-15' },
+  // 童軍（b3）自辦活動：八月童軍技能日（已過期，供補改示範）
+  { id: 'a20', memberId: 'm01', ymNumber: '3000000001', name: '陳大文', branchId: 'b3', patrolId: 'p12', date: '2026-08-16', status: 'P', sessionType: 'activity', eventId: 'e00', markedBy: 'u_bl', markedAt: '2026-08-16' },
+  { id: 'a21', memberId: 'm02', ymNumber: '3000000002', name: '王小名', branchId: 'b3', patrolId: 'p11', date: '2026-08-16', status: 'P', sessionType: 'activity', eventId: 'e00', markedBy: 'u_bl', markedAt: '2026-08-16' },
+  { id: 'a22', memberId: 'm03', ymNumber: '3000000003', name: '李浩浩', branchId: 'b3', patrolId: 'p10', date: '2026-08-16', status: 'E', sessionType: 'activity', eventId: 'e00', markedBy: 'u_bl', markedAt: '2026-08-16' },
+  // 幼童軍（b2）恆常集會（星期六）
+  { id: 'a30', memberId: 'm05', ymNumber: '3000000005', name: '林小雨', branchId: 'b2', patrolId: 'p1', date: '2026-08-29', status: 'P', sessionType: 'meeting', markedBy: 'u_gl', markedAt: '2026-08-29' },
+  { id: 'a31', memberId: 'm06', ymNumber: '3000000006', name: '黃芷晴', branchId: 'b2', patrolId: 'p2', date: '2026-08-29', status: 'P', sessionType: 'meeting', markedBy: 'u_gl', markedAt: '2026-08-29' },
+  { id: 'a32', memberId: 'm07', ymNumber: '3000000007', name: '劉琪琪', branchId: 'b2', patrolId: 'p3', date: '2026-08-29', status: 'A', sessionType: 'meeting', markedBy: 'u_gl', markedAt: '2026-08-29' },
 ];
 
 let store: AppState = JSON.parse(JSON.stringify(seed));
@@ -226,6 +244,18 @@ const FEATURES: Record<string, string[]> = {
   member: [],
 };
 
+// 個別授權（模擬 GS UserPermissions 表）：教練員何健獲授「全旅點名」，
+// 展示「即使是教練員，只要有權限就可以為所有支部點名」。
+const USER_FEATURE_OVERRIDES: Record<string, string[]> = {
+  u_coach: ['attendance_all'],
+};
+
+function featuresFor(userId: string, role: string) {
+  const base = FEATURES[role] || [];
+  const extra = USER_FEATURE_OVERRIDES[userId] || [];
+  return Array.from(new Set([...base, ...extra]));
+}
+
 function findUser(userId: string) {
   return store.users.find(u => u.id === userId) || null;
 }
@@ -248,7 +278,7 @@ export function buildMockState(userId: string): AppState {
     regularMeetings: [], cancelledMeetings: [],
     meetings: [], plugins: [], pluginSettings: [],
     equipment: [], equipmentLoans: [],
-    audits: [], config: { ...store.config }, userFeatures: FEATURES[role] || [],
+    audits: [], config: { ...store.config }, userFeatures: featuresFor(userId, role),
   };
 
   const memberBranch = isMember ? (store.members.find(m => m.id === user!.memberId)?.branchId || '') : '';
@@ -367,6 +397,7 @@ export const DEMO_ACCOUNTS: { userId: string; label: string; desc: string; dashb
   { userId: 'u_m4', label: '🧑 成員(成年)', desc: '張磊磊 18 歲 · 可自行報名', dashboard: '/member' },
   { userId: 'u5', label: '👩 家長', desc: '王秀蘭 · 代子女報名 / 查看', dashboard: '/parent' },
   { userId: 'u_bl', label: '🏹 支部領袖', desc: '黃志遠 · 本支部活動 / 成員 / 點名', dashboard: '/leader' },
+  { userId: 'u_coach', label: '🧑‍🏫 教練員(獲授全旅點名)', desc: '何健 · 即使教練員，有權限亦可點全旅', dashboard: '/leader' },
   { userId: 'u_gl', label: '📋 團長', desc: '李偉國 · 全旅活動 / 集會 / 會議', dashboard: '/leader' },
   { userId: 'u_admin', label: '🛠️ 管理員', desc: '陳堅強 · 全部管理功能', dashboard: '/admin' },
 ];
@@ -404,13 +435,34 @@ function attFor(date: string, sessionType: string, branchId: string, eventId: st
   );
 }
 
+function attendanceBranchScope(p: Record<string, any>, requestedBranch: string): { branchId?: string; error?: string } {
+  const user = findUser(String(p.userId || p.operatedBy || ''));
+  const role = user?.role || 'guest';
+  if (['super_admin', 'troop_super', 'admin', 'group_leader'].includes(role)) return { branchId: requestedBranch || user?.branchId || '' };
+  if (['branch_leader', 'coach'].includes(role)) {
+    if (featuresFor(user!.id, role).includes('attendance_all')) return { branchId: requestedBranch || user?.branchId || '' };
+    return { branchId: user?.branchId || '' };
+  }
+  if (role === 'member') return { branchId: store.members.find(m => m.id === user?.memberId)?.branchId || '' };
+  if (role === 'parent') {
+    const kids = store.members.filter(m => (user!.childMemberIds || []).includes(m.id));
+    const ids = Array.from(new Set(kids.map(k => k.branchId)));
+    if (ids.length === 1) return { branchId: ids[0] };
+    return { branchId: requestedBranch && ids.includes(requestedBranch) ? requestedBranch : (ids[0] || '') };
+  }
+  return { error: '只有領袖可以點名' };
+}
+
 function handleGetAttendance(p: Record<string, any>) {
   const date = String(p.date || '');
-  const branchId = String(p.branchId || '');
   const sessionType = p.sessionType === 'activity' ? 'activity' : 'meeting';
   const eventId = String(p.eventId || '');
   const user = findUser(String(p.userId || ''));
   const role = user?.role || 'guest';
+  const scope = attendanceBranchScope(p, String(p.branchId || ''));
+  if (scope.error) return { success: false, error: scope.error };
+  const branchId = scope.branchId;
+
   let members = store.members.filter(m => m.active && m.branchId === branchId);
   if (role === 'member') members = members.filter(m => m.id === user!.memberId);
   if (role === 'parent') members = members.filter(m => (user!.childMemberIds || []).includes(m.id));
@@ -421,16 +473,23 @@ function handleGetAttendance(p: Record<string, any>) {
   const records = attFor(date, sessionType, branchId, eventId);
   const roster = members.map(m => {
     const r = records.find(x => x.memberId === m.id);
-    return { memberId: m.id, ymNumber: m.ymNumber, name: m.name, patrolId: m.patrolId || '', status: r ? r.status : '', note: r?.note || '' };
+    const patrol = store.patrols.find(p => p.id === m.patrolId);
+    return {
+      memberId: m.id, ymNumber: m.ymNumber, name: m.name, branchId: m.branchId,
+      patrolId: m.patrolId || '', patrolName: patrol ? patrol.name : '',
+      status: r ? r.status : '', note: r?.note || '', recordId: r?.id || '',
+    };
   });
-  return { success: true, roster, saved: records.length };
+  return { success: true, roster, saved: records.length, branchId, date, sessionType, eventId };
 }
 
 function handleSaveAttendance(p: Record<string, any>) {
-  const branchId = String(p.branchId || '');
   const date = String(p.date || '');
   const sessionType = p.sessionType === 'activity' ? 'activity' : 'meeting';
   const eventId = String(p.eventId || '');
+  const scope = attendanceBranchScope(p, String(p.branchId || ''));
+  if (scope.error) return { success: false, error: scope.error };
+  const branchId = scope.branchId;
   const records: any[] = Array.isArray(p.records) ? p.records : [];
   let saved = 0;
   records.forEach(r => {
@@ -443,28 +502,120 @@ function handleSaveAttendance(p: Record<string, any>) {
 }
 
 function handleGetMatrix(p: Record<string, any>) {
-  const branchId = String(p.branchId || '');
   const days = Math.min(parseInt(String(p.days || '30'), 10) || 30, 90);
-  const sessionType = p.sessionType === 'activity' ? 'activity' : 'meeting';
-  const members = store.members.filter(m => m.active && m.branchId === branchId);
-  const dates = att.filter(r => r.branchId === branchId && r.sessionType === sessionType).map(r => r.date).filter((d, i, a) => a.indexOf(d) === i).sort().slice(-days);
-  const headers = ['成員', ...dates];
+  const sessionType = p.sessionType === 'activity' ? 'activity' : p.sessionType === 'all' ? 'all' : 'meeting';
+  const patrolId = String(p.patrolId || '');
+  const from = String(p.from || '');
+  const to = String(p.to || '');
+  const scope = attendanceBranchScope(p, String(p.branchId || ''));
+  if (scope.error) return { success: false, error: scope.error };
+  const branchId = scope.branchId;
+
+  const members = store.members.filter(m => m.active && m.branchId === branchId && (!patrolId || m.patrolId === patrolId));
+
+  let records = att.filter(r => r.branchId === branchId);
+  if (sessionType !== 'all') records = records.filter(r => r.sessionType === sessionType);
+  if (from) records = records.filter(r => r.date >= from);
+  if (to) records = records.filter(r => r.date <= to);
+
+  // 場次欄（date|type|eventId），去重 + 排序（日期昇序，同日先集會後活動）
+  const colMap = new Map<string, { key: string; date: string; sessionType: string; eventId: string; label: string }>();
+  records.forEach(r => {
+    const key = `${r.date}|${r.sessionType}|${r.eventId || ''}`;
+    if (colMap.has(key)) return;
+    colMap.set(key, {
+      key, date: r.date, sessionType: r.sessionType, eventId: r.eventId || '',
+      label: r.date.slice(5) + (sessionType === 'all' ? (r.sessionType === 'activity' ? ' 活' : ' 集') : ''),
+    });
+  });
+  let columns = Array.from(colMap.values()).sort((a, b) => (a.date === b.date ? a.sessionType.localeCompare(b.sessionType) : a.date.localeCompare(b.date)));
+  if (!from && !to && columns.length > days) columns = columns.slice(columns.length - days);
+
+  const recMap = new Map<string, string>();
+  records.forEach(r => { recMap.set(`${r.memberId}|${r.date}|${r.sessionType}|${r.eventId || ''}`, r.status); });
+
+  const headers = ['YMIS號', '姓名', '支部', '小隊', ...columns.map(c => c.label)];
   const rows = members.map(m => {
-    const row: Record<string, string> = { '成員': `${m.name} (${m.ymNumber})` };
-    dates.forEach(d => {
-      const r = att.find(x => x.memberId === m.id && x.date === d && x.sessionType === sessionType);
-      row[d] = r ? r.status : '';
+    const patrol = store.patrols.find(p => p.id === m.patrolId);
+    const row: Record<string, string> = {
+      'YMIS號': m.ymNumber || '', '姓名': m.name, '支部': m.branchId, '小隊': patrol ? patrol.name : '',
+    };
+    columns.forEach(c => {
+      row[c.key] = recMap.get(`${m.id}|${c.date}|${c.sessionType}|${c.eventId}`) || '';
     });
     return row;
   });
-  return { success: true, headers, rows, branchId, days, sessionType };
+  return { success: true, headers, columns, rows, branchId, days, sessionType };
+}
+
+/** 後補／補改：列出可點名場次（過期／即將的恆常集會日 + 旅團自辦活動），由新至舊 */
+function handleGetSessions(p: Record<string, any>) {
+  const scope = attendanceBranchScope(p, String(p.branchId || ''));
+  if (scope.error) return { success: false, error: scope.error };
+  const branchId = scope.branchId;
+  if (!branchId) return { success: false, error: '請選擇支部' };
+
+  const now = new Date();
+  const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  const weekdayOf = (iso: string) => { const [y, m, d] = iso.split('-').map(Number); return new Date(y, m - 1, d).getDay(); };
+
+  // 恆常集會日：按 RegularMeetings 每星期回推 120 日，扣除取消日，再併入已點名但非規律的日期
+  const seen = new Set<string>();
+  const meetings: any[] = [];
+  store.regularMeetings.filter(r => r.enabled && r.branchId === branchId).forEach(rule => {
+    for (let i = 0; i < 120; i++) {
+      const d = new Date(now); d.setDate(now.getDate() - i);
+      if (d.getDay() !== rule.weekday) continue;
+      const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      const cancelled = store.cancelledMeetings.some(c => c.branchId === branchId && c.date === iso);
+      if (cancelled) continue;
+      const key = `meeting|${branchId}|${iso}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      meetings.push({ id: key, date: iso, label: rule.title, time: `${rule.startTime}-${rule.endTime}`, location: rule.location, weekday: rule.weekday });
+    }
+  });
+  att.filter(r => r.sessionType === 'meeting' && r.branchId === branchId).forEach(r => {
+    const key = `meeting|${branchId}|${r.date}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    meetings.push({ id: key, date: r.date, label: '已點名集會', time: '', location: '', weekday: weekdayOf(r.date) });
+  });
+  meetings.sort((a, b) => b.date.localeCompare(a.date));
+  meetings.forEach(m => { m.hasRecords = att.some(r => r.sessionType === 'meeting' && r.branchId === branchId && r.date === m.date); });
+
+  // 旅團自辦活動（含已過期，供補改）
+  const activities = store.events
+    .filter(e => e.kind === 'activity' && e.status === 'published' && (e.scope === 'troop' || e.branchId === branchId))
+    .map(e => ({ id: e.id, date: e.date, label: e.title, location: e.location, branchId: e.branchId, scope: e.scope, hasRecords: att.some(r => r.sessionType === 'activity' && r.eventId === e.id) }))
+    .sort((a, b) => b.date.localeCompare(a.date));
+
+  return { success: true, branchId, today, meetings, activities };
 }
 
 function handleMemberAttendance(p: Record<string, any>) {
   let target = store.members.find(m => m.id === p.memberId) || store.members.find(m => m.ymNumber === p.ymNumber) || store.members.find(m => m.name === p.name) || null;
+  const user = findUser(String(p.userId || ''));
+  if (!target && user?.role === 'member') target = store.members.find(m => m.id === user.memberId) || null;
   if (!target) return { success: false, error: '找不到該成員' };
   const records = att.filter(r => r.memberId === target!.id).sort((a, b) => b.date.localeCompare(a.date));
-  return { success: true, record: { member: target, total: records.length, present: records.filter(r => r.status === 'P').length, records } };
+  const dates: Record<string, { status: string; note: string; sessionType: string; eventId?: string }> = {};
+  const stats = { P: 0, A: 0, L: 0, E: 0, S: 0, blank: 0, total: 0 };
+  records.forEach(r => {
+    dates[r.date] = { status: r.status, note: r.note || '', sessionType: r.sessionType, eventId: r.eventId || '' };
+    if (r.status === 'P' || r.status === 'A' || r.status === 'L' || r.status === 'E' || r.status === 'S') stats[r.status]++;
+    else stats.blank++;
+    stats.total++;
+  });
+  const patrol = store.patrols.find(p => p.id === target!.patrolId);
+  return {
+    success: true,
+    record: {
+      memberId: target!.id, ymNumber: target!.ymNumber || '', name: target!.name,
+      branchId: target!.branchId, patrolId: target!.patrolId || '',
+      patrolName: patrol ? patrol.name : '', dates, stats,
+    },
+  };
 }
 
 // ==================== 報名統計 ====================
@@ -658,7 +809,23 @@ function handleMutate(action: string, p: Record<string, any>) {
     case 'updateUserPermissions':
     case 'grantFeature':
     case 'revokeFeature': return S(ob);
-    case 'getUserFeatures': return { success: true, features: FEATURES[findUser(String(p.targetUserId || ''))?.role || 'member'] || [], role: findUser(String(p.targetUserId || ''))?.role || '' };
+    case 'getUserFeatures': {
+      const tu = findUser(String(p.targetUserId || ''));
+      const role = tu?.role || 'member';
+      const defaults = FEATURES[role] || [];
+      const overrides: Record<string, boolean> = {};
+      (USER_FEATURE_OVERRIDES[tu?.id || ''] || []).forEach(f => { overrides[f] = true; });
+      const allFeatures = ['branches', 'members', 'applications', 'events', 'registrations', 'attendance', 'attendance_all', 'library_import', 'notices', 'users', 'settings', 'audit', 'calendar'];
+      return {
+        success: true,
+        role,
+        features: allFeatures.map(f => {
+          const isDefault = defaults.includes(f);
+          const overridden = overrides[f] !== undefined;
+          return { feature: f, enabled: overridden ? overrides[f] : isDefault, isDefault, overridden };
+        }),
+      };
+    }
     // 小隊
     case 'createPatrol':
       store.patrols.push({ id: uid('p'), branchId: String(p.branchId || ''), name: String(p.name || ''), short: String(p.short || ''), memberIds: [], enabled: true, order: store.patrols.length + 1 });
@@ -778,6 +945,7 @@ export function mockHandle(action: string, params: Record<string, any> = {}): an
   if (action === 'getAttendance') return handleGetAttendance(p);
   if (action === 'saveAttendance') return handleSaveAttendance(p);
   if (action === 'getAttendanceMatrix') return handleGetMatrix(p);
+  if (action === 'getAttendanceSessions') return handleGetSessions(p);
   if (action === 'getMemberAttendance') return handleMemberAttendance(p);
   if (action === 'forgotPassword') return { success: true, message: '(演示) 密碼重設信已寄出(模擬)。' };
   if (action === 'getSystemStatus') return { success: true, status: 'ok (mock)' };

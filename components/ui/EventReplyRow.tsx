@@ -38,6 +38,7 @@ export default function EventReplyRow({
   loading,
   onAct,
   labels,
+  footer,
 }: {
   event: ReplyEvent;
   status?: string;
@@ -46,6 +47,7 @@ export default function EventReplyRow({
   loading: boolean;
   onAct: (type: ReplyActionType) => void;
   labels?: Partial<Record<'registered' | 'declined' | 'interested' | 'unresponded', string>>;
+  footer?: React.ReactNode;
 }) {
   const key = status || 'unresponded';
   const st = STATUS[key] || STATUS.unresponded;
@@ -111,6 +113,8 @@ export default function EventReplyRow({
           ))}
         </div>
       )}
+
+      {footer && <div className="border-t border-slate-200/70 pt-2.5">{footer}</div>}
     </div>
   );
 }

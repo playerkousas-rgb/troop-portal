@@ -31,10 +31,17 @@ const PAST_ACTIVITIES = [
   { title: '暑期露營', date: '7月15-16日', location: '創興水上活動中心', status: 'attended' as const },
 ];
 
+// 幼童軍支部（b2）年紀細，想考的章由家長代填；其他支部由成員自己填
 const CHILDREN = [
-  { id: 'c1', name: '王大明', ymNumber: '1234567890', branch: '童軍', patrol: 'TIGER', age: 13 },
-  { id: 'c2', name: '王小明', ymNumber: '0987654321', branch: '幼童軍', patrol: 'RED', age: 9 },
+  { id: 'c1', name: '王大明', ymNumber: '1234567890', branch: '童軍', branchId: 'b3', patrol: 'TIGER', age: 13, badges: [
+    { name: '世界環保章', note: '想在今年完成', read: true },
+  ] as Badge[] },
+  { id: 'c2', name: '王小明', ymNumber: '0987654321', branch: '幼童軍', branchId: 'b2', patrol: 'RED', age: 9, badges: [
+    { name: '幼童軍天象章', note: '想學觀星', read: false },
+  ] as Badge[] },
 ];
+
+type Badge = { name: string; note: string; read: boolean };
 
 const MY_BADGES = [
   { name: '世界環保章', note: '想在今年完成', read: true },
@@ -77,6 +84,20 @@ export default function ProfilePage() {
   const [role, setRole] = useState<Role>('member');
   const [tab, setTab] = useState<'dashboard' | 'info' | 'children' | 'badges' | 'supplies' | 'password'>('dashboard');
   const [showPast, setShowPast] = useState(false);
+  const [children, setChildren] = useState(CHILDREN);
+  const [badgeChildId, setBadgeChildId] = useState('');
+  const [badgeName, setBadgeName] = useState('');
+  const [badgeNote, setBadgeNote] = useState('');
+
+  function addChildBadge(childId: string) {
+    const name = badgeName.trim();
+    if (!name) return;
+    setChildren(prev => prev.map(c => c.id === childId
+      ? { ...c, badges: [...c.badges, { name, note: badgeNote.trim(), read: false }] }
+      : c));
+    setBadgeName('');
+    setBadgeNote('');
+  }
 
   const isManager = ['admin', 'super_admin', 'group_leader', 'branch_leader'].includes(role);
   const isLeader = ['admin', 'super_admin', 'group_leader', 'branch_leader', 'coach'].includes(role);
@@ -85,12 +106,16 @@ export default function ProfilePage() {
   const isParentOrMember = isParent || isMember;
 
   // 家長/成員的 tabs
+  // 家長：睇子女資料；不能借物資、冇自己嘅「想考的章」（想考的章係成員自己填）
   const MEMBER_TABS = [
     { id: 'dashboard' as const, icon: '🏠', label: '概覽' },
     { id: 'info' as const, icon: '👤', label: '基本資料' },
-    ...(isParent ? [{ id: 'children' as const, icon: '👨‍👩‍👧', label: '子女' }] : []),
-    { id: 'badges' as const, icon: '🎖️', label: '想考的章' },
-    { id: 'supplies' as const, icon: '📦', label: '借物資' },
+    ...(isParent
+      ? [{ id: 'children' as const, icon: '👨‍👩‍👧', label: '子女' }]
+      : [
+          { id: 'badges' as const, icon: '🎖️', label: '想考的章' },
+          { id: 'supplies' as const, icon: '📦', label: '借物資' },
+        ]),
     { id: 'password' as const, icon: '🔑', label: '改密碼' },
   ];
 
@@ -106,14 +131,14 @@ export default function ProfilePage() {
   const currentRoleName = ROLE_LABEL[role];
 
   return (
-    <main className="max-w-2xl mx-auto px-4 py-4 pb-24 space-y-4">
+    <main className="max-w-5xl mx-auto px-4 py-5 pb-24 space-y-5">
 
       {/* ── Demo 切換 ── */}
       <div className="flex gap-1.5 flex-wrap">
-        <span className="text-[11px] text-slate-500 mr-1 self-center">Demo：</span>
+        <span className="text-[13px] text-slate-500 mr-1 self-center">Demo：</span>
         {(['admin', 'branch_leader', 'coach', 'parent', 'member'] as Role[]).map(r => (
           <button key={r} onClick={() => { setRole(r); setTab('dashboard'); }}
-            className={`text-[11px] px-2.5 py-1 rounded-full border transition font-bold ${
+            className={`text-[13px] px-2.5 py-1 rounded-full border transition font-bold ${
               role === r ? 'bg-brand-600 text-white border-brand-600 shadow' : 'bg-white text-slate-500 border-slate-200'
             }`}>
             {ROLE_LABEL[r]}
@@ -128,9 +153,9 @@ export default function ProfilePage() {
           <div className="flex-1 min-w-0">
             <h2 className="text-lg font-extrabold">{isLeader ? '陳管理員' : MY_PROFILE.name}</h2>
             <div className="flex gap-1.5 mt-1 flex-wrap">
-              <span className="bg-white/20 text-[11px] font-bold px-2 py-0.5 rounded-full">{currentRoleName}</span>
-              {!isLeader && <span className="bg-white/20 text-[11px] font-bold px-2 py-0.5 rounded-full">{MY_PROFILE.branch}</span>}
-              {!isLeader && <span className="bg-white/20 text-[11px] font-bold px-2 py-0.5 rounded-full">{MY_PROFILE.patrol}</span>}
+              <span className="bg-white/20 text-[13px] font-bold px-2 py-0.5 rounded-full">{currentRoleName}</span>
+              {!isLeader && <span className="bg-white/20 text-[13px] font-bold px-2 py-0.5 rounded-full">{MY_PROFILE.branch}</span>}
+              {!isLeader && <span className="bg-white/20 text-[13px] font-bold px-2 py-0.5 rounded-full">{MY_PROFILE.patrol}</span>}
             </div>
           </div>
         </div>
@@ -140,7 +165,7 @@ export default function ProfilePage() {
       <div className="flex gap-1 overflow-x-auto pb-1 -mx-1 px-1">
         {currentTabs.map(t => (
           <button key={t.id} onClick={() => setTab(t.id)}
-            className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-[11px] font-bold whitespace-nowrap transition border ${
+            className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-[13px] font-bold whitespace-nowrap transition border ${
               tab === t.id ? 'bg-brand-600 text-white border-brand-600' : 'bg-white text-slate-600 border-slate-200'
             }`}>
             <span>{t.icon}</span> {t.label}
@@ -156,25 +181,25 @@ export default function ProfilePage() {
           {/* 我的監察 */}
           <div className="bg-white rounded-2xl border border-slate-200 p-4">
             <div className="flex items-center justify-between mb-3">
-              <h3 className="font-bold text-sm flex items-center gap-1.5">
-                <span className="bg-amber-400 text-slate-900 text-[11px] font-extrabold px-2 py-0.5 rounded-lg">📡</span>
+              <h3 className="font-bold text-[15px] flex items-center gap-1.5">
+                <span className="bg-amber-400 text-slate-900 text-[13px] font-extrabold px-2 py-0.5 rounded-lg">📡</span>
                 我的監察
               </h3>
-              <span className="text-[11px] text-slate-500">1 待回覆</span>
+              <span className="text-[13px] text-slate-500">1 待回覆</span>
             </div>
             <div className="space-y-2">
               {MY_REGISTRATIONS.map((r, i) => (
                 <div key={i} className="rounded-xl p-3 bg-slate-50 border border-slate-100">
                   <div className="flex items-center justify-between mb-1.5">
-                    <span className="font-bold text-xs">{r.title}</span>
+                    <span className="font-bold text-[13px]">{r.title}</span>
                     <div className="flex gap-1">
-                      <span className={`text-[11px] px-1.5 py-0.5 rounded-full font-bold ${
+                      <span className={`text-[13px] px-1.5 py-0.5 rounded-full font-bold ${
                         r.status === 'registered' ? 'bg-emerald-100 text-emerald-700' :
                         r.status === 'interested' ? 'bg-amber-100 text-amber-700' : 'bg-rose-100 text-rose-700'
                       }`}>
                         {r.status === 'registered' ? '✅' : r.status === 'interested' ? '❤️' : '❌'}
                       </span>
-                      <span className={`text-[11px] px-1.5 py-0.5 rounded-full font-bold ${
+                      <span className={`text-[13px] px-1.5 py-0.5 rounded-full font-bold ${
                         r.paid === 'confirmed' ? 'bg-emerald-100 text-emerald-700' :
                         r.paid === 'pending' ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-500'
                       }`}>
@@ -182,12 +207,13 @@ export default function ProfilePage() {
                       </span>
                     </div>
                   </div>
-                  <div className="text-[11px] text-slate-500">{r.date} · {r.location} · {r.fee}</div>
-                  {/* 活動回覆快捷鍵（家長） */}
-                  {isParent && r.status !== 'registered' && (
-                    <div className="flex gap-1.5 mt-2">
-                      <button className="flex-1 text-[11px] font-bold py-1.5 rounded-lg bg-emerald-700 text-white">✅ 確認參加</button>
-                      <button className="flex-1 text-[11px] font-bold py-1.5 rounded-lg bg-rose-100 text-rose-700">❌ 不參加</button>
+                  <div className="text-[13px] text-slate-500">{r.date} · {r.location} · {r.fee}</div>
+                  {/* 活動回覆快捷鍵（家長）—— 家長帳戶回覆＝已簽署 */}
+                  {isParent && (
+                    <div className="flex gap-1.5 mt-2 flex-wrap">
+                      <button className="text-[13px] font-bold py-1.5 px-2 rounded-lg bg-amber-100 text-amber-700">❤️ 有興趣</button>
+                      <button className="text-[13px] font-bold py-1.5 px-2 rounded-lg bg-emerald-700 text-white">✅ 參加</button>
+                      <button className="text-[13px] font-bold py-1.5 px-2 rounded-lg bg-rose-100 text-rose-700">❌ 不參加</button>
                     </div>
                   )}
                 </div>
@@ -198,18 +224,18 @@ export default function ProfilePage() {
           {/* 過往活動（摺疊，只限內部已參加的） */}
           <div className="bg-white rounded-2xl border border-slate-200 p-4">
             <button onClick={() => setShowPast(!showPast)} className="w-full flex items-center justify-between text-left">
-              <h3 className="font-bold text-xs text-slate-600">📁 過往活動（已參加）</h3>
-              <span className="text-slate-500 text-xs">{showPast ? '▲' : '▼'}</span>
+              <h3 className="font-bold text-[13px] text-slate-600">📁 過往活動（已參加）</h3>
+              <span className="text-slate-500 text-[13px]">{showPast ? '▲' : '▼'}</span>
             </button>
             {showPast && (
               <div className="space-y-1.5 mt-2">
                 {PAST_ACTIVITIES.map((p, i) => (
                   <div key={i} className="flex items-center justify-between bg-slate-50 rounded-lg px-3 py-2">
                     <div>
-                      <div className="text-[11px] font-bold">{p.title}</div>
-                      <div className="text-[11px] text-slate-500">{p.date} · {p.location}</div>
+                      <div className="text-[13px] font-bold">{p.title}</div>
+                      <div className="text-[13px] text-slate-500">{p.date} · {p.location}</div>
                     </div>
-                    <span className="text-[11px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded font-bold">✓ 已參加</span>
+                    <span className="text-[13px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded font-bold">✓ 已參加</span>
                   </div>
                 ))}
               </div>
@@ -225,14 +251,14 @@ export default function ProfilePage() {
         <section className="space-y-4">
           {/* 申請 */}
           <div className="bg-white rounded-2xl border border-slate-200 p-4">
-            <h3 className="font-bold text-sm mb-3">📋 申請</h3>
+            <h3 className="font-bold text-[15px] mb-3">📋 申請</h3>
             <div className="grid grid-cols-4 gap-2">
               {APPROVALS.map((a, i) => (
                 <Link key={i} href={`/dashboard/admin/applications?type=${a.type}`} className="no-underline text-inherit">
                   <div className={`rounded-xl p-2.5 text-center relative ${a.count > 0 ? 'bg-amber-50 border border-amber-200' : 'bg-slate-50'}`}>
-                    {a.count > 0 && <span className="absolute -top-1 -right-1 text-[11px] bg-rose-600 text-white w-3.5 h-3.5 rounded-full flex items-center justify-center font-bold">{a.count}</span>}
+                    {a.count > 0 && <span className="absolute -top-1 -right-1 text-[13px] bg-rose-600 text-white w-3.5 h-3.5 rounded-full flex items-center justify-center font-bold">{a.count}</span>}
                     <div className="text-lg">{a.icon}</div>
-                    <div className={`text-[11px] font-bold ${a.count > 0 ? 'text-amber-800' : 'text-slate-500'}`}>{a.type}</div>
+                    <div className={`text-[13px] font-bold ${a.count > 0 ? 'text-amber-800' : 'text-slate-500'}`}>{a.type}</div>
                   </div>
                 </Link>
               ))}
@@ -242,8 +268,8 @@ export default function ProfilePage() {
           {/* 活動概況 */}
           <div>
             <div className="flex items-center justify-between mb-2">
-              <h3 className="font-bold text-sm">🎯 活動概況</h3>
-              <Link href="/dashboard/admin/registrations" className="text-[11px] text-brand-600 font-bold no-underline">全部 →</Link>
+              <h3 className="font-bold text-[15px]">🎯 活動概況</h3>
+              <Link href="/dashboard/admin/registrations" className="text-[13px] text-brand-600 font-bold no-underline">全部 →</Link>
             </div>
             <div className="space-y-2">
               {ACTIVITIES_OVERVIEW.map(a => (
@@ -251,18 +277,18 @@ export default function ProfilePage() {
                   <div className={`bg-white rounded-xl border p-3 card-hover ${a.expired ? 'opacity-60 border-dashed' : 'border-slate-200'}`}>
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center gap-2">
-                        <span className={`text-[11px] px-1.5 py-0.5 rounded font-bold ${a.type === 'internal' ? 'bg-blue-100 text-blue-700' : 'bg-violet-100 text-violet-700'}`}>
+                        <span className={`text-[13px] px-1.5 py-0.5 rounded font-bold ${a.type === 'internal' ? 'bg-blue-100 text-blue-700' : 'bg-violet-100 text-violet-700'}`}>
                           {a.type === 'internal' ? '🏠' : '📚'}
                         </span>
-                        <span className="font-bold text-xs">{a.title}</span>
+                        <span className="font-bold text-[13px]">{a.title}</span>
                       </div>
-                      <span className="text-[11px] text-slate-500">{a.expired ? '⏰' : `截止 ${a.deadline}`}</span>
+                      <span className="text-[13px] text-slate-500">{a.expired ? '⏰' : `截止 ${a.deadline}`}</span>
                     </div>
                     <div className="grid grid-cols-4 gap-1">
-                      <div className="bg-emerald-50 rounded px-1.5 py-1 text-center"><div className="text-[11px] font-extrabold text-emerald-700">{a.registered}</div><div className="text-[11px] text-emerald-700">✅報名</div></div>
-                      <div className="bg-amber-50 rounded px-1.5 py-1 text-center"><div className="text-[11px] font-extrabold text-amber-700">{a.interested}</div><div className="text-[11px] text-amber-700">❤️興趣</div></div>
-                      <div className="bg-slate-100 rounded px-1.5 py-1 text-center"><div className="text-[11px] font-extrabold text-slate-600">{a.pending}</div><div className="text-[11px] text-slate-500">⚠️待覆</div></div>
-                      <div className={`rounded px-1.5 py-1 text-center ${a.paid >= a.registered ? 'bg-emerald-50' : 'bg-rose-50'}`}><div className={`text-[11px] font-extrabold ${a.paid >= a.registered ? 'text-emerald-700' : 'text-rose-700'}`}>{a.paid}/{a.registered}</div><div className="text-[11px] text-slate-500">💰付款</div></div>
+                      <div className="bg-emerald-50 rounded px-1.5 py-1 text-center"><div className="text-[13px] font-extrabold text-emerald-700">{a.registered}</div><div className="text-[13px] text-emerald-700">✅報名</div></div>
+                      <div className="bg-amber-50 rounded px-1.5 py-1 text-center"><div className="text-[13px] font-extrabold text-amber-700">{a.interested}</div><div className="text-[13px] text-amber-700">❤️興趣</div></div>
+                      <div className="bg-slate-100 rounded px-1.5 py-1 text-center"><div className="text-[13px] font-extrabold text-slate-600">{a.pending}</div><div className="text-[13px] text-slate-500">⚠️待覆</div></div>
+                      <div className={`rounded px-1.5 py-1 text-center ${a.paid >= a.registered ? 'bg-emerald-50' : 'bg-rose-50'}`}><div className={`text-[13px] font-extrabold ${a.paid >= a.registered ? 'text-emerald-700' : 'text-rose-700'}`}>{a.paid}/{a.registered}</div><div className="text-[13px] text-slate-500">💰付款</div></div>
                     </div>
                   </div>
                 </Link>
@@ -273,22 +299,22 @@ export default function ProfilePage() {
           {/* 成員 */}
           <div>
             <div className="flex items-center justify-between mb-2">
-              <h3 className="font-bold text-sm">👥 成員</h3>
-              <Link href="/dashboard/admin/members" className="text-[11px] text-brand-600 font-bold no-underline">管理 →</Link>
+              <h3 className="font-bold text-[15px]">👥 成員</h3>
+              <Link href="/dashboard/admin/members" className="text-[13px] text-brand-600 font-bold no-underline">管理 →</Link>
             </div>
             <div className="space-y-1.5">
               {BRANCH_STATS.map(b => (
                 <Link key={b.id} href={`/dashboard/admin/members?branch=${b.id}`} className="no-underline text-inherit block">
                   <div className="bg-white rounded-xl border border-slate-200 p-2.5 card-hover flex items-center justify-between">
-                    <span className="font-bold text-xs">{b.name}</span>
+                    <span className="font-bold text-[13px]">{b.name}</span>
                     <div className="flex gap-1 flex-wrap">
                       {b.patrolDetail?.map((p, i) => (
-                        <span key={i} className="text-[11px] bg-slate-50 border border-slate-100 rounded px-1.5 py-0.5">
+                        <span key={i} className="text-[13px] bg-slate-50 border border-slate-100 rounded px-1.5 py-0.5">
                           <span className="font-bold">{p.name}</span> {p.count}
                           {'leader' in p && p.leader && <span className="text-emerald-700"> ★</span>}
                         </span>
                       ))}
-                      <span className="text-[11px] text-slate-500 self-center ml-1">{b.members}人</span>
+                      <span className="text-[13px] text-slate-500 self-center ml-1">{b.members}人</span>
                     </div>
                   </div>
                 </Link>
@@ -299,8 +325,8 @@ export default function ProfilePage() {
           {/* 會議 */}
           <div>
             <div className="flex items-center justify-between mb-2">
-              <h3 className="font-bold text-sm">🤝 會議</h3>
-              <Link href="/dashboard/meetings" className="text-[11px] text-brand-600 font-bold no-underline">全部 →</Link>
+              <h3 className="font-bold text-[15px]">🤝 會議</h3>
+              <Link href="/dashboard/meetings" className="text-[13px] text-brand-600 font-bold no-underline">全部 →</Link>
             </div>
             <div className="space-y-1.5">
               {MEETINGS.map(m => (
@@ -308,10 +334,10 @@ export default function ProfilePage() {
                   <div className="bg-white rounded-xl border border-slate-200 p-2.5 card-hover flex items-center gap-2">
                     <span className="text-lg">{m.status === 'upcoming' ? '📋' : '📁'}</span>
                     <div className="flex-1 min-w-0">
-                      <div className="font-bold text-[11px]">{m.title}</div>
-                      <div className="text-[11px] text-slate-500">{m.date} {m.time}</div>
+                      <div className="font-bold text-[13px]">{m.title}</div>
+                      <div className="text-[13px] text-slate-500">{m.date} {m.time}</div>
                     </div>
-                    {m.files > 0 && <span className="text-[11px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded font-bold">📎{m.files}</span>}
+                    {m.files > 0 && <span className="text-[13px] bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded font-bold">📎{m.files}</span>}
                   </div>
                 </Link>
               ))}
@@ -320,7 +346,7 @@ export default function ProfilePage() {
 
           {/* 管理中心 */}
           <div>
-            <h3 className="font-bold text-sm mb-2">🔧 管理中心</h3>
+            <h3 className="font-bold text-[15px] mb-2">🔧 管理中心</h3>
             <div className="grid grid-cols-4 gap-2">
               {[
                 { icon: '🏢', label: '支部管理', href: '/dashboard/admin/members' },
@@ -331,7 +357,7 @@ export default function ProfilePage() {
                 <Link key={i} href={item.href} className="no-underline text-inherit">
                   <div className="bg-white rounded-xl border border-slate-200 p-2.5 card-hover text-center">
                     <div className="text-xl mb-1">{item.icon}</div>
-                    <div className="font-bold text-[11px]">{item.label}</div>
+                    <div className="font-bold text-[13px]">{item.label}</div>
                   </div>
                 </Link>
               ))}
@@ -345,7 +371,7 @@ export default function ProfilePage() {
           ═══════════════════════════════════════════════════ */}
       {tab === 'info' && (
         <section className="bg-white rounded-2xl border border-slate-200 p-4 space-y-3">
-          <h3 className="font-bold text-sm">📋 基本資料</h3>
+          <h3 className="font-bold text-[15px]">📋 基本資料</h3>
           <div className="grid grid-cols-2 gap-2">
             {[
               { label: '姓名', value: isLeader ? '陳管理員' : MY_PROFILE.name },
@@ -356,17 +382,17 @@ export default function ProfilePage() {
               { label: '緊急電話', value: MY_PROFILE.emergencyContactPhone },
             ].map((item, i) => (
               <div key={i} className="bg-slate-50 rounded-xl p-2.5">
-                <div className="text-[11px] text-slate-500 font-bold uppercase">{item.label}</div>
-                <div className="text-[11px] font-bold text-slate-800 mt-0.5">{item.value}</div>
+                <div className="text-[13px] text-slate-500 font-bold uppercase">{item.label}</div>
+                <div className="text-[13px] font-bold text-slate-800 mt-0.5">{item.value}</div>
               </div>
             ))}
           </div>
           {!isLeader && !isParent && (
             <div className="border-t border-slate-100 pt-3">
-              <h4 className="text-[11px] font-bold text-slate-500 mb-1.5">👨‍👩‍👧 家長連結</h4>
+              <h4 className="text-[13px] font-bold text-slate-500 mb-1.5">👨‍👩‍👧 家長連結</h4>
               <div className="bg-blue-50 rounded-xl p-2.5 flex items-center justify-between">
-                <div><div className="text-[11px] font-bold">{MY_PROFILE.parentName}</div><div className="text-[11px] text-slate-500">{MY_PROFILE.parentEmail}</div></div>
-                <span className="text-[11px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full font-bold">已連結</span>
+                <div><div className="text-[13px] font-bold">{MY_PROFILE.parentName}</div><div className="text-[13px] text-slate-500">{MY_PROFILE.parentEmail}</div></div>
+                <span className="text-[13px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full font-bold">已連結</span>
               </div>
             </div>
           )}
@@ -377,36 +403,88 @@ export default function ProfilePage() {
           子女資料
           ═══════════════════════════════════════════════════ */}
       {tab === 'children' && isParent && (
-        <section className="space-y-2">
-          {CHILDREN.map(c => (
-            <div key={c.id} className="bg-white rounded-2xl border border-slate-200 p-3">
+        <section className="space-y-3">
+          {children.map(c => (
+            <div key={c.id} className="bg-white rounded-2xl border border-slate-200 p-4">
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2">
-                  <span className="text-lg">🧒</span>
-                  <div><div className="font-bold text-[11px]">{c.name}</div><div className="text-[11px] text-slate-500">{c.branch} · {c.patrol}</div></div>
+                  <span className="text-xl">🧒</span>
+                  <div><div className="font-bold text-base">{c.name}</div><div className="text-[15px] text-slate-500">{c.branch} · {c.patrol} · {c.age} 歲</div></div>
                 </div>
               </div>
+
+              {/* 想考的章：家長可睇子女嘅；幼童軍（b2）可由家長代填 */}
+              <div className="border-t border-slate-100 pt-3 mb-2">
+                <div className="flex items-center justify-between mb-1.5">
+                  <h4 className="font-bold text-[15px] flex items-center gap-1.5 m-0">🎖️ 想考的章</h4>
+                  {c.branchId === 'b2' && (
+                    <span className="text-[13px] bg-violet-100 text-violet-700 px-2 py-0.5 rounded-full font-bold">家長可代填（幼童軍）</span>
+                  )}
+                </div>
+                {c.badges.length === 0 && <p className="text-[15px] text-slate-500 m-0">未有想考的章。</p>}
+                <div className="space-y-1.5">
+                  {c.badges.map((b, i) => (
+                    <div key={i} className="rounded-lg p-2.5 bg-slate-50 border border-slate-100 flex items-center justify-between gap-2">
+                      <div>
+                        <div className="font-bold text-[15px]">{b.name}</div>
+                        {b.note && <div className="text-[15px] text-slate-500">想考：{b.note}</div>}
+                      </div>
+                      {b.read ? (
+                        <span className="text-[13px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded-full font-bold whitespace-nowrap">✓ 領袖已讀</span>
+                      ) : (
+                        <span className="text-[13px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full font-bold whitespace-nowrap">⏳ 待查看</span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+
+                {/* 幼童軍：家長可幫子女填想考的章 */}
+                {c.branchId === 'b2' && (
+                  <div className="mt-2 bg-violet-50 border border-violet-100 rounded-xl p-2.5 space-y-2">
+                    {badgeChildId === c.id ? (
+                      <>
+                        <input className="w-full rounded-lg border border-slate-300 px-3 py-2 text-[15px]" placeholder="章名（例如 幼童軍天象章）" value={badgeName} onChange={e => setBadgeName(e.target.value)} />
+                        <input className="w-full rounded-lg border border-slate-300 px-3 py-2 text-[15px]" placeholder="備註（例如 想學觀星）" value={badgeNote} onChange={e => setBadgeNote(e.target.value)} />
+                        <div className="flex gap-2">
+                          <button className="flex-1 bg-brand-600 text-white text-[15px] font-bold py-2 rounded-lg" onClick={() => addChildBadge(c.id)}>＋ 加入</button>
+                          <button className="bg-white text-slate-600 text-[15px] font-bold px-3 py-2 rounded-lg border border-slate-200" onClick={() => { setBadgeChildId(''); setBadgeName(''); setBadgeNote(''); }}>取消</button>
+                        </div>
+                      </>
+                    ) : (
+                      <button className="w-full bg-brand-600 text-white text-[15px] font-bold py-2 rounded-lg" onClick={() => { setBadgeChildId(c.id); setBadgeName(''); setBadgeNote(''); }}>
+                        ＋ 幫 {c.name} 填想考的章
+                      </button>
+                    )}
+                  </div>
+                )}
+                {c.branchId !== 'b2' && (
+                  <p className="text-[13px] text-slate-500 m-0 mt-1.5">此子女可喺自己帳戶填寫想考的章。</p>
+                )}
+              </div>
+
               <div className="space-y-1 border-t border-slate-100 pt-2">
-                <div className="flex items-center justify-between bg-slate-50 rounded-lg px-2.5 py-1.5">
-                  <span className="text-[11px]">旅團露營 (9月20日)</span>
+                <div className="flex items-center justify-between bg-slate-50 rounded-lg px-2.5 py-2">
+                  <span className="text-[15px]">旅團露營 (9月20日)</span>
                   <div className="flex gap-1">
-                    <span className="text-[11px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded font-bold">✅</span>
-                    <span className="text-[11px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded font-bold">💰 已核實</span>
+                    <span className="text-[13px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded font-bold">✅</span>
+                    <span className="text-[13px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded font-bold">💰 已核實</span>
                   </div>
                 </div>
-                <div className="flex items-center justify-between bg-slate-50 rounded-lg px-2.5 py-1.5">
-                  <span className="text-[11px]">區運會 (10月5日)</span>
+                <div className="flex items-center justify-between bg-slate-50 rounded-lg px-2.5 py-2">
+                  <span className="text-[15px]">區運會 (10月5日)</span>
                   <div className="flex gap-1">
-                    <span className="text-[11px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded font-bold">✅</span>
-                    <span className="text-[11px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-bold">💰 待核實</span>
+                    <span className="text-[13px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded font-bold">✅</span>
+                    <span className="text-[13px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-bold">💰 待核實</span>
                   </div>
                 </div>
               </div>
-              {/* 家長快捷回覆 */}
-              <div className="flex gap-1.5 mt-2">
-                <button className="flex-1 text-[11px] font-bold py-1.5 rounded-lg bg-emerald-700 text-white">✅ 確認參加</button>
-                <button className="flex-1 text-[11px] font-bold py-1.5 rounded-lg bg-rose-100 text-rose-700">❌ 不參加</button>
+              {/* 家長快捷回覆 —— 有興趣／參加／不參加；參加才需 tick 已付款 */}
+              <div className="flex gap-1.5 mt-2 flex-wrap">
+                <button className="text-[15px] font-bold py-2 px-3 rounded-lg bg-amber-100 text-amber-700">❤️ 有興趣</button>
+                <button className="text-[15px] font-bold py-2 px-3 rounded-lg bg-emerald-700 text-white">✅ 參加</button>
+                <button className="text-[15px] font-bold py-2 px-3 rounded-lg bg-rose-100 text-rose-700">❌ 不參加</button>
               </div>
+              <p className="text-[13px] text-slate-500 m-0 mt-1.5">ℹ️ 家長不用簽署：用家長帳戶登入報名＝已簽署。選「不參加」不用 tick 付款。</p>
             </div>
           ))}
         </section>
@@ -415,25 +493,25 @@ export default function ProfilePage() {
       {/* ═══════════════════════════════════════════════════
           想考的章
           ═══════════════════════════════════════════════════ */}
-      {tab === 'badges' && !isLeader && (
+      {tab === 'badges' && isMember && (
         <section className="bg-white rounded-2xl border border-slate-200 p-4 space-y-3">
           <div className="flex items-center justify-between">
-            <h3 className="font-bold text-sm">🎖️ 想考的章</h3>
-            <button className="bg-brand-600 text-white text-[11px] font-bold px-3 py-1.5 rounded-lg">+ 新增</button>
+            <h3 className="font-bold text-[15px]">🎖️ 想考的章</h3>
+            <button className="bg-brand-600 text-white text-[13px] font-bold px-3 py-1.5 rounded-lg">+ 新增</button>
           </div>
-          <p className="text-[11px] text-slate-500">填寫你想考的獎章，領袖看到後會標記「已讀」。</p>
+          <p className="text-[13px] text-slate-500">填寫你想考的獎章，領袖看到後會標記「已讀」。</p>
           <div className="space-y-2">
             {MY_BADGES.map((b, i) => (
               <div key={i} className="rounded-xl p-3 bg-slate-50 border border-slate-100">
                 <div className="flex items-center justify-between mb-1">
-                  <span className="font-bold text-[11px]">{b.name}</span>
+                  <span className="font-bold text-[13px]">{b.name}</span>
                   {b.read ? (
-                    <span className="text-[11px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded-full font-bold">✓ 領袖已讀</span>
+                    <span className="text-[13px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded-full font-bold">✓ 領袖已讀</span>
                   ) : (
-                    <span className="text-[11px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full font-bold">⏳ 待查看</span>
+                    <span className="text-[13px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full font-bold">⏳ 待查看</span>
                   )}
                 </div>
-                <div className="text-[11px] text-slate-500">我想考：{b.note}</div>
+                <div className="text-[13px] text-slate-500">我想考：{b.note}</div>
               </div>
             ))}
           </div>
@@ -443,16 +521,16 @@ export default function ProfilePage() {
       {/* ═══════════════════════════════════════════════════
           物資借用
           ═══════════════════════════════════════════════════ */}
-      {tab === 'supplies' && !isLeader && (
+      {tab === 'supplies' && isMember && (
         <section className="bg-white rounded-2xl border border-slate-200 p-4 space-y-3">
           <div className="flex items-center justify-between">
-            <h3 className="font-bold text-sm">📦 物資借用</h3>
-            <button className="bg-brand-600 text-white text-[11px] font-bold px-3 py-1.5 rounded-lg">申請借用</button>
+            <h3 className="font-bold text-[15px]">📦 物資借用</h3>
+            <button className="bg-brand-600 text-white text-[13px] font-bold px-3 py-1.5 rounded-lg">申請借用</button>
           </div>
           {SUPPLIES.map(s => (
             <div key={s.id} className={`rounded-xl p-3 flex items-center justify-between ${s.status === 'borrowed' ? 'bg-amber-50 border border-amber-200' : 'bg-slate-50'}`}>
-              <div><div className="text-[11px] font-bold">{s.name}</div><div className="text-[11px] text-slate-500">{s.borrowDate} → {s.returnDate}</div></div>
-              <span className={`text-[11px] px-2 py-0.5 rounded-full font-bold ${s.status === 'borrowed' ? 'bg-amber-100 text-amber-700' : 'bg-slate-200 text-slate-500'}`}>
+              <div><div className="text-[13px] font-bold">{s.name}</div><div className="text-[13px] text-slate-500">{s.borrowDate} → {s.returnDate}</div></div>
+              <span className={`text-[13px] px-2 py-0.5 rounded-full font-bold ${s.status === 'borrowed' ? 'bg-amber-100 text-amber-700' : 'bg-slate-200 text-slate-500'}`}>
                 {s.status === 'borrowed' ? '借用中' : '已歸還'}
               </span>
             </div>
@@ -465,12 +543,12 @@ export default function ProfilePage() {
           ═══════════════════════════════════════════════════ */}
       {tab === 'password' && (
         <section className="bg-white rounded-2xl border border-slate-200 p-4 space-y-3">
-          <h3 className="font-bold text-sm">🔑 更改密碼</h3>
+          <h3 className="font-bold text-[15px]">🔑 更改密碼</h3>
           <div className="space-y-2.5">
-            <div><label className="text-[11px] font-bold text-slate-500 uppercase">目前密碼</label><input type="password" className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm" /></div>
-            <div><label className="text-[11px] font-bold text-slate-500 uppercase">新密碼</label><input type="password" className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm" /></div>
-            <div><label className="text-[11px] font-bold text-slate-500 uppercase">確認新密碼</label><input type="password" className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm" /></div>
-            <button className="w-full bg-brand-600 text-white py-2.5 rounded-xl text-sm font-bold">更新密碼</button>
+            <div><label className="text-[13px] font-bold text-slate-500 uppercase">目前密碼</label><input type="password" className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-[15px]" /></div>
+            <div><label className="text-[13px] font-bold text-slate-500 uppercase">新密碼</label><input type="password" className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-[15px]" /></div>
+            <div><label className="text-[13px] font-bold text-slate-500 uppercase">確認新密碼</label><input type="password" className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-[15px]" /></div>
+            <button className="w-full bg-brand-600 text-white py-2.5 rounded-xl text-[15px] font-bold">更新密碼</button>
           </div>
         </section>
       )}
