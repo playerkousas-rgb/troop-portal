@@ -56,8 +56,39 @@ export default function CalendarPage() {
 
   const isLeader = ['admin', 'group_leader', 'branch_leader', 'coach'].includes(role);
 
+  const [exportOpen, setExportOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
+
   const year = month.getFullYear();
   const mo = month.getMonth();
+
+  /* ── 匯出 / 同步 Google 日曆（對照用戶問題 #10）── */
+  // 真實版會提供「訂閱網址（ICS）」：成員喺 Google 日曆「其他日曆 → 從網址新增」貼上即可自動同步；
+  // MOCK 版先用 UI 展示呢個能力（ICS 內容由前端即時生成）。
+  function icsHref() {
+    const lines = [
+      'BEGIN:VCALENDAR',
+      'VERSION:2.0',
+      'PRODID:-//ScoutSystem//TW//',
+      ...events.map(e => [
+        'BEGIN:VEVENT',
+        `UID:${e.id}@scout-system.demo`,
+        `DTSTART;VALUE=DATE:${e.date.replace(/-/g, '')}`,
+        `SUMMARY:${e.title} (${e.branch})`,
+        `LOCATION:${e.location || ''}`,
+        'END:VEVENT',
+      ].join('\n')),
+      'END:VCALENDAR',
+    ].join('\n');
+    return `data:text/calendar;charset=utf-8,${encodeURIComponent(lines)}`;
+  }
+
+  function copySubscribe() {
+    const sub = 'https://troop-router.vercel.app/api/calendar.ics?u=0082&role=' + role;
+    if (navigator.clipboard) navigator.clipboard.writeText(sub).catch(() => {});
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1800);
+  }
   const monthNames = ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'];
 
   /* ── 恆常集會展開成每一日 ── */
@@ -222,6 +253,39 @@ export default function CalendarPage() {
       </div>
 
       {msg && <div className="text-[11px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-xl px-3 py-2">{msg}</div>}
+
+      {/* 匯出 / 同步到 Gmail／Google 日曆（對照用戶問題 #10） */}
+      <section className="bg-white rounded-2xl border border-slate-200 p-4 space-y-2.5">
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <h3 className="font-bold text-sm m-0 flex items-center gap-2">
+            <span className="w-6 h-6 bg-red-600 text-white rounded-lg flex items-center justify-center text-[11px]">📤</span>
+            匯出／同步去你嘅 Gmail／Google 日曆
+          </h3>
+          <button onClick={() => setExportOpen(!exportOpen)} className="text-[11px] font-bold text-brand-700 bg-brand-50 border border-brand-200 rounded-lg px-3 py-1.5">
+            {exportOpen ? '▲ 收起' : '▼ 點開睇做法'}
+          </button>
+        </div>
+        {exportOpen && (
+          <div className="space-y-2.5 text-[11px] text-slate-600 leading-relaxed">
+            <p className="m-0">
+              將旅團行事曆加到你自己嘅 <strong>Google 日曆／Gmail</strong>，手機電腦都會自動同步更新，唔使次次開 APP。
+            </p>
+            <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-3 space-y-2">
+              <div className="font-bold text-slate-700">方法一：訂閱（推薦，自動同步）</div>
+              <p className="m-0">複製下面訂閱網址 → 喺 Google 日曆左邊「其他日曆」→「從網址新增」貼上，就永久同步。</p>
+              <div className="flex gap-2">
+                <input readOnly value={`https://troop-router.vercel.app/api/calendar.ics?u=0082&role=${role}`} className="flex-1 rounded-lg border border-slate-200 px-2 py-1.5 text-xs bg-white" />
+                <button onClick={copySubscribe} className="text-[11px] font-bold bg-brand-600 text-white px-3 py-1.5 rounded-lg">{copied ? '✅ 已複製' : '📋 複製'}</button>
+              </div>
+            </div>
+            <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-3 space-y-2">
+              <div className="font-bold text-slate-700">方法二：下載 .ics 檔再匯入</div>
+              <p className="m-0">下載之後，喺 Google 日曆「匯入」選返呢個檔，一次性加入。</p>
+              <a href={icsHref()} download="scout-calendar.ics" className="inline-block text-[11px] font-bold bg-slate-700 text-white px-3 py-1.5 rounded-lg">⬇️ 下載 .ics</a>
+            </div>
+          </div>
+        )}
+      </section>
 
       {/* 分類標籤篩選 */}
       <div className="flex gap-1 overflow-x-auto pb-1 -mx-1 px-1">

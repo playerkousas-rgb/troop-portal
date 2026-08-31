@@ -25,9 +25,14 @@ export default function TopNav() {
   }, [pathname]);
 
   const admin = isAdmin(user?.role as Role);
-  // 首頁（登入旅團頁）同 /login 本身都係登入頁：
-  // 頂欄只顯示 Scout System，右邊唔顯示登入／帳戶選單（成頁都係登入，再放登入鈕好怪）
-  const isLanding = pathname === '/' || pathname === '/login' || pathname === '/dashboard/login';
+  // 首頁（登入旅團頁）、/login 本身，以及「新旅團申請及教學」（/setup、/onboard）都唔需要登入鈕：
+  // 1) 成頁都係登入，再放登入鈕好怪；2) 「我要申請，點會要我登入？」
+  const hideAuth =
+    pathname === '/' ||
+    pathname === '/login' ||
+    pathname === '/dashboard/login' ||
+    pathname === '/setup' ||
+    pathname === '/onboard';
 
   // 已登入 → 回到該角色的真實控制台（不是 /dashboard 的 mock 展示樹）
   const home =
@@ -62,15 +67,15 @@ export default function TopNav() {
               </>
             ) : (
               <>
-                <div className="font-bold text-xs text-scout-blue truncate">{isLanding ? 'Scout System' : troop?.name || '旅團管理系統'}</div>
-                {!isLanding && <div className="text-[11px] text-slate-500 font-semibold">2026 Scout System</div>}
+                <div className="font-bold text-xs text-scout-blue truncate">{hideAuth ? 'Scout System' : troop?.name || '旅團管理系統'}</div>
+                {!hideAuth && <div className="text-[11px] text-slate-500 font-semibold">2026 Scout System</div>}
               </>
             )}
           </div>
         </Link>
 
-        {/* 右：操作（首頁隱藏） */}
-        {!isLanding && (
+        {/* 右：操作（首頁／申請頁隱藏） */}
+        {!hideAuth && (
         <div className="flex items-center gap-1 flex-shrink-0">
           {admin && (
             <>

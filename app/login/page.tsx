@@ -223,9 +223,7 @@ export default function Login() {
         <p className="text-[12px] text-slate-600 m-0">
           未有帳號？<Link href="/apply" className="font-bold text-brand-700 underline underline-offset-2">申請加入</Link>
         </p>
-        <p className="text-[12px] text-slate-500 m-0">
-          唔想開帳戶？<Link href="/calendar" className="font-bold text-slate-700 underline underline-offset-2">👀 只睇公開行事曆／公告／活動</Link>
-        </p>
+        {/* 「只睇公開資料」已移除：唔登入都睇到公開行事曆／公告／活動，唔使特登開連結 */}
       </div>
 
       {/* ── 進階／除錯（後期功能，收合） ── */}

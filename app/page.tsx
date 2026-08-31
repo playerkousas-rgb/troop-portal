@@ -58,14 +58,6 @@ export default function HomePage() {
     setMsg('已退出演示模式');
   }
 
-  /** 唔想開帳戶，只睇公開資料：唔建 session，直接去公開行事曆 */
-  function browsePublic() {
-    let t: any = null;
-    try { t = JSON.parse(localStorage.getItem(TROOP_KEY) || 'null'); } catch {}
-    if (!t?.key) { setMsg('請先撳一個旅團，再撳「只睇公開資料」。'); return; }
-    router.push('/calendar');
-  }
-
   function logoutAndStay() {
     clearSession();
     setResume(null);
@@ -173,22 +165,12 @@ export default function HomePage() {
           ))}
         </div>
 
-        <div className="mt-3 pt-3 border-t border-slate-100">
-          <button
-            type="button"
-            onClick={browsePublic}
-            className="text-[11px] font-bold text-slate-600 bg-slate-100 border-0 rounded-lg px-3 py-2 cursor-pointer hover:bg-slate-200 transition"
-          >
-            👀 只睇公開資料（唔使開帳戶）
-          </button>
-          <p className="text-[11px] text-slate-400 mt-1.5 m-0 leading-relaxed">
-            揀咗旅團之後，可以直接睇公開行事曆／公告／活動，唔使登入。
-          </p>
-        </div>
-
+        {/* 公開內容（行事曆／公告／活動）唔使登入已經喺底部「選擇旅團」後可見，
+            所以唔再放「只睇公開資料」按鈕；旅團管理員可以喺「系統設定」關閉公開瀏覽。 */}
         {msg && <p className="mt-3 text-[12px] text-slate-500 font-bold m-0">{msg}</p>}
         <p className="mt-3 text-[11px] text-slate-500 m-0">
-          💡 看不到你的旅團？代表尚未開通，請用右上角「新旅團申請及教學」。
+          💡 揀咗旅團之後，公開行事曆／公告／活動唔使登入都可以睇（旅團可自行選擇關閉）。
+          看不到你的旅團？代表尚未開通，請用右上角「新旅團申請及教學」。
         </p>
       </section>
     </div>

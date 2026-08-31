@@ -38,6 +38,7 @@ type Act = {
   quota: number;                // 名額（0＝無限）
   registered: number;
   myStatus: 'registered' | 'interested' | 'unresponded';
+  expired?: boolean;            // 過期區：唔刪除，保留集合時間地點俾已報名嘅人睇
 };
 
 const SEED: Act[] = [
@@ -75,6 +76,14 @@ const SEED: Act[] = [
     notices: [{ label: '區會通告及報名表（連結）', kind: 'link', url: 'https://www.scout.org.hk/demo-swim' }],
     registerWay: 'leader', quota: 0, registered: 0, myStatus: 'interested',
   },
+  // 過期區示例：活動過咗期 → 移入過期區，唔刪除（已報名嘅成員／家長仍然睇到集合時間地點）
+  {
+    id: 'a9', title: '8月旅團集會（已過期）', kind: 'internal', date: '2026-08-24', deadline: '2026-08-20',
+    location: '旅團部', branch: '全旅', fee: '',
+    summary: '常規集會。已結束，留存作紀錄。',
+    notices: [{ label: '集會通告', kind: 'inline', body: '集合：8月24日 19:00 旅團部\n解散：21:00\n當日內容：小隊會議 + 團務' }],
+    registerWay: 'app', quota: 0, registered: 15, myStatus: 'registered', expired: true,
+  },
 ];
 
 const BRANCHES = ['全旅', '小童軍', '幼童軍', '童軍', '深資', '樂行', '領袖'];
@@ -94,9 +103,12 @@ export default function ActivitiesPage() {
   const [msg, setMsg] = useState('');
   const [noticeDraft, setNoticeDraft] = useState<NoticeLink>({ label: '', kind: 'link', url: '', body: '' });
   const [preview, setPreview] = useState<string | null>(null);
+  // 新增：追蹤通告來源方法
+  const [noticeSourcingMethod, setNoticeSourcingMethod] = useState<'link' | 'inline' | 'import_troop' | 'import_district'>('link');
 
   const isLeader = ['admin', 'group_leader', 'branch_leader', 'coach'].includes(role);
-  const list = filter === 'all' ? items : items.filter(a => a.kind === filter);
+  const activeList = (filter === 'all' ? items : items.filter(a => a.kind === filter)).filter(a => !a.expired);
+  const expiredList = items.filter(a => a.expired);
   const current = detail ? items.find(a => a.id === detail) || null : null;
   // 開另一張活動詳情時，重設通告預覽選擇
 
@@ -134,33 +146,60 @@ export default function ActivitiesPage() {
   function del(id: string) {
     const a = items.find(x => x.id === id);
     if (!a) return;
-    // 防呆：刪除前確認
-    if (!window.confirm(`確定刪除「${a.title}」？${a.kind === 'internal' ? '行事曆上嘅呢個活動都會一併移除。' : ''}`)) return;
+    // 防呆：刪除前確認（刪除後已報名嘅人會睇唔到集合資料）
+    if (!window.confirm(`確定永久刪除「${a.title}」？已報名嘅成員／家長之後就睇唔到集合時間地點，建議改用「移入過期區」。${a.kind === 'internal' ? '行事曆上嘅呢個活動都會一併移除。' : ''}`)) return;
     setItems(prev => prev.filter(x => x.id !== id));
     setDetail(null);
-    setMsg(`🗑 已刪除「${a.title}」`);
+    setMsg(`🗑 已永久刪除「${a.title}」`);
+  }
+
+  /** 移入過期區：唔刪除，保留集合資料俾已報名嘅人睇（對照用戶要求 #13） */
+  function moveToExpired(id: string) {
+    const a = items.find(x => x.id === id);
+    if (!a) return;
+    setItems(prev => prev.map(x => x.id === id ? { ...x, expired: true } : x));
+    setDetail(null);
+    setMsg(`⏰ 已將「${a.title}」移入過期區（已報名者仍可查看集合時間／地點）`);
+  }
+
+  function restoreFromExpired(id: string) {
+    const a = items.find(x => x.id === id);
+    if (!a) return;
+    setItems(prev => prev.map(x => x.id === id ? { ...x, expired: false } : x));
+    setMsg(`↺ 已恢復「${a.title}」到進行中列表`);
   }
 
   function addNotice() {
     if (!form) return;
     if (!noticeDraft.label.trim()) { setFormErr('請填寫通告名稱（例如「露營通告」）。'); return; }
-    if (noticeDraft.kind === 'link') {
-      // 防呆：連結要係網址
+    // 根據 noticeSourcingMethod 來決定儲存哪種類型的通告
+    if (noticeSourcingMethod === 'link') {
       if (!/^https?:\/\/.+/.test((noticeDraft.url || '').trim())) { setFormErr('請貼上完整連結（要 http:// 或 https:// 開頭）。'); return; }
-    } else {
-      // 防呆：APP 內建內容唔可以空白
+      setForm({
+        ...form,
+        notices: [...form.notices, {
+          label: noticeDraft.label.trim(),
+          kind: 'link',
+          url: noticeDraft.url!.trim(),
+        }],
+      });
+    } else if (noticeSourcingMethod === 'inline') {
       if (!(noticeDraft.body || '').trim()) { setFormErr('請輸入通告內容。'); return; }
+      setForm({
+        ...form,
+        notices: [...form.notices, {
+          label: noticeDraft.label.trim(),
+          kind: 'inline',
+          body: noticeDraft.body!.trim(),
+        }],
+      });
+    } else {
+      // 匯入方法：目前僅為佔位符，不實際儲存通告內容
+      setFormErr('匯入圖書館功能尚未實裝，請改用其他方法新增通告。');
+      return;
     }
-    setForm({
-      ...form,
-      notices: [...form.notices, {
-        label: noticeDraft.label.trim(),
-        kind: noticeDraft.kind,
-        url: noticeDraft.kind === 'link' ? (noticeDraft.url || '').trim() : undefined,
-        body: noticeDraft.kind === 'inline' ? (noticeDraft.body || '').trim() : undefined,
-      }],
-    });
-    setNoticeDraft({ label: '', kind: noticeDraft.kind, url: '', body: '' });
+    setNoticeDraft({ label: '', kind: 'link', url: '', body: '' }); // Reset draft, default to 'link'
+    setNoticeSourcingMethod('link'); // Reset to default method
     setFormErr('');
   }
 
@@ -221,8 +260,8 @@ export default function ActivitiesPage() {
 
       {/* 列表（每一張都可以撳入去睇詳情） */}
       <div className="space-y-2">
-        {list.length === 0 && <p className="text-center text-sm text-slate-500 py-8">暫無活動</p>}
-        {list.map(a => (
+        {activeList.length === 0 && <p className="text-center text-sm text-slate-500 py-8">暫無活動</p>}
+        {activeList.map(a => (
           <div key={a.id} className="bg-white rounded-2xl border border-slate-200 p-3.5 card-hover">
             <button onClick={() => { setDetail(a.id); setPreview(null); }} className="w-full text-left bg-transparent border-0 p-0 cursor-pointer">
               <div className="flex items-center gap-1.5 flex-wrap">{kindBadge(a.kind)}<span className="font-bold text-[13px]">{a.title}</span></div>
@@ -243,12 +282,54 @@ export default function ActivitiesPage() {
             {isLeader && (
               <div className="flex gap-1 justify-end mt-1.5">
                 <button onClick={() => openEdit(a.id)} className="text-[11px] text-slate-600 px-1.5 py-0.5 rounded hover:bg-slate-100" title="編輯">✏️ 編輯</button>
+                <button onClick={() => moveToExpired(a.id)} className="text-[11px] text-amber-700 px-1.5 py-0.5 rounded hover:bg-amber-50" title="移入過期區">⏰ 移入過期區</button>
                 <button onClick={() => del(a.id)} className="text-[11px] text-rose-600 px-1.5 py-0.5 rounded hover:bg-rose-50" title="刪除">🗑 刪除</button>
               </div>
             )}
           </div>
         ))}
       </div>
+
+      {/* ═════ 過期區（已過期嘅活動移到呢度，唔刪除，已報名嘅成員／家長仍然睇到集合資料） ═════ */}
+      {expiredList.length > 0 && (
+        <section className="rounded-2xl border border-dashed border-slate-300 bg-slate-50/60 p-3.5 space-y-2">
+          <div className="flex items-center justify-between">
+            <h3 className="font-bold text-sm m-0 flex items-center gap-2">
+              <span className="w-6 h-6 bg-slate-400 text-white rounded-lg flex items-center justify-center text-[11px]">⏰</span>
+              過期區（{expiredList.length}）
+            </h3>
+            <span className="text-[11px] text-slate-500">已過期嘅通告唔刪除，已報名者仍可睇集合時間／地點</span>
+          </div>
+          <div className="space-y-2">
+            {expiredList.map(a => (
+              <div key={a.id} className="bg-white rounded-xl border border-slate-200 p-3 card-hover">
+                <button onClick={() => { setDetail(a.id); setPreview(null); }} className="w-full text-left bg-transparent border-0 p-0 cursor-pointer">
+                  <div className="flex items-center gap-1.5 flex-wrap">{kindBadge(a.kind)}<span className="font-bold text-[13px]">{a.title}</span>
+                    {a.expired && <span className="text-[11px] bg-slate-200 text-slate-600 px-1.5 py-0.5 rounded font-bold">已過期</span>}
+                  </div>
+                  <div className="text-[11px] text-slate-500 mt-1">{a.date} · {a.location || '待定'} · {a.branch}</div>
+                  {a.myStatus === 'registered' && <span className="inline-block mt-1.5 text-[11px] px-1.5 py-0.5 rounded font-bold bg-emerald-100 text-emerald-700">✅ 你已報名（仍可睇集合資料）</span>}
+                </button>
+                {isLeader && (
+                  <div className="flex gap-1 justify-end mt-1.5">
+                    {a.expired ? ( // Conditional rendering for expired items
+                      <>
+                        <button onClick={() => restoreFromExpired(a.id)} className="text-[11px] text-slate-600 px-1.5 py-0.5 rounded hover:bg-slate-100" title="恢復">↺ 恢復</button>
+                        <button onClick={() => del(a.id)} className="text-[11px] text-rose-600 px-1.5 py-0.5 rounded hover:bg-rose-50" title="刪除">🗑 永久刪除</button>
+                      </>
+                    ) : (
+                      <>
+                        <button onClick={() => moveToExpired(a.id)} className="text-[11px] text-amber-700 px-1.5 py-0.5 rounded hover:bg-amber-50" title="移入過期區">⏰ 移入過期區</button>
+                        <button onClick={() => del(a.id)} className="text-[11px] text-rose-600 px-1.5 py-0.5 rounded hover:bg-rose-50" title="刪除">🗑 刪除</button>
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* ═════ 詳情（點入去睇） ═════ */}
       {current && (

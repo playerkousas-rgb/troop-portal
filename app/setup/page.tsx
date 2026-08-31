@@ -2,6 +2,8 @@ import Link from 'next/link';
 
 // 新旅團申請及教學：GS 模組下載直接做咗流程入面嘅一步（第 2 步），
 // 唔再另外搞「必要下載」卡，亦唔放其他模板（其他模板之後放喺公告／行事曆頁）。
+// 步驟順序（對照用戶反饋）：先 RUN SETUP 攞到 API Key → 部署 → 填 FORM 提交申請，
+// 最後先喺 Sheet 設定管理員（唔使佢設好晒先嚟搵 API Key 填申請表）。
 const STEPS: { icon: string; title: string; desc: string; download?: { label: string; href: string } }[] = [
   { icon: '1️⃣', title: '建立 Google Sheet', desc: '開一個全新嘅空白 Google Sheet（建議用旅團專用 Google 帳號）。' },
   {
@@ -10,10 +12,10 @@ const STEPS: { icon: string; title: string; desc: string; download?: { label: st
     desc: '撳下面下載 GS 模組 → 打開 Sheet 的「擴充功能 → Apps Script」→ 刪除預設內容 → 全選貼上 → 儲存。',
     download: { label: '⬇️ 下載 GS 模組（必要）', href: '/downloads/SCOUTSYSTEM_2_SETUP.gs.txt' },
   },
-  { icon: '3️⃣', title: '執行 Setup', desc: '喺 Apps Script 選 setup 再執行；彈窗會顯示 API Key，只顯示一次，立即複製！' },
-  { icon: '4️⃣', title: '填寫旅團資料', desc: '喺 SystemConfig 填旅團號（如 0082）、旅團名稱、第一位管理員 Email。' },
-  { icon: '5️⃣', title: '部署 Web App', desc: 'Deploy → New deployment → Web app；「誰可以存取」揀「任何人」，複製 /exec 網址。' },
-  { icon: '6️⃣', title: '提交申請', desc: '喺「申請接入」頁填入 /exec 網址同 API Key，等平台管理員審核開通。' },
+  { icon: '3️⃣', title: '執行 Setup 並複製 API Key', desc: '喺 Apps Script 選 setup 再執行；彈窗會顯示 API Key，只顯示一次，立即複製！（之後填申請表會用到）' },
+  { icon: '4️⃣', title: '部署 Web App', desc: 'Deploy → New deployment → Web app；「誰可以存取」揀「任何人」，複製 /exec 網址。' },
+  { icon: '5️⃣', title: '填寫申請（提交 FORM）', desc: '喺「申請接入」頁填入旅團號、旅團名稱、/exec 網址同 API Key（第 3 步複製嘅），提交後等平台管理員審核開通。' },
+  { icon: '6️⃣', title: '開通後，先喺 Sheet 設定管理員', desc: '等管理員開通後，先返去 Sheet 填 SystemConfig（旅團號／名稱／管理員 Email）、Members，再用「重新建立管理員帳號」生成登入密碼。唔使喺提交申請前就設定晒。' },
 ];
 
 export default function Setup() {
@@ -29,7 +31,7 @@ export default function Setup() {
         <div className="text-4xl mb-1" aria-hidden>📖</div>
         <h1 className="text-2xl font-black text-brand-700 leading-tight m-0">新旅團申請及教學</h1>
         <p className="text-[12px] text-slate-500 mt-2 mb-0 leading-relaxed">
-          6 步完成接入。所需 GS 模組喺第 2 步直接下載，唔使跳出嚟搵；最後一步提交申請，等管理員開通即可使用。
+          6 步完成接入。所需 GS 模組喺第 2 步直接下載，唔使跳出嚟搵；第 3 步執行 Setup 後複製 API Key，第 5 步填申請表就會用到。設定管理員留到最後（第 6 步）。
         </p>
         <Link href="/onboard" className="inline-flex items-center justify-center gap-2 bg-brand-600 text-white font-bold text-sm px-5 py-2.5 rounded-xl no-underline hover:bg-brand-700 transition mt-3">
           開始接入 →
@@ -65,7 +67,7 @@ export default function Setup() {
         ))}
 
         <p className="text-[11px] text-slate-500 m-0 leading-relaxed">
-          ✅ 等管理員開通後 → 回首頁選擇旅團 → 用管理員 Email ＋初始密碼登入 → 即時改密碼 → 完成。
+          ✅ 等管理員開通後 → 先喺 Sheet 設定管理員（SystemConfig + Members + 重新建立管理員帳號）→ 回首頁選擇旅團 → 用管理員 Email ＋初始密碼登入 → 即時改密碼 → 完成。
         </p>
       </section>
 

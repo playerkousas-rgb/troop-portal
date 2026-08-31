@@ -78,13 +78,13 @@ export default function Onboard(){
       </>
     },
     {
-      title: '第 3 步：執行 Setup',
+      title: '第 3 步：執行 Setup 並複製 API Key',
       content: <>
         <ol className="muted">
           <li>在 Apps Script 上方下拉選 <code>setupScoutSystem</code></li>
           <li>按「執行」</li>
           <li>第一次會問你授權 → 按允許</li>
-          <li>⚠️ <strong>彈窗會顯示 API Key — 只顯示一次！雙擊 key 複製，不要多帶任何字元！</strong></li>
+          <li>⚠️ <strong>彈窗會顯示 API Key — 只顯示一次！雙擊 key 複製，不要多帶任何字元！</strong>（第 5 步填申請表會用到）</li>
         </ol>
         <div className="row">
           <button className="btn" onClick={()=>setStep(1)}>← 上一步</button>
@@ -93,21 +93,7 @@ export default function Onboard(){
       </>
     },
     {
-      title: '第 4 步：填寫旅團資料',
-      content: <>
-        <ul className="muted">
-          <li>到黃色 <strong>SystemConfig</strong> 填 TROOP_CODE、TROOP_NAME、ADMIN_EMAIL</li>
-          <li>到藍色 <strong>Members</strong> 輸入成員（ymNumber 必須 10 位數字）</li>
-          <li>上方選單 → 2026 Scout System → 重新建立管理員帳號</li>
-        </ul>
-        <div className="row">
-          <button className="btn" onClick={()=>setStep(2)}>← 上一步</button>
-          <button className="btn primary" onClick={()=>setStep(4)}>下一步 →</button>
-        </div>
-      </>
-    },
-    {
-      title: '第 5 步：部署 Web App',
+      title: '第 4 步：部署 Web App',
       content: <>
         <ol className="muted">
           <li>在 Apps Script 右上方 → 部署 → 新增部署作業</li>
@@ -117,22 +103,22 @@ export default function Onboard(){
           <li>按「部署」→ 複製 <strong>/exec 網址</strong></li>
         </ol>
         <div className="row">
-          <button className="btn" onClick={()=>setStep(3)}>← 上一步</button>
-          <button className="btn primary" onClick={()=>setStep(5)}>下一步：傳送接入資料 →</button>
+          <button className="btn" onClick={()=>setStep(2)}>← 上一步</button>
+          <button className="btn primary" onClick={()=>setStep(4)}>下一步：填申請表 →</button>
         </div>
       </>
     },
     {
-      title: '第 6 步：傳送接入資料',
+      title: '第 5 步：填寫申請（提交 FORM）',
       content: <>
-        <p className="muted">填入以下資料後按「📧 傳送接入資料」，資料會直接提交到平台管理員的審核系統（由管理員後台記錄並通知管理員）。<strong>不會從你的 Google 帳號寄出任何信件</strong>，管理員開通後你就可以在首頁選擇旅團登入。</p>
+        <p className="muted">填入以下資料後按「📧 傳送接入資料」，資料會直接提交到平台管理員的審核系統（由管理員後台記錄並通知管理員）。<strong>不會從你的 Google 帳號寄出任何信件</strong>。提交後先唔好急住設定管理員——等開通咗先做（第 6 步）。</p>
         <label>旅團名稱<input placeholder="第82旅" value={name} onChange={e=>setName(e.target.value)}/></label>
         <label>旅團號<input placeholder="0082" value={id} onChange={e=>setId(e.target.value)}/></label>
-        <label>聯絡人 Email（選填，預設用你的 Google 帳號寄出）<input placeholder="admin@example.com" value={email} onChange={e=>setEmail(e.target.value)}/></label>
+        <label>聯絡人 Email（選填）<input placeholder="admin@example.com" value={email} onChange={e=>setEmail(e.target.value)}/></label>
         <label>Apps Script /exec 網址<input placeholder="https://script.google.com/macros/s/.../exec" value={webAppUrl} onChange={e=>setWebAppUrl(e.target.value)}/></label>
         <label>API Key<input placeholder="ak_xxxxxxxx（setup 彈窗顯示的 Key）" value={apiKey} onChange={e=>setApiKey(e.target.value)}/></label>
         <p className="muted" style={{fontSize:13}}>
-          💡 API Key 在 setup 彈窗只顯示一次，雙擊 key 複製最保險。忘記了？到 Sheet 選單 → 2026 Scout System → 重新生成 API Key。
+          💡 API Key 喺第 3 步 setup 彈窗只顯示一次，雙擊 key 複製最保險。忘記咗？到 Sheet 選單 → 2026 Scout System → 重新生成 API Key，再填返呢度。
         </p>
         <label>備註<textarea rows={2} placeholder="（選填）" value={note} onChange={e=>setNote(e.target.value)}/></label>
         <button className={`btn primary${canSubmit?'':' disabled'}`}
@@ -143,7 +129,26 @@ export default function Onboard(){
         {!canSubmit && <p className="muted" style={{fontSize:12,color:'#d93025'}}>請填寫所有必填欄位（旅團名稱、旅團號、/exec 網址、API Key）</p>}
         {sent==='ok' && <p className="muted" style={{fontSize:13,color:'#137333',fontWeight:600}}>✅ {resultMsg}</p>}
         {(sent==='' && resultMsg) && <p className="muted" style={{fontSize:13,color:'#d93025',fontWeight:600}}>⚠️ {resultMsg}</p>}
-        <button className="btn" onClick={()=>setStep(4)}>← 上一步</button>
+        <div className="row" style={{marginTop:8}}>
+          <button className="btn" onClick={()=>setStep(3)}>← 上一步</button>
+          <button className="btn primary" onClick={()=>setStep(5)}>下一步：設定管理員（開通後）→</button>
+        </div>
+      </>
+    },
+    {
+      title: '第 6 步：開通後，喺 Sheet 設定管理員',
+      content: <>
+        <p className="muted">申請獲批、喺首頁揀到自己旅團之前，先返去 Sheet 設定旅團資料同管理員。呢步唔使喺提交申請前做。</p>
+        <ul className="muted">
+          <li>到黃色 <strong>SystemConfig</strong> 填 TROOP_CODE、TROOP_NAME、ADMIN_EMAIL</li>
+          <li>到藍色 <strong>Members</strong> 輸入成員（ymNumber 必須 10 位數字）</li>
+          <li>上方選單 → 2026 Scout System → 重新建立管理員帳號（攞初始密碼）</li>
+        </ul>
+        <p className="muted" style={{fontSize:13}}>✅ 完成後回首頁選擇旅團 → 用管理員 Email ＋初始密碼登入 → 即時改密碼。</p>
+        <div className="row">
+          <button className="btn" onClick={()=>setStep(4)}>← 上一步</button>
+          <Link className="btn primary" href="/">回首頁 →</Link>
+        </div>
       </>
     }
   ]
