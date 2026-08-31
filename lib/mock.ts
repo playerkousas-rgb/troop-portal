@@ -22,7 +22,12 @@ export const MOCK_TROOP = { key: 'troop_demo', id: '0088', name: '演示旅團(M
 
 export function isMockMode(): boolean {
   if (typeof window === 'undefined') return false;
-  try { return localStorage.getItem(MOCK_KEY) === '1'; } catch { return false; }
+  try {
+    // MOCK 只屬於演示旅團。即使瀏覽器殘留了開關，只要目前選的是 0082，
+    // API 仍然必須走真實旅團後台，避免把 82 誤當成 MOCK。
+    const selected = JSON.parse(localStorage.getItem('scoutsystem2_selected_troop') || 'null');
+    return localStorage.getItem(MOCK_KEY) === '1' && selected?.key === MOCK_TROOP.key;
+  } catch { return false; }
 }
 export function setMockMode(on: boolean) {
   if (typeof window === 'undefined') return;

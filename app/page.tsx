@@ -103,7 +103,7 @@ export default function HomePage() {
         </p>
       </section>
 
-      {/* ── 選擇旅團（MOCK 放前，其餘旅團排後面）：一按即進入登入頁 ── */}
+      {/* ── 選擇旅團（MOCK 放前，其餘旅團排後面）── */}
       <section className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 sm:p-5">
         <h2 className="font-bold text-sm flex items-center gap-2 mt-0 mb-3">
           <span className="w-7 h-7 bg-brand-600 text-white rounded-lg flex items-center justify-center text-sm">🏠</span>
