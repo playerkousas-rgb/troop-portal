@@ -48,15 +48,22 @@ export default function BottomNav() {
   }, [pathname]);
 
   const isDemo = !!pathname?.startsWith('/dashboard');
+  // 首頁（登入旅團頁）：底部就係平台資訊 tab —— 模板下載／更新公告
+  const isLanding = pathname === '/';
 
-  // 未選旅團又未登入 → 冇嘢可快捷；平台資訊頁一律唔顯示
-  if (!isDemo && (!hasTroop && !loggedIn)) return null;
-  if (!isDemo && HIDDEN_PATHS.includes(pathname || '')) return null;
+  // 未選旅團又未登入 → 冇嘢可快捷；平台資訊頁一律唔顯示（首頁除外）
+  if (!isDemo && !isLanding && (!hasTroop && !loggedIn)) return null;
+  if (!isDemo && !isLanding && HIDDEN_PATHS.includes(pathname || '')) return null;
 
-  const items: Item[] = [
-    ...(isDemo ? DEMO_ITEMS : REAL_ITEMS),
-    { icon: '👤', label: '我的', href: isDemo ? '/dashboard/profile' : loggedIn ? '/profile' : '/login' },
-  ];
+  const items: Item[] = isLanding
+    ? [
+        { icon: '⬇️', label: '模板下載', href: '/downloads' },
+        { icon: '📢', label: '更新公告', href: '/updates' },
+      ]
+    : [
+        ...(isDemo ? DEMO_ITEMS : REAL_ITEMS),
+        { icon: '👤', label: '我的', href: isDemo ? '/dashboard/profile' : loggedIn ? '/profile' : '/login' },
+      ];
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-sm border-t border-slate-200 pb-[env(safe-area-inset-bottom)] shadow-lg">

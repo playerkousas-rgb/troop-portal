@@ -356,6 +356,7 @@ function sliceState(full: AppState, keys: string): AppState {
 // ==================== 登入 ====================
 
 /** 演示帳號:一鍵登入用(login 頁) */
+// 注意：超級管理員（系統製作者 debug 用）唔會喺任何演示／介面出現，所以呢度冇佢
 export const DEMO_ACCOUNTS: { userId: string; label: string; desc: string; dashboard: string }[] = [
   { userId: 'u_m1', label: '🧒 成員(小童)', desc: '陳大文 16 歲 · 體驗報名需家長代操作', dashboard: '/member' },
   { userId: 'u_m4', label: '🧑 成員(成年)', desc: '張磊磊 18 歲 · 可自行報名', dashboard: '/member' },
@@ -363,7 +364,6 @@ export const DEMO_ACCOUNTS: { userId: string; label: string; desc: string; dashb
   { userId: 'u_bl', label: '🏹 支部領袖', desc: '黃志遠 · 本支部活動 / 成員 / 點名', dashboard: '/leader' },
   { userId: 'u_gl', label: '📋 團長', desc: '李偉國 · 全旅活動 / 集會 / 會議', dashboard: '/leader' },
   { userId: 'u_admin', label: '🛠️ 管理員', desc: '陳堅強 · 全部管理功能', dashboard: '/admin' },
-  { userId: 'u_super', label: '👑 超級管理員', desc: '最高權限 · 系統設定 / 審計', dashboard: '/admin' },
 ];
 
 function handleMockLogin(p: Record<string, any>) {

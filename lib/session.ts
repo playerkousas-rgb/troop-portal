@@ -1,6 +1,6 @@
 'use client';
 import { Role } from './model';
-export type Session = { userId: string; name: string; role: Role; troopCode: string; troopName: string; branchId?: string; memberId?: string; age?: number; dashboard?: string };
+export type Session = { userId: string; name: string; role: Role; troopCode: string; troopName: string; branchId?: string; memberId?: string; age?: number; dashboard?: string; iat?: number; exp?: number };
 
 /** 角色 → 登入後的首頁。與 /login 原本的導向規則完全一致，只是抽出來共用，
  *  讓「已登入再開 APP」能回到同一個頁面。 */
@@ -14,11 +14,31 @@ export function dashboardFor(role: Role): string {
   }
 }
 export const SESSION_KEY = 'scoutsystem2_current_user';
+/** 登入狀態有效期：7 日，過期就要重新登入。
+ *  注意：呢個只係前端防呆（避免永久登入）；真正防偽要 GS 端簽發 token，之後再做。 */
+export const SESSION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 export function getSession(): Session | null {
   if (typeof window === 'undefined') return null;
-  try { const raw = localStorage.getItem(SESSION_KEY); return raw ? JSON.parse(raw) : null; } catch { return null; }
+  try {
+    const raw = localStorage.getItem(SESSION_KEY);
+    if (!raw) return null;
+    const s = JSON.parse(raw);
+    if (!s || typeof s !== 'object') return null;
+    // 舊 session 冇 exp 欄位 → 補上，避免更新即刻踢走晒所有人
+    if (typeof s.exp !== 'number') {
+      s.iat = s.iat || Date.now();
+      s.exp = Date.now() + SESSION_TTL_MS;
+      localStorage.setItem(SESSION_KEY, JSON.stringify(s));
+    }
+    if (s.exp <= Date.now()) { localStorage.removeItem(SESSION_KEY); return null; }
+    return s;
+  } catch { return null; }
 }
-export function setSession(s: Session) { if (typeof window !== 'undefined') localStorage.setItem(SESSION_KEY, JSON.stringify(s)); }
+export function setSession(s: Session) {
+  if (typeof window === 'undefined') return;
+  const now = Date.now();
+  localStorage.setItem(SESSION_KEY, JSON.stringify({ ...s, iat: s.iat || now, exp: s.exp || now + SESSION_TTL_MS }));
+}
 export function clearSession() { if (typeof window !== 'undefined') localStorage.removeItem(SESSION_KEY); }
 export function demoSession(role: Role): Session {
   let selected:any=null;

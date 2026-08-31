@@ -7,8 +7,10 @@ import { isMockMode, setMockMode, MOCK_TROOP } from '@/lib/mock';
 import { getSession, clearSession, dashboardFor } from '@/lib/session';
 import { ROLE_LABEL, Role } from '@/lib/model';
 
-// 旅團登記表（MOCK 會排在最前，其餘旅團排後面）
-const TROOPS = activeTroops();
+// 旅團登記表（MOCK 排最前，其餘旅團按旅團號碼由細到大排）
+const TROOPS = [...activeTroops()].sort(
+  (a, b) => (parseInt(a.id, 10) || 0) - (parseInt(b.id, 10) || 0)
+);
 const TROOP_KEY = 'scoutsystem2_selected_troop';
 
 export default function HomePage() {
@@ -56,6 +58,14 @@ export default function HomePage() {
     setMsg('已退出演示模式');
   }
 
+  /** 唔想開帳戶，只睇公開資料：唔建 session，直接去公開行事曆 */
+  function browsePublic() {
+    let t: any = null;
+    try { t = JSON.parse(localStorage.getItem(TROOP_KEY) || 'null'); } catch {}
+    if (!t?.key) { setMsg('請先撳一個旅團，再撳「只睇公開資料」。'); return; }
+    router.push('/calendar');
+  }
+
   function logoutAndStay() {
     clearSession();
     setResume(null);
@@ -92,8 +102,18 @@ export default function HomePage() {
   return (
     <div className="max-w-3xl mx-auto px-4 py-6 pb-24 space-y-5">
 
+      {/* ── 右上：新旅團申請及教學 ── */}
+      <div className="flex justify-end">
+        <Link
+          href="/setup"
+          className="no-underline text-[11px] font-bold bg-violet-600 text-white px-3 py-1.5 rounded-full hover:bg-violet-700 transition flex items-center gap-1"
+        >
+          📖 新旅團申請及教學
+        </Link>
+      </div>
+
       {/* ── 頁首（簡單）── */}
-      <section className="text-center pt-4">
+      <section className="text-center">
         <div className="text-5xl text-brand-600 mb-2" aria-hidden>⚜</div>
         <h1 className="text-2xl sm:text-3xl font-black text-brand-700 leading-tight m-0">2026 童軍系統</h1>
         <p className="text-[12px] text-slate-500 mt-2 mb-0 leading-relaxed">
@@ -153,53 +173,23 @@ export default function HomePage() {
           ))}
         </div>
 
+        <div className="mt-3 pt-3 border-t border-slate-100">
+          <button
+            type="button"
+            onClick={browsePublic}
+            className="text-[11px] font-bold text-slate-600 bg-slate-100 border-0 rounded-lg px-3 py-2 cursor-pointer hover:bg-slate-200 transition"
+          >
+            👀 只睇公開資料（唔使開帳戶）
+          </button>
+          <p className="text-[11px] text-slate-400 mt-1.5 m-0 leading-relaxed">
+            揀咗旅團之後，可以直接睇公開行事曆／公告／活動，唔使登入。
+          </p>
+        </div>
+
         {msg && <p className="mt-3 text-[12px] text-slate-500 font-bold m-0">{msg}</p>}
         <p className="mt-3 text-[11px] text-slate-500 m-0">
-          💡 看不到你的旅團？代表尚未開通，請用下方「新旅團申請及教學」。
+          💡 看不到你的旅團？代表尚未開通，請用右上角「新旅團申請及教學」。
         </p>
-      </section>
-
-      {/* ── 新旅團申請及教學（含 GS 下載）── */}
-      <section className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 sm:p-5">
-        <div className="flex items-start justify-between gap-3 flex-wrap">
-          <div className="min-w-0">
-            <h2 className="font-bold text-sm flex items-center gap-2 mt-0 mb-1">
-              <span className="w-7 h-7 bg-violet-600 text-white rounded-lg flex items-center justify-center text-sm">📖</span>
-              新旅團申請及教學
-            </h2>
-            <p className="text-[11px] text-slate-500 leading-relaxed m-0">
-              由建立 Google Sheet、貼上 GS 模組、部署到提交申請，全部步驟連所需下載都喺呢度，唔使跳出嚟搵。
-            </p>
-          </div>
-          <div className="flex gap-2 flex-wrap">
-            <Link href="/setup" className="no-underline text-[11px] font-bold bg-violet-600 text-white px-3 py-2 rounded-xl hover:bg-violet-700 transition">開始教學 →</Link>
-            <a href="/downloads/SCOUTSYSTEM_2_SETUP.gs.txt" download className="no-underline text-[11px] font-bold bg-white text-violet-700 border border-violet-200 px-3 py-2 rounded-xl hover:bg-violet-50 transition">⬇️ GS 模組</a>
-          </div>
-        </div>
-      </section>
-
-      {/* ── 平台資訊（只保留模板下載 + 更新公告）── */}
-      <section>
-        <h2 className="font-bold text-sm flex items-center gap-2 mb-2.5">
-          <span className="w-7 h-7 bg-slate-600 text-white rounded-lg flex items-center justify-center text-sm">📚</span>
-          平台資訊
-        </h2>
-        <div className="grid grid-cols-2 gap-2.5">
-          <Link href="/downloads" className="no-underline text-inherit group">
-            <div className="bg-white rounded-2xl border border-slate-200 p-4 h-full group-hover:shadow-sm transition">
-              <div className="w-9 h-9 bg-slate-100 rounded-xl flex items-center justify-center text-xl mb-2">⬇️</div>
-              <h3 className="font-bold text-xs text-slate-800 m-0">模板下載</h3>
-              <p className="text-[11px] text-slate-500 mt-1 m-0">下載 Apps Script 及通告模板</p>
-            </div>
-          </Link>
-          <Link href="/updates" className="no-underline text-inherit group">
-            <div className="bg-white rounded-2xl border border-slate-200 p-4 h-full group-hover:shadow-sm transition">
-              <div className="w-9 h-9 bg-slate-100 rounded-xl flex items-center justify-center text-xl mb-2">📢</div>
-              <h3 className="font-bold text-xs text-slate-800 m-0">更新公告</h3>
-              <p className="text-[11px] text-slate-500 mt-1 m-0">平台及元件更新紀錄</p>
-            </div>
-          </Link>
-        </div>
       </section>
     </div>
   );

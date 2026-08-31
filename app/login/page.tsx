@@ -171,10 +171,11 @@ export default function Login() {
 
         {/* 登入方式（後期功能，收進分段按鈕） */}
         <div className="flex gap-1 bg-slate-100 rounded-xl p-1">
+          {/* STAFF_TOKEN 已移除：GS 初始化已經建立咗管理員帳戶，用佢喺領袖／管理員位置登入就得；
+              一個唔可以改密碼嘅萬能 token 反而是安全風險。 */}
           {([
             { id: 'account' as Tab, label: '領袖 / 家長' },
             { id: 'member' as Tab, label: '成員 YMIS' },
-            { id: 'staffToken' as Tab, label: 'STAFF' },
           ]).map(t => (
             <button key={t.id} type="button" onClick={() => { setTab(t.id); setIdentifier(''); setPassword(''); setMsg(''); }}
               className={`flex-1 text-[11px] font-bold py-1.5 rounded-lg transition ${tab === t.id ? 'bg-white text-brand-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
@@ -217,10 +218,15 @@ export default function Login() {
         </div>
       </section>
 
-      {/* ── 申請加入 ── */}
-      <p className="text-center text-[12px] text-slate-600 m-0">
-        未有帳號？<Link href="/apply" className="font-bold text-brand-700 underline underline-offset-2">申請加入</Link>
-      </p>
+      {/* ── 申請加入 / 只睇公開資料 ── */}
+      <div className="text-center space-y-1">
+        <p className="text-[12px] text-slate-600 m-0">
+          未有帳號？<Link href="/apply" className="font-bold text-brand-700 underline underline-offset-2">申請加入</Link>
+        </p>
+        <p className="text-[12px] text-slate-500 m-0">
+          唔想開帳戶？<Link href="/calendar" className="font-bold text-slate-700 underline underline-offset-2">👀 只睇公開行事曆／公告／活動</Link>
+        </p>
+      </div>
 
       {/* ── 進階／除錯（後期功能，收合） ── */}
       <section className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
