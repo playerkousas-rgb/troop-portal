@@ -79,7 +79,7 @@
     display: grid;
     gap: 6px;
     font-weight: 600;
-    font-size: 13px;
+    font-size: 14px;
     color: var(--muted-strong);
     margin-bottom: 10px;
   }
@@ -135,7 +135,7 @@
   .btn:disabled, .btn.disabled { opacity: .6; cursor: not-allowed; }
 
   /* ── 徽章 ── */
-  .badge { display: inline-flex; border-radius: 999px; padding: 5px 10px; font-size: 12px; font-weight: 800; background: #e7f0ff; color: #135cab; }
+  .badge { display: inline-flex; border-radius: 999px; padding: 5px 11px; font-size: 13px; font-weight: 800; background: #e7f0ff; color: #135cab; }
   .badge.blue { background: #dbeafe; color: #1e40af; }
   .badge.green { background: #dcfce7; color: #166534; }
   .badge.red { background: #fee2e2; color: #991b1b; }
@@ -143,7 +143,7 @@
   .badge.purple { background: #ede9fe; color: #5b21b6; }
 
   /* ── 文字 ── */
-  .muted { color: var(--muted); font-size: 14px; line-height: 1.6; }
+  .muted { color: var(--muted); font-size: 15px; line-height: 1.6; }
   .summary h2 { font-size: 30px; margin: 8px 0; }
   .feature-card { text-decoration: none; color: inherit; display: grid; gap: 16px; }
   .feature-card:hover { border-color: #9fc3e8; transform: translateY(-1px); }
@@ -153,7 +153,7 @@
 
   /* ── 表格 ── */
   .table { width: 100%; border-collapse: collapse; }
-  .table th, .table td { padding: 10px; border-bottom: 1px solid var(--line); text-align: left; font-size: 14px; }
+  .table th, .table td { padding: 10px 12px; border-bottom: 1px solid var(--line); text-align: left; font-size: 15px; }
 
   /* ── 通告模式 / 行事曆 ── */
   .notice-mode { border: 2px solid var(--line); cursor: pointer; }
@@ -175,7 +175,7 @@
   .plugin-card h3 { margin: 0; color: #5b21b6; }
 
   /* ── 分頁標籤 ── */
-  .tab { display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; border-radius: 10px; border: 1px solid var(--line); background: #fff; font-weight: 700; font-size: 13px; color: #33475b; cursor: pointer; }
+  .tab { display: inline-flex; align-items: center; gap: 6px; padding: 9px 15px; border-radius: 10px; border: 1px solid var(--line); background: #fff; font-weight: 700; font-size: 14px; color: #33475b; cursor: pointer; }
   .tab.active { background: var(--blue); border-color: var(--blue); color: #fff; }
 
   /* ── Hero 漸層 / 卡片懸浮 ── */
@@ -212,8 +212,8 @@
   /* ── 簽到／點名 ── */
   .attendance-page { gap: 18px; }
   .attendance-rollcall { gap: 14px; }
-  .attendance-legend { gap: 10px; font-size: 12px; color: var(--muted-strong); }
-  .attendance-table { font-size: 13px; }
+  .attendance-legend { gap: 10px; font-size: 14px; color: var(--muted-strong); }
+  .attendance-table { font-size: 15px; }
   .attendance-feature-card { border: 2px solid #c4b5fd; background: linear-gradient(145deg, #fff 0%, #f5f3ff 100%); }
   .attendance-feature-card:hover { border-color: #7c3aed; box-shadow: 0 12px 30px rgba(109, 40, 217, .13); }
   .attendance-feature-card h3 { margin: 0 0 6px; color: #5b21b6; }
@@ -229,9 +229,9 @@
   .attendance-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
   .attendance-history-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; }
   .att-status-row { gap: 6px; }
-  .att-btn { min-width: 42px; min-height: 42px; padding: 6px 8px; border-radius: 10px; border: 1px solid var(--line); background: #fff; font-weight: 800; cursor: pointer; }
+  .att-btn { min-width: 48px; min-height: 48px; padding: 8px 10px; border-radius: 10px; border: 1px solid var(--line); background: #fff; font-weight: 900; font-size: 16px; cursor: pointer; }
   .att-btn.active { outline: 2px solid currentColor; box-shadow: 0 0 0 3px rgba(109, 40, 217, .15); }
-  .att-chip { display: inline-flex; align-items: center; gap: 4px; border-radius: 999px; padding: 4px 10px; font-size: 12px; font-weight: 800; }
+  .att-chip { display: inline-flex; align-items: center; gap: 5px; border-radius: 999px; padding: 5px 12px; font-size: 14px; font-weight: 800; }
   .att-chip.att-status-P, .att-btn.att-status-P { background: #dcfce7; color: #166534; border-color: #86efac; }
   .att-chip.att-status-A, .att-btn.att-status-A { background: #fee2e2; color: #991b1b; border-color: #fca5a5; }
   .att-chip.att-status-L, .att-btn.att-status-L { background: #fef9c3; color: #854d0e; border-color: #fde047; }

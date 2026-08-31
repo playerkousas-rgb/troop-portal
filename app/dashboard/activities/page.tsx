@@ -40,7 +40,7 @@ type Act = {
   registerWay: 'app' | 'leader';
   quota: number;                // 名額（0＝無限）
   registered: number;
-  myStatus: 'registered' | 'interested' | 'unresponded';
+  myStatus: 'registered' | 'interested' | 'declined' | 'unresponded';
   expired?: boolean;            // 過期區：唔刪除，保留集合時間地點俾已報名嘅人睇
 };
 
@@ -50,8 +50,8 @@ const SEED: Act[] = [
     location: '西貢白沙灣', branch: '全旅', tag: '露營', fee: '$300',
     summary: '兩日一夜旅團露營，含晚間營火會及周日早會。請自備水壺、電筒及個人藥品。9月18日 19:00 旅團部集合。',
     notices: [
-      { label: '露營通告（家長須簽署）', kind: 'link', url: 'https://drive.google.com/file/d/demo1/view' },
-      { label: '重點內容', kind: 'inline', body: '集合：9月20日 09:00 旅團部\n解散：9月21日 16:00 同一地點\n費用：$300（含營費及膳食）\n要帶：睡袋、水壺、電筒、個人藥品、制服\n家長須簽署通告回條，9月15日前交回支部領袖。' },
+      { label: '露營通告（家長帳戶登入報名＝簽署）', kind: 'link', url: 'https://drive.google.com/file/d/demo1/view' },
+      { label: '重點內容', kind: 'inline', body: '集合：9月20日 09:00 旅團部\n解散：9月21日 16:00 同一地點\n費用：$300（含營費及膳食）\n要帶：睡袋、水壺、電筒、個人藥品、制服\n家長不用簽署：用家長帳戶登入報名＝已簽署，9月15日前喺 APP 回覆參加／不參加。' },
     ],
     registerWay: 'app', quota: 40, registered: 31, myStatus: 'registered',
   },
@@ -81,11 +81,25 @@ const SEED: Act[] = [
   },
   // 過期區示例：活動過咗期 → 移入過期區，唔刪除（已報名嘅成員／家長仍然睇到集合時間地點）
   {
+    id: 'a8', title: '8月親子同樂日（已過期）', kind: 'internal', date: '2026-08-30', deadline: '2026-08-27',
+    location: '大埔海濱公園', branch: '全旅', tag: '集會', fee: '',
+    summary: '親子活動。已結束，留存作紀錄。',
+    notices: [{ label: '同樂日通告', kind: 'inline', body: '集合：8月30日 09:00 大埔海濱公園\n解散：12:00' }],
+    registerWay: 'app', quota: 0, registered: 22, myStatus: 'registered', expired: true,
+  },
+  {
     id: 'a9', title: '8月旅團集會（已過期）', kind: 'internal', date: '2026-08-24', deadline: '2026-08-20',
     location: '旅團部', branch: '全旅', tag: '集會', fee: '',
     summary: '常規集會。已結束，留存作紀錄。',
     notices: [{ label: '集會通告', kind: 'inline', body: '集合：8月24日 19:00 旅團部\n解散：21:00\n當日內容：小隊會議 + 團務' }],
     registerWay: 'app', quota: 0, registered: 15, myStatus: 'registered', expired: true,
+  },
+  {
+    id: 'a10', title: '7月夏日嘉年華（已過期）', kind: 'internal', date: '2026-07-12', deadline: '2026-07-08',
+    location: '旅團部', branch: '全旅', tag: '服務', fee: '',
+    summary: '攤位服務。已結束，留存作紀錄。',
+    notices: [{ label: '嘉年華通告', kind: 'inline', body: '集合：7月12日 08:30 旅團部\n解散：18:00' }],
+    registerWay: 'app', quota: 0, registered: 30, myStatus: 'declined', expired: true,
   },
 ];
 
@@ -105,6 +119,8 @@ export default function ActivitiesPage() {
   const [role, setRole] = useState('parent');
   const [items, setItems] = useState<Act[]>(SEED);
   const [filter, setFilter] = useState<'all' | 'internal' | 'external'>('all');
+  const [showExpired, setShowExpired] = useState(false); // 過期區：收合做下拉式，撳先展開
+  const [adult, setAdult] = useState(false); // 成員示範：18 歲或以上可自行報名
   const [detail, setDetail] = useState<string | null>(null);
   const [form, setForm] = useState<Act | null>(null);
   const [formErr, setFormErr] = useState('');
@@ -117,7 +133,8 @@ export default function ActivitiesPage() {
 
   const isLeader = ['admin', 'group_leader', 'branch_leader', 'coach'].includes(role);
   const activeList = (filter === 'all' ? items : items.filter(a => a.kind === filter)).filter(a => !a.expired);
-  const expiredList = items.filter(a => a.expired);
+  // 過期區：由新至舊排列（日期近嘅放最上）
+  const expiredList = items.filter(a => a.expired).sort((a, b) => b.date.localeCompare(a.date));
   const current = detail ? items.find(a => a.id === detail) || null : null;
   // 開另一張活動詳情時，重設通告預覽選擇
 
@@ -228,9 +245,14 @@ export default function ActivitiesPage() {
     setForm({ ...form, notices: form.notices.filter((_, idx) => idx !== i) });
   }
 
-  function respond(id: string, type: 'registered' | 'interested') {
-    setItems(prev => prev.map(a => (a.id === id ? { ...a, myStatus: type, registered: a.registered + (type === 'registered' && a.myStatus !== 'registered' ? 1 : 0) } : a)));
-    setMsg(type === 'registered' ? '✅ 已回覆參加' : '❤️ 已標記有興趣，請搵領袖報名');
+  function respond(id: string, type: 'registered' | 'interested' | 'declined') {
+    setItems(prev => prev.map(a => {
+      if (a.id !== id) return a;
+      const wasRegistered = a.myStatus === 'registered';
+      const nextRegistered = a.registered + (type === 'registered' && !wasRegistered ? 1 : wasRegistered && type !== 'registered' ? -1 : 0);
+      return { ...a, myStatus: type, registered: Math.max(0, nextRegistered) };
+    }));
+    setMsg(type === 'registered' ? '✅ 已回覆參加' : type === 'interested' ? '❤️ 已標記有興趣，請搵領袖報名' : '❌ 已回覆不參加');
     setDetail(null);
   }
 
@@ -253,6 +275,12 @@ export default function ActivitiesPage() {
           </button>
         ))}
         {isLeader && <span className="text-[11px] text-emerald-700 font-bold">· 你可直接喺本頁管理</span>}
+        {role === 'member' && (
+          <label className="flex items-center gap-1 text-[11px] font-bold text-slate-600">
+            <input type="checkbox" checked={adult} onChange={e => setAdult(e.target.checked)} />
+            18 歲或以上（可自行報名）
+          </label>
+        )}
       </div>
 
       {/* Header + 管理入口 */}
@@ -294,8 +322,10 @@ export default function ActivitiesPage() {
                 {a.notices.length > 0 && ` · 📎 通告 ${a.notices.length}`}
               </div>
               {a.myStatus !== 'unresponded' && (
-                <span className={`inline-block mt-1.5 text-[11px] px-1.5 py-0.5 rounded font-bold ${a.myStatus === 'registered' ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}`}>
-                  {a.myStatus === 'registered' ? '✅ 已回覆參加' : '❤️ 已標記有興趣'}
+                <span className={`inline-block mt-1.5 text-[11px] px-1.5 py-0.5 rounded font-bold ${
+                  a.myStatus === 'registered' ? 'bg-emerald-100 text-emerald-700' :
+                  a.myStatus === 'declined' ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700'}`}>
+                  {a.myStatus === 'registered' ? '✅ 已回覆參加' : a.myStatus === 'declined' ? '❌ 已回覆不參加' : '❤️ 已標記有興趣'}
                 </span>
               )}
             </button>
@@ -310,45 +340,45 @@ export default function ActivitiesPage() {
         ))}
       </div>
 
-      {/* ═════ 過期區（已過期嘅活動移到呢度，唔刪除，已報名嘅成員／家長仍然睇到集合資料） ═════ */}
+      {/* ═════ 過期區（下拉式：預設收合，撳先展開；由新至舊排列） ═════ */}
       {expiredList.length > 0 && (
-        <section className="rounded-2xl border border-dashed border-slate-300 bg-slate-50/60 p-3.5 space-y-2">
-          <div className="flex items-center justify-between">
+        <section className="rounded-2xl border border-dashed border-slate-300 bg-slate-50/60 overflow-hidden">
+          <button
+            onClick={() => setShowExpired(v => !v)}
+            className="w-full flex items-center justify-between gap-2 px-3.5 py-3 text-left bg-transparent border-0 cursor-pointer hover:bg-slate-100/70 transition"
+            aria-expanded={showExpired}
+          >
             <h3 className="font-bold text-sm m-0 flex items-center gap-2">
               <span className="w-6 h-6 bg-slate-400 text-white rounded-lg flex items-center justify-center text-[11px]">⏰</span>
               過期區（{expiredList.length}）
             </h3>
-            <span className="text-[11px] text-slate-500">已過期嘅通告唔刪除，已報名者仍可睇集合時間／地點</span>
-          </div>
-          <div className="space-y-2">
-            {expiredList.map(a => (
-              <div key={a.id} className="bg-white rounded-xl border border-slate-200 p-3 card-hover">
-                <button onClick={() => { setDetail(a.id); setPreview(null); }} className="w-full text-left bg-transparent border-0 p-0 cursor-pointer">
-                  <div className="flex items-center gap-1.5 flex-wrap">{kindBadge(a.kind)}<span className="font-bold text-[13px]">{a.title}</span>
-                    <span className="text-[11px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded font-bold">🏷️ {a.tag}</span>
-                    {a.expired && <span className="text-[11px] bg-slate-200 text-slate-600 px-1.5 py-0.5 rounded font-bold">已過期</span>}
-                  </div>
-                  <div className="text-[11px] text-slate-500 mt-1">{a.date} · {a.location || '待定'} · {a.branch}</div>
-                  {a.myStatus === 'registered' && <span className="inline-block mt-1.5 text-[11px] px-1.5 py-0.5 rounded font-bold bg-emerald-100 text-emerald-700">✅ 你已報名（仍可睇集合資料）</span>}
-                </button>
-                {isLeader && (
-                  <div className="flex gap-1 justify-end mt-1.5">
-                    {a.expired ? ( // Conditional rendering for expired items
-                      <>
-                        <button onClick={() => restoreFromExpired(a.id)} className="text-[11px] text-slate-600 px-1.5 py-0.5 rounded hover:bg-slate-100" title="恢復">↺ 恢復</button>
-                        <button onClick={() => del(a.id)} className="text-[11px] text-rose-600 px-1.5 py-0.5 rounded hover:bg-rose-50" title="刪除">🗑 永久刪除</button>
-                      </>
-                    ) : (
-                      <>
-                        <button onClick={() => moveToExpired(a.id)} className="text-[11px] text-amber-700 px-1.5 py-0.5 rounded hover:bg-amber-50" title="移入過期區">⏰ 移入過期區</button>
-                        <button onClick={() => del(a.id)} className="text-[11px] text-rose-600 px-1.5 py-0.5 rounded hover:bg-rose-50" title="刪除">🗑 刪除</button>
-                      </>
-                    )}
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
+            <span className="flex items-center gap-2">
+              <span className="text-[11px] text-slate-500 hidden sm:inline">由新至舊 · 已報名者仍可睇集合時間／地點</span>
+              <span className="text-slate-500 text-xs">{showExpired ? '▲ 收合' : '▼ 展開'}</span>
+            </span>
+          </button>
+          {showExpired && (
+            <div className="space-y-2 px-3.5 pb-3.5">
+              {expiredList.map(a => (
+                <div key={a.id} className="bg-white rounded-xl border border-slate-200 p-3 card-hover">
+                  <button onClick={() => { setDetail(a.id); setPreview(null); }} className="w-full text-left bg-transparent border-0 p-0 cursor-pointer">
+                    <div className="flex items-center gap-1.5 flex-wrap">{kindBadge(a.kind)}<span className="font-bold text-[13px]">{a.title}</span>
+                      <span className="text-[11px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded font-bold">🏷️ {a.tag}</span>
+                      {a.expired && <span className="text-[11px] bg-slate-200 text-slate-600 px-1.5 py-0.5 rounded font-bold">已過期</span>}
+                    </div>
+                    <div className="text-[11px] text-slate-500 mt-1">{a.date} · {a.location || '待定'} · {a.branch}</div>
+                    {a.myStatus === 'registered' && <span className="inline-block mt-1.5 text-[11px] px-1.5 py-0.5 rounded font-bold bg-emerald-100 text-emerald-700">✅ 你已報名（仍可睇集合資料）</span>}
+                  </button>
+                  {isLeader && (
+                    <div className="flex gap-1 justify-end mt-1.5">
+                      <button onClick={() => restoreFromExpired(a.id)} className="text-[11px] text-slate-600 px-1.5 py-0.5 rounded hover:bg-slate-100" title="恢復">↺ 恢復</button>
+                      <button onClick={() => del(a.id)} className="text-[11px] text-rose-600 px-1.5 py-0.5 rounded hover:bg-rose-50" title="刪除">🗑 永久刪除</button>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
         </section>
       )}
 
@@ -415,18 +445,40 @@ export default function ActivitiesPage() {
             <div className="rounded-xl bg-amber-50 border border-amber-200 p-2.5">
               <p className="text-[11px] text-amber-800 m-0 leading-relaxed">
                 {current.registerWay === 'app'
-                  ? 'ℹ️ 呢個係旅團活動：可以直接喺 APP 回覆參加／唔參加，活動已自動列入行事曆。'
-                  : 'ℹ️ 呢個係區／地域總會活動：有興趣請自己搵領袖報名，領袖會代為交表。'}
+                  ? 'ℹ️ 呢個係旅團活動：可以直接喺 APP 回覆，活動已自動列入行事曆。家長不用簽署：用家長帳戶登入報名＝已簽署。'
+                  : 'ℹ️ 呢個係區／地域總會活動：有興趣請自己搵領袖報名。'}
               </p>
             </div>
-            <div className="flex gap-2">
-              {current.registerWay === 'app' ? (
-                <button onClick={() => respond(current.id, 'registered')} className="flex-1 text-[12px] font-bold bg-brand-600 text-white py-2 rounded-xl">✅ 回覆參加</button>
-              ) : (
-                <button onClick={() => respond(current.id, 'interested')} className="flex-1 text-[12px] font-bold bg-violet-600 text-white py-2 rounded-xl">❤️ 我有興趣（搵領袖報名）</button>
-              )}
-              <button onClick={() => setDetail(null)} className="flex-1 text-[12px] font-bold bg-slate-100 text-slate-600 py-2 rounded-xl">關閉</button>
-            </div>
+            {isLeader ? (
+              <div className="flex gap-2">
+                <p className="flex-1 text-[11px] text-slate-500 m-0 self-center">領袖請用「編輯」或報名管理處理報名名單。</p>
+                <button onClick={() => setDetail(null)} className="flex-1 text-[12px] font-bold bg-slate-100 text-slate-600 py-2 rounded-xl">關閉</button>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {current.registerWay === 'app' ? (
+                  <div className="flex gap-2 flex-wrap">
+                    <button onClick={() => respond(current.id, 'interested')} className="flex-1 text-[12px] font-bold bg-amber-500 text-white py-2 rounded-xl">❤️ 有興趣</button>
+                    {(role === 'parent' || adult) && (
+                      <>
+                        <button onClick={() => respond(current.id, 'registered')} className="flex-1 text-[12px] font-bold bg-brand-600 text-white py-2 rounded-xl">✅ 參加</button>
+                        <button onClick={() => respond(current.id, 'declined')} className="flex-1 text-[12px] font-bold bg-rose-600 text-white py-2 rounded-xl">❌ 不參加</button>
+                      </>
+                    )}
+                  </div>
+                ) : (
+                  <button onClick={() => respond(current.id, 'interested')} className="w-full text-[12px] font-bold bg-violet-600 text-white py-2 rounded-xl">❤️ 我有興趣（搵領袖報名）</button>
+                )}
+                <p className="text-[11px] text-slate-500 m-0 leading-relaxed">
+                  {role === 'parent'
+                    ? 'ℹ️ 家長可標示：有興趣／參加／不參加。選「參加」才需標記已付款；選「不參加」不用 tick。'
+                    : adult
+                    ? 'ℹ️ 你已 18 歲或以上，可自行報名。'
+                    : 'ℹ️ 你未滿 18 歲，可按「有興趣」；參加／不參加由家長用家長帳戶回覆。'}
+                </p>
+                <button onClick={() => setDetail(null)} className="w-full text-[12px] font-bold bg-slate-100 text-slate-600 py-2 rounded-xl">關閉</button>
+              </div>
+            )}
           </div>
         </div>
       )}

@@ -36,11 +36,42 @@ export type AttendancePayload = {
   summary?: AttendanceSummary;
 };
 
+export type AttendanceMatrixColumn = {
+  key: string;               // `${date}|${sessionType}|${eventId}`
+  date: string;
+  sessionType: AttendanceSessionType;
+  eventId: string;
+  label: string;             // 顯示用（MM-DD，全部模式加 集／活）
+};
+
 export type AttendanceMatrix = {
   success: boolean;
   error?: string;
   headers: string[];
+  columns?: AttendanceMatrixColumn[];
   rows: Array<Record<string, string>>;
+};
+
+/** 後補／補改：一個可以點名嘅「場次」（恆常集會日 或 旅團自辦活動） */
+export type AttendanceSession = {
+  id: string;
+  date: string;
+  label: string;
+  time?: string;
+  location?: string;
+  weekday?: number;
+  hasRecords?: boolean;
+  branchId?: string;
+  scope?: string;
+};
+
+export type AttendanceSessions = {
+  success: boolean;
+  error?: string;
+  branchId?: string;
+  today?: string;
+  meetings: AttendanceSession[];
+  activities: AttendanceSession[];
 };
 
 export type MemberAttendanceRecord = {
@@ -102,6 +133,35 @@ export function weekdayLabel(date: string) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return '';
   const [y, m, d] = date.split('-').map(Number);
   return ['日', '一', '二', '三', '四', '五', '六'][new Date(y, m - 1, d).getDay()] || '';
+}
+
+/** 日期顯示：YYYY-MM-DD → MM-DD（同年）或 YYYY-MM-DD */
+export function shortDate(date: string) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return date;
+  return date.slice(5);
+}
+
+export function statusLabel(code: AttendanceStatus) {
+  const found = ATTENDANCE_STATUSES.find(s => s.code === code);
+  return found ? found.label : (code || '未點');
+}
+
+/**
+ * 由矩陣 rows + columns 計算每位成員統計（出席數字）
+ * columns[i].key 對應 rows[].columns[i].key
+ */
+export function summarizeMatrix(rows: Array<Record<string, string>>, columns: AttendanceMatrixColumn[]) {
+  return rows.map(row => {
+    const st = { P: 0, A: 0, L: 0, E: 0, S: 0, marked: 0 };
+    columns.forEach(c => {
+      const v = (row[c.key] || '').toUpperCase();
+      if (v === 'P' || v === 'A' || v === 'L' || v === 'E' || v === 'S') {
+        st[v] += 1;
+        st.marked += 1;
+      }
+    });
+    return st;
+  });
 }
 
 export const PLUGIN_IDS_NOW_CORE = new Set(['troop_attendance']);

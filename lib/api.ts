@@ -496,6 +496,8 @@ export async function apiGetAttendanceMatrix(p: {
   days?: number;
   sessionType?: string;
   patrolId?: string;
+  from?: string;
+  to?: string;
 }) {
   const user = currentUser();
   return apiGet('getAttendanceMatrix', {
@@ -503,6 +505,17 @@ export async function apiGetAttendanceMatrix(p: {
     days: String(p.days || 30),
     sessionType: p.sessionType || 'meeting',
     patrolId: p.patrolId || '',
+    from: p.from || '',
+    to: p.to || '',
+    userId: user?.userId || '',
+  });
+}
+
+/** 後補／補改：列出可以點名嘅場次（過期／即將嘅恆常集會日 + 旅團自辦活動） */
+export async function apiGetAttendanceSessions(p: { branchId: string }) {
+  const user = currentUser();
+  return apiGet('getAttendanceSessions', {
+    branchId: p.branchId,
     userId: user?.userId || '',
   });
 }

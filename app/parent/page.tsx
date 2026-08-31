@@ -7,7 +7,7 @@ import Panel from '@/components/ui/Panel';
 import EmptyState from '@/components/ui/EmptyState';
 import EventReplyRow from '@/components/ui/EventReplyRow';
 import { AppState, loadStateSlice, replyStatus } from '@/lib/store';
-import { apiSetReply } from '@/lib/api';
+import { apiSetReply, apiTogglePaid } from '@/lib/api';
 import { getSession } from '@/lib/session';
 
 export default function Parent(){
@@ -28,9 +28,15 @@ export default function Parent(){
   const parent=s.users.find(u=>u.id===(session?.userId))||s.users.find(u=>u.role==='parent');
   if(!parent)return <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 text-sm text-slate-600">找不到家長帳號。</div>;
   const children=s.members.filter(m=>(parent.childMemberIds||[]).includes(m.id)||m.parentUserId===parent.id);
-  async function respond(eid:string,mid:string,type:'registered'|'declined'){
+  // 家長報名＝簽署：用家長帳戶登入回覆，無需再簽通告回條
+  async function respond(eid:string,mid:string,type:'interested'|'registered'|'declined'){
     setLoadingId(eid+mid);setErr('');
     try{const f=await apiSetReply({eventId:eid,memberId:mid,type,parentUserId:parent.id});setS(f)}catch(e:any){setErr(e.message)}finally{setLoadingId('')}
+  }
+  // 已付款 tick：只喺「已參加」時先會出現（不參加不用 tick）
+  async function togglePaid(eid:string,mid:string){
+    setLoadingId(eid+mid+'paid');setErr('');
+    try{const f=await apiTogglePaid(eid,mid);setS(f)}catch(e:any){setErr(e.message)}finally{setLoadingId('')}
   }
 
   return (
@@ -40,7 +46,7 @@ export default function Parent(){
         name={parent.name}
         roleLabel="家長"
         tone="violet"
-        tagline="管理子女活動報名與資訊。"
+        tagline="管理子女活動報名與資訊。用家長帳戶登入報名＝已簽署，無需再簽通告回條。"
         action={
           <Link href="/profile" className="no-underline text-[11px] font-bold bg-white/95 text-slate-800 px-3 py-2 rounded-xl hover:bg-white transition whitespace-nowrap">
             👤 個人設定
@@ -68,13 +74,13 @@ export default function Parent(){
               key={c.id}
               icon="📢"
               title={`${c.name} 的活動`}
-              subtitle="為子女回覆參加 / 不參加"
+              subtitle="為子女回覆：有興趣 / 參加 / 不參加，並標記付款"
               tone="blue"
               count={`${events.length} 個`}
             >
               <div className="grid gap-2">
                 {events.length === 0 ? (
-                  <EmptyState icon="🏕️" title="暫無待回覆活動" desc="領袖發布活動後，這裡會顯示需要你回覆的活動。" />
+                  <EmptyState icon="🏕️" title="暫無待回覆活動" desc="領袖發布活動後，這裡會顯示需要你回覆的活動。用家長帳戶登入回覆＝已簽署。" />
                 ) : (
                   events.map(e => {
                     const r = replyStatus(s, e.id, c.id);
@@ -85,11 +91,31 @@ export default function Parent(){
                         status={r?.type}
                         labels={{ registered: '✅ 狀態：已報名參加', declined: '❌ 狀態：已婉拒參加', interested: '❤️ 狀態：子女有興趣', unresponded: '⚠️ 狀態：尚未回覆' }}
                         actions={[
-                          { type: 'registered', idle: '✅ 確認參加', active: '【已為子女確認】✅ 參加' },
-                          { type: 'declined', idle: '❌ 不參加', active: '【已為子女婉拒】❌ 不參加' },
+                          { type: 'interested', idle: '❤️ 有興趣', active: '【已標記】❤️ 有興趣' },
+                          { type: 'registered', idle: '✅ 參加', active: '【已報名】✅ 參加' },
+                          { type: 'declined', idle: '❌ 不參加', active: '【已婉拒】❌ 不參加' },
                         ]}
                         loading={loadingId === e.id + c.id}
-                        onAct={t => respond(e.id, c.id, t as 'registered' | 'declined')}
+                        onAct={t => respond(e.id, c.id, t)}
+                        footer={
+                          r?.type === 'registered' ? (
+                            <div className="flex items-center justify-between gap-2 flex-wrap">
+                              <span className="text-[11px] text-slate-500 font-semibold">💰 付款（參加先需 tick）</span>
+                              <button
+                                type="button"
+                                disabled={loadingId === e.id + c.id + 'paid'}
+                                onClick={() => togglePaid(e.id, c.id)}
+                                className={`text-[11px] font-bold px-3 py-2 rounded-lg border transition cursor-pointer disabled:opacity-60 ${
+                                  r?.paid ? 'bg-emerald-700 text-white border-emerald-800 shadow-sm' : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300 hover:bg-slate-50'
+                                }`}
+                              >
+                                {r?.paid ? '✅ 已付款（點擊取消）' : '💰 標記已付款'}
+                              </button>
+                            </div>
+                          ) : (
+                            <p className="text-[11px] text-slate-400 m-0 leading-relaxed">ℹ️ 選「不參加」或「有興趣」不用 tick 付款。</p>
+                          )
+                        }
                       />
                     );
                   })

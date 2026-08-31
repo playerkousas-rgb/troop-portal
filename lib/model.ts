@@ -31,6 +31,14 @@ export function publicViewEnabled(config: any): boolean {
 }
 
 export function isAdmin(role?: Role) { return role === 'super_admin' || role === 'troop_super' || role === 'admin'; }
+
+/** 點名「全旅點名權」功能 key：授予支部領袖／教練員後，可為所有支部點名（預設只有自己支部） */
+export const ATTENDANCE_ALL_BRANCHES_FEATURE = 'attendance_all';
+export function canMarkAllBranchesAttendance(role?: Role, features?: string[]) {
+  if (!role) return false;
+  if (['super_admin', 'troop_super', 'admin', 'group_leader'].includes(role)) return true;
+  return (features || []).includes(ATTENDANCE_ALL_BRANCHES_FEATURE);
+}
 export function isLeaderOrAbove(role?: Role) { return !!role && ['super_admin','troop_super','admin','group_leader','branch_leader','coach'].includes(role); }
 export function canSeeRole(viewer: Role, target: Role) {
   if (viewer === 'super_admin') return true;

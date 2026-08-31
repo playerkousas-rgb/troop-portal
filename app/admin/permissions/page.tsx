@@ -8,6 +8,8 @@ const ALL_FEATURES = [
   { id: 'events', label: '活動管理' },
   { id: 'applications', label: '申請審核' },
   { id: 'registrations', label: '報名管理' },
+  { id: 'attendance', label: '簽到／點名' },
+  { id: 'attendance_all', label: '全旅點名（跨支部）' },
   { id: 'meetings', label: '會議管理' },
   { id: 'users', label: '帳號管理' },
   { id: 'settings', label: '系統設定' },

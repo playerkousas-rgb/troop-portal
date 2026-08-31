@@ -1473,7 +1473,7 @@ function handleGetUserFeatures_(p) {
     overrides[getField_(pm, 'feature')] = String(getField_(pm, 'granted') || '').toLowerCase() === 'true';
   });
   
-  var allFeatures = ['branches','members','applications','events','registrations','attendance','library_import','notices','users','settings','audit','calendar'];
+  var allFeatures = ['branches','members','applications','events','registrations','attendance','attendance_all','library_import','notices','users','settings','audit','calendar'];
   var result = allFeatures.map(function(f) {
     var isDefault = defaults.indexOf(f) >= 0;
     var overridden = overrides[f] !== undefined;
@@ -1633,6 +1633,7 @@ function doGet(e) {
       case 'getAttendance': return json(handleGetAttendance_(p));
       case 'saveAttendance': return json(handleSaveAttendance_(p));
       case 'getAttendanceMatrix': return json(handleGetAttendanceMatrix_(p));
+      case 'getAttendanceSessions': return json(handleGetAttendanceSessions_(p));
       case 'getMemberAttendance': return json(handleGetMemberAttendance_(p));
 
       // ---- 物資借用 ----
@@ -4031,10 +4032,14 @@ function patrolNameById_(patrols, patrolId) {
 
 function scopedAttendanceBranch_(caller, requestedBranch) {
   if (!caller) return { error: '請先登入' };
-  if (['super_admin', 'troop_super', 'admin'].indexOf(caller.role) >= 0) return { branchId: requestedBranch || '' };
-  if (['group_leader', 'branch_leader', 'coach'].indexOf(caller.role) >= 0) {
+  // 團長（group_leader）以上：看全旅
+  if (['super_admin', 'troop_super', 'admin', 'group_leader'].indexOf(caller.role) >= 0) return { branchId: requestedBranch || '' };
+  // 支部領袖／教練員：預設只有自己支部；獲授 attendance_all 後可點所有支部
+  if (['branch_leader', 'coach'].indexOf(caller.role) >= 0) {
+    var features = getUserFeatures_(caller.userId, caller.role);
+    if (features.indexOf('attendance_all') >= 0) return { branchId: requestedBranch || caller.branchId || '' };
     if (requestedBranch && caller.branchId && requestedBranch !== caller.branchId) {
-      return { error: '只能處理自己支部的點名' };
+      return { error: '只能處理自己支部的點名（如需點全旅，請管理員授權「全旅點名」）' };
     }
     return { branchId: caller.branchId || requestedBranch || '' };
   }
@@ -4156,8 +4161,10 @@ function handleGetAttendanceMatrix_(p) {
   var scope = scopedAttendanceBranch_(caller, p.branchId || '');
   if (scope.error) return { success: false, error: scope.error };
   var branchId = scope.branchId;
-  var sessionType = p.sessionType === 'activity' ? 'activity' : 'meeting';
+  var sessionType = p.sessionType === 'activity' ? 'activity' : (p.sessionType === 'all' ? 'all' : 'meeting');
   var patrolId = String(p.patrolId || '');
+  var from = String(p.from || '');
+  var to = String(p.to || '');
   var days = parseInt(p.days, 10);
   if (!days || days < 1) days = 30;
   if (days > 90) days = 90;
@@ -4170,23 +4177,47 @@ function handleGetAttendanceMatrix_(p) {
   });
   var patrols = mapPatrols_();
   var rows = readTable_('AttendanceRecords').filter(function (r) {
-    return String(getField_(r, 'branchId')) === branchId &&
-      String(getField_(r, 'sessionType') || 'meeting') === sessionType;
+    if (String(getField_(r, 'branchId')) !== branchId) return false;
+    if (sessionType !== 'all' && String(getField_(r, 'sessionType') || 'meeting') !== sessionType) return false;
+    var d = fmtDate_(getField_(r, 'date'));
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(d)) return false;
+    if (from && d < from) return false;
+    if (to && d > to) return false;
+    return true;
   });
-  var dateSet = {};
+
+  // 場次欄（date|type|eventId），去重 + 排序（日期昇序，同日先集會後活動）
+  var colMap = {};
+  var colOrder = [];
   rows.forEach(function (r) {
     var d = fmtDate_(getField_(r, 'date'));
-    if (/^\d{4}-\d{2}-\d{2}$/.test(d)) dateSet[d] = true;
+    var type = String(getField_(r, 'sessionType') || 'meeting');
+    var evId = String(getField_(r, 'eventId') || '');
+    var key = d + '|' + type + '|' + evId;
+    if (colMap[key]) return;
+    colOrder.push(key);
+    colMap[key] = {
+      key: key, date: d, sessionType: type, eventId: evId,
+      label: d.slice(5) + (sessionType === 'all' ? (type === 'activity' ? ' 活' : ' 集') : '')
+    };
   });
-  var dates = Object.keys(dateSet).sort();
-  if (dates.length > days) dates = dates.slice(dates.length - days);
+  colOrder.sort(function (a, b) {
+    var ca = colMap[a], cb = colMap[b];
+    if (ca.date === cb.date) return ca.sessionType < cb.sessionType ? -1 : 1;
+    return ca.date < cb.date ? -1 : 1;
+  });
+  var columns = colOrder.map(function (k) { return colMap[k]; });
+  if (!from && !to && columns.length > days) columns = columns.slice(columns.length - days);
 
   var recMap = {};
   rows.forEach(function (r) {
-    recMap[String(getField_(r, 'memberId')) + '|' + fmtDate_(getField_(r, 'date'))] = String(getField_(r, 'status') || '');
+    var d = fmtDate_(getField_(r, 'date'));
+    var type = String(getField_(r, 'sessionType') || 'meeting');
+    var evId = String(getField_(r, 'eventId') || '');
+    recMap[String(getField_(r, 'memberId')) + '|' + d + '|' + type + '|' + evId] = String(getField_(r, 'status') || '');
   });
 
-  var headers = ['YMIS號', '姓名', '支部', '小隊'].concat(dates);
+  var headers = ['YMIS號', '姓名', '支部', '小隊'].concat(columns.map(function (c) { return c.label; }));
   var outRows = members.map(function (m) {
     var obj = {
       'YMIS號': m.ymNumber || '',
@@ -4194,12 +4225,81 @@ function handleGetAttendanceMatrix_(p) {
       '支部': m.branchId || '',
       '小隊': patrolNameById_(patrols, m.patrolId)
     };
-    dates.forEach(function (d) {
-      obj[d] = recMap[m.id + '|' + d] || '';
+    columns.forEach(function (c) {
+      obj[c.key] = recMap[m.id + '|' + c.date + '|' + c.sessionType + '|' + c.eventId] || '';
     });
     return obj;
   });
-  return { success: true, headers: headers, rows: outRows, branchId: branchId, sessionType: sessionType };
+  return { success: true, headers: headers, columns: columns, rows: outRows, branchId: branchId, sessionType: sessionType };
+}
+
+/** 後補／補改：列出可點名場次（過期／即將的恆常集會日 + 旅團自辦活動），由新至舊 */
+function handleGetAttendanceSessions_(p) {
+  ensureAttendanceSheet_();
+  var caller = resolveAttendanceCaller_(p);
+  var scope = scopedAttendanceBranch_(caller, p.branchId || '');
+  if (scope.error) return { success: false, error: scope.error };
+  var branchId = scope.branchId;
+  if (!branchId) return { success: false, error: '請選擇支部' };
+
+  var today = fmtDate_(new Date());
+  function weekdayOf_(iso) {
+    var parts = String(iso).split('-').map(function (n) { return Number(n); });
+    return new Date(parts[0], parts[1] - 1, parts[2]).getDay();
+  }
+
+  var meetings = [];
+  var seen = {};
+  var now = new Date();
+  var rules = mapRegularMeetings_().filter(function (r) { return r.enabled && r.branchId === branchId; });
+  var cancelledSet = {};
+  mapCancelledMeetings_().forEach(function (c) { if (c.branchId === branchId) cancelledSet[fmtDate_(c.date)] = true; });
+
+  rules.forEach(function (rule) {
+    for (var i = 0; i < 120; i++) {
+      var d = new Date(now); d.setDate(now.getDate() - i);
+      if (d.getDay() !== Number(rule.weekday)) continue;
+      var iso = fmtDate_(d);
+      if (cancelledSet[iso]) continue;
+      var key = 'meeting|' + branchId + '|' + iso;
+      if (seen[key]) continue;
+      seen[key] = true;
+      meetings.push({ id: key, date: iso, label: rule.title, time: (rule.startTime || '') + '-' + (rule.endTime || ''), location: rule.location || '', weekday: Number(rule.weekday) });
+    }
+  });
+  // 併入已點名但非規律的日期（例如補辦的集會）
+  readTable_('AttendanceRecords').forEach(function (r) {
+    if (String(getField_(r, 'branchId')) !== branchId) return;
+    if (String(getField_(r, 'sessionType') || 'meeting') !== 'meeting') return;
+    var d = fmtDate_(getField_(r, 'date'));
+    var key = 'meeting|' + branchId + '|' + d;
+    if (seen[key]) return;
+    seen[key] = true;
+    meetings.push({ id: key, date: d, label: '已點名集會', time: '', location: '', weekday: weekdayOf_(d) });
+  });
+  meetings.sort(function (a, b) { return a.date < b.date ? 1 : -1; });
+  var recDates = {};
+  readTable_('AttendanceRecords').forEach(function (r) {
+    if (String(getField_(r, 'branchId')) === branchId && String(getField_(r, 'sessionType') || 'meeting') === 'meeting') {
+      recDates[fmtDate_(getField_(r, 'date'))] = true;
+    }
+  });
+  meetings.forEach(function (m) { m.hasRecords = !!recDates[m.date]; });
+
+  var activities = mapEvents_().filter(function (e) {
+    if (e.kind !== 'activity') return false;
+    if (e.status !== 'published') return false;
+    if (e.scope === 'troop') return true;
+    return e.branchId === branchId;
+  }).map(function (e) {
+    var has = false;
+    readTable_('AttendanceRecords').forEach(function (r) {
+      if (String(getField_(r, 'sessionType') || 'meeting') === 'activity' && String(getField_(r, 'eventId') || '') === e.id) has = true;
+    });
+    return { id: e.id, date: e.date, label: e.title, location: e.location || '', branchId: e.branchId, scope: e.scope, hasRecords: has };
+  }).sort(function (a, b) { return a.date < b.date ? 1 : -1; });
+
+  return { success: true, branchId: branchId, today: today, meetings: meetings, activities: activities };
 }
 
 function handleGetMemberAttendance_(p) {
@@ -4224,7 +4324,8 @@ function handleGetMemberAttendance_(p) {
     if (!allowed) return { success: false, error: '只能查看自己子女的出席紀錄' };
   }
   if (['group_leader', 'branch_leader', 'coach'].indexOf(caller.role) >= 0) {
-    if (caller.branchId && target.branchId !== caller.branchId) {
+    var feats = getUserFeatures_(caller.userId, caller.role);
+    if (feats.indexOf('attendance_all') < 0 && caller.branchId && target.branchId !== caller.branchId) {
       return { success: false, error: '只能查看自己支部成員的出席紀錄' };
     }
   }
