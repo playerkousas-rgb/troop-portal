@@ -7,7 +7,7 @@ import { useMemo, useState } from 'react';
    （真實版會用同一套版式，改接 apiCreateEvent / apiUpdateEvent / …）
    ═══════════════════════════════════════════════════ */
 
-type Ev = { id: string; title: string; date: string; branch: string; location: string; kind: 'event' | 'meeting' };
+type Ev = { id: string; title: string; date: string; branch: string; location: string; kind: 'event' | 'meeting'; tag: string };
 type Rule = { id: string; branch: string; weekday: string; time: string; location: string; active: boolean };
 
 const BRANCHES = ['小童軍', '幼童軍', '童軍', '深資', '樂行', '全旅'];
@@ -18,10 +18,14 @@ const BRANCH_COLORS: Record<string, string> = {
 };
 
 const SEED_EVENTS: Ev[] = [
-  { id: 'e1', title: '旅團露營', date: '2026-09-20', branch: '全旅', location: '西貢', kind: 'event' },
-  { id: 'e2', title: '區運會', date: '2026-10-05', branch: '全旅', location: '九龍公園', kind: 'event' },
-  { id: 'e3', title: '親子日營', date: '2026-10-12', branch: '童軍', location: '大埔', kind: 'event' },
+  { id: 'e1', title: '旅團露營', date: '2026-09-20', branch: '全旅', location: '西貢', kind: 'event', tag: '活動' },
+  { id: 'e2', title: '區運會', date: '2026-10-05', branch: '全旅', location: '九龍公園', kind: 'event', tag: '活動' },
+  { id: 'e3', title: '親子日營', date: '2026-10-12', branch: '童軍', location: '大埔', kind: 'event', tag: '活動' },
+  { id: 'e4', title: '旅務會議', date: '2026-09-12', branch: '領袖', location: '旅團部', kind: 'event', tag: '會議' },
 ];
+
+/** 預設分類標籤（團長／管理員可以加新標籤，純粹幫佢哋分類同篩選） */
+const DEFAULT_TAGS = ['恆常集會', '活動', '會議'];
 
 const SEED_RULES: Rule[] = [
   { id: 'r1', branch: '童軍', weekday: '星期一', time: '19:00-21:00', location: '旅團部', active: true },
@@ -30,13 +34,16 @@ const SEED_RULES: Rule[] = [
 
 const WEEKDAY_INDEX: Record<string, number> = { 星期日: 0, 星期一: 1, 星期二: 2, 星期三: 3, 星期四: 4, 星期五: 5, 星期六: 6 };
 
-const emptyForm = { id: '', title: '', date: '', branch: '全旅', location: '', kind: 'event' as 'event' | 'meeting' };
+const emptyForm = { id: '', title: '', date: '', branch: '全旅', location: '', kind: 'event' as 'event' | 'meeting', tag: '活動' };
 
 export default function CalendarPage() {
   const [role, setRole] = useState('parent');
   const [view, setView] = useState<'month' | 'list'>('month');
   const [month, setMonth] = useState(new Date(2026, 8)); // Sep 2026
   const [branchFilter, setBranchFilter] = useState('all');
+  const [tags, setTags] = useState<string[]>(DEFAULT_TAGS);
+  const [tagFilter, setTagFilter] = useState('all');
+  const [newTag, setNewTag] = useState('');
 
   const [events, setEvents] = useState<Ev[]>(SEED_EVENTS);
   const [rules, setRules] = useState<Rule[]>(SEED_RULES);
@@ -70,26 +77,28 @@ export default function CalendarPage() {
   function itemsForDay(day: number) {
     const date = `${year}-${String(mo + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
     const items: { title: string; time?: string; branch: string; cancelled?: boolean }[] = [];
-    events.filter(e => e.date === date).forEach(e => items.push({ title: e.title, branch: e.branch }));
-    meetingItems.filter(m => m.date === date).forEach(m => {
-      if (m.cancelled && !isLeader) return; // 成員唔會睇到已取消嘅集會
-      items.push({ title: m.title, time: m.time, branch: m.branch, cancelled: m.cancelled });
-    });
+    events.filter(e => e.date === date && (tagFilter === 'all' || e.tag === tagFilter)).forEach(e => items.push({ title: e.title, branch: e.branch }));
+    if (tagFilter === 'all' || tagFilter === '恆常集會') {
+      meetingItems.filter(m => m.date === date).forEach(m => {
+        if (m.cancelled && !isLeader) return; // 成員唔會睇到已取消嘅集會
+        items.push({ title: m.title, time: m.time, branch: m.branch, cancelled: m.cancelled });
+      });
+    }
     return branchFilter === 'all' ? items : items.filter(i => i.branch === branchFilter);
   }
 
   const listItems = useMemo(() => {
     const daysInMonth = new Date(year, mo + 1, 0).getDate();
-    const rows: { date: string; title: string; time?: string; branch: string; cancelled?: boolean; type: 'event' | 'meeting'; id: string; location?: string }[] = [];
+    const rows: { date: string; title: string; time?: string; branch: string; cancelled?: boolean; type: 'event' | 'meeting'; id: string; location?: string; tag?: string }[] = [];
     for (let d = 1; d <= daysInMonth; d++) {
       const date = `${year}-${String(mo + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-      events.filter(e => e.date === date && (branchFilter === 'all' || e.branch === branchFilter))
-        .forEach(e => rows.push({ date, title: e.title, branch: e.branch, type: 'event', id: e.id, location: e.location }));
-      meetingItems.filter(m => m.date === date && (branchFilter === 'all' || m.branch === branchFilter))
-        .forEach(m => { if (!m.cancelled || isLeader) rows.push({ date, title: m.title, time: m.time, branch: m.branch, type: 'meeting', id: m.ruleId, cancelled: m.cancelled }); });
+      events.filter(e => e.date === date && (branchFilter === 'all' || e.branch === branchFilter) && (tagFilter === 'all' || e.tag === tagFilter))
+        .forEach(e => rows.push({ date, title: e.title, branch: e.branch, type: 'event', id: e.id, location: e.location, tag: e.tag }));
+      meetingItems.filter(m => m.date === date && (branchFilter === 'all' || m.branch === branchFilter) && (tagFilter === 'all' || tagFilter === '恆常集會'))
+        .forEach(m => { if (!m.cancelled || isLeader) rows.push({ date, title: m.title, time: m.time, branch: m.branch, type: 'meeting', id: m.ruleId, cancelled: m.cancelled, tag: '恆常集會' }); });
     }
     return rows;
-  }, [events, meetingItems, branchFilter, year, mo, isLeader]);
+  }, [events, meetingItems, branchFilter, tagFilter, year, mo, isLeader]);
 
   /* ══════════ 管理動作（有權限者先見到按鈕）══════════ */
 
@@ -132,6 +141,26 @@ export default function CalendarPage() {
     if (!isCancelled && !window.confirm(`確定取消 ${date} 嘅${title}？成員嘅行事曆會即時唔再顯示。`)) return;
     setCancelled(prev => (isCancelled ? prev.filter(d => d !== date) : [...prev, date]));
     setMsg(isCancelled ? `↺ 已恢復 ${date} 嘅${title}` : `✕ 已取消 ${date} 嘅${title}`);
+  }
+
+  function addTag() {
+    const t = newTag.trim();
+    // 防呆：空白同重複
+    if (!t) { setMsg('⚠️ 請先輸入標籤名稱。'); return; }
+    if (tags.includes(t)) { setMsg(`⚠️ 「${t}」已經存在。`); return; }
+    setTags(prev => [...prev, t]);
+    setNewTag('');
+    setMsg(`✅ 已新增標籤「${t}」`);
+  }
+
+  function removeTag(t: string) {
+    const used = events.filter(e => e.tag === t).length;
+    // 防呆：有活動用緊要先講清楚
+    if (!window.confirm(`確定刪除標籤「${t}」？${used ? `有 ${used} 個活動用緊，佢哋會變成「未分類」。` : ''}`)) return;
+    setTags(prev => prev.filter(x => x !== t));
+    setEvents(prev => prev.map(e => (e.tag === t ? { ...e, tag: '' } : e)));
+    if (tagFilter === t) setTagFilter('all');
+    setMsg(`🗑 已刪除標籤「${t}」`);
   }
 
   function saveRule() {
@@ -194,6 +223,20 @@ export default function CalendarPage() {
 
       {msg && <div className="text-[11px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-xl px-3 py-2">{msg}</div>}
 
+      {/* 分類標籤篩選 */}
+      <div className="flex gap-1 overflow-x-auto pb-1 -mx-1 px-1">
+        <button onClick={() => setTagFilter('all')}
+          className={`text-[11px] px-2.5 py-1 rounded-full font-bold whitespace-nowrap border ${tagFilter === 'all' ? 'bg-slate-700 text-white border-slate-700' : 'bg-white text-slate-600 border-slate-200'}`}>
+          🏷️ 全部標籤
+        </button>
+        {tags.map(t => (
+          <button key={t} onClick={() => setTagFilter(t)}
+            className={`text-[11px] px-2.5 py-1 rounded-full font-bold whitespace-nowrap border ${tagFilter === t ? 'bg-slate-700 text-white border-slate-700' : 'bg-white text-slate-600 border-slate-200'}`}>
+            {t}
+          </button>
+        ))}
+      </div>
+
       {/* 支部 filter */}
       <div className="flex gap-1 overflow-x-auto pb-1 -mx-1 px-1">
         {[{ id: 'all', label: '全部' }, ...BRANCHES.map(b => ({ id: b, label: b }))].map(b => (
@@ -247,7 +290,7 @@ export default function CalendarPage() {
                   {item.cancelled && <span className="text-[11px] bg-rose-100 text-rose-700 px-1 py-0.5 rounded font-bold">已取消</span>}
                   <span className="font-bold text-xs">{item.title}</span>
                 </div>
-                <div className="text-[11px] text-slate-500 mt-0.5">{item.date} {item.time && `· ${item.time}`} · {item.branch}{item.location ? ` · ${item.location}` : ''}</div>
+                <div className="text-[11px] text-slate-500 mt-0.5">{item.date} {item.time && `· ${item.time}`} · {item.branch}{item.location ? ` · ${item.location}` : ''}{item.tag ? ` · 🏷️ ${item.tag}` : ''}</div>
               </div>
               <span className={`text-[11px] px-1.5 py-0.5 rounded font-bold ${item.type === 'event' ? 'bg-blue-100 text-blue-700' : 'bg-emerald-100 text-emerald-700'}`}>
                 {item.type === 'event' ? '活動' : '集會'}
@@ -303,6 +346,28 @@ export default function CalendarPage() {
         </section>
       )}
 
+      {/* ═════ 分類標籤管理（團長／管理員可加新標籤）═════ */}
+      {isLeader && (
+        <section className="bg-white rounded-2xl border border-slate-200 p-4 space-y-2.5">
+          <h3 className="font-bold text-sm m-0">🏷️ 分類標籤</h3>
+          <p className="text-[11px] text-slate-500 m-0 -mt-1 leading-relaxed">
+            預設有「恆常集會」「活動」「會議」，你可以加自己嘅標籤（例如「訓練」「服務」「營火會」），純粹用來分類同篩選。
+          </p>
+          <div className="flex flex-wrap gap-1.5">
+            {tags.map(t => (
+              <span key={t} className="inline-flex items-center gap-1 text-[11px] font-bold bg-slate-100 text-slate-700 rounded-full pl-2.5 pr-1 py-1">
+                {t}
+                <button onClick={() => removeTag(t)} className="text-slate-400 hover:text-rose-600 bg-transparent border-0 cursor-pointer px-1" title="刪除標籤">✕</button>
+              </span>
+            ))}
+          </div>
+          <div className="flex gap-2">
+            <input className="flex-1 rounded-lg border border-slate-200 px-2 py-1.5 text-xs" placeholder="新標籤名稱" value={newTag} onChange={e => setNewTag(e.target.value)} />
+            <button onClick={addTag} className="text-[11px] font-bold bg-brand-600 text-white px-3 py-1.5 rounded-lg">+ 加入</button>
+          </div>
+        </section>
+      )}
+
       {/* ═════ 活動表單（inline，唔使跳頁）═════ */}
       {form && (
         <div className="fixed inset-0 z-50 bg-black/30 flex items-end sm:items-center justify-center p-0 sm:p-4">
@@ -316,6 +381,11 @@ export default function CalendarPage() {
               </select>
             </label>
             <label className="flex items-center gap-2 text-[11px] font-bold text-slate-600">地點<input className={inputCls} value={form.location} onChange={e => setForm({ ...form, location: e.target.value })} placeholder="例如：西貢" /></label>
+            <label className="flex items-center gap-2 text-[11px] font-bold text-slate-600">分類標籤
+              <select className={inputCls} value={form.tag} onChange={e => setForm({ ...form, tag: e.target.value })}>
+                {tags.map(t => <option key={t} value={t}>{t}</option>)}
+              </select>
+            </label>
             {formErr && <p className="text-[11px] font-bold text-rose-700 bg-rose-50 rounded-lg px-2 py-1.5 m-0">{formErr}</p>}
             <div className="flex gap-2 pt-1">
               <button onClick={saveEvent} className="flex-1 text-[12px] font-bold bg-brand-600 text-white py-2 rounded-xl">儲存</button>
