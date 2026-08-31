@@ -4120,6 +4120,45 @@ function handleSaveAttendance_(p) {
   if (records.length > 500) return { success: false, error: '一次最多儲存 500 筆' };
 
   var allowed = { P: 1, A: 1, L: 1, E: 1, S: 1 };
+
+  // ★ 效能：只讀一次整張表 → 喺記憶體改 → 最後一次過寫返。
+  //   之前逐筆「findRow + updateCell」會令成個旅團點名讀寫上千次成張表 → 超時卡死。
+  var sh = getSheet_('AttendanceRecords');
+  var data = sh.getDataRange().getValues();
+  var headers = data[0].map(function (h) { return String(h || '').trim(); });
+  var colIdx = {};
+  headers.forEach(function (h, i) { colIdx[h.toLowerCase()] = i; });
+
+  var neededCols = ['recordId', 'memberId', 'ymNumber', 'name', 'branchId', 'patrolId', 'date', 'status', 'note', 'sessionType', 'eventId', 'markedBy', 'markedAt'];
+  var headerChanged = false;
+  neededCols.forEach(function (c) {
+    if (colIdx[c.toLowerCase()] === undefined) {
+      colIdx[c.toLowerCase()] = headers.length;
+      headers.push(c);
+      headerChanged = true;
+    }
+  });
+  if (headerChanged) {
+    sh.getRange(1, 1, 1, headers.length).setValues([headers]);
+    data[0] = headers;
+    for (var ri = 1; ri < data.length; ri++) {
+      while (data[ri].length < headers.length) data[ri].push('');
+    }
+  }
+
+  var ridIdx = colIdx['recordid'];
+  var rowIndexById = {};
+  for (var i = 1; i < data.length; i++) {
+    rowIndexById[String(data[i][ridIdx])] = i;
+  }
+
+  function setCell_(rowIdx, colName, value) {
+    var c = colIdx[String(colName).toLowerCase()];
+    if (c === undefined) return;
+    while (data[rowIdx].length <= c) data[rowIdx].push('');
+    data[rowIdx][c] = value;
+  }
+
   var saved = 0;
   records.forEach(function (raw) {
     var memberId = String(raw.memberId || '').trim();
@@ -4141,16 +4180,25 @@ function handleSaveAttendance_(p) {
       markedBy: caller.userId,
       markedAt: now_()
     };
-    var idx = findRowIndexById_('AttendanceRecords', 'recordId', recordId);
-    if (idx >= 0) {
-      Object.keys(fields).forEach(function (k) {
-        updateCellByName_('AttendanceRecords', 'recordId', recordId, k, fields[k]);
-      });
+    var existing = rowIndexById[recordId];
+    if (existing !== undefined) {
+      Object.keys(fields).forEach(function (k) { setCell_(existing, k, fields[k]); });
     } else {
-      appendRowByHeaders_('AttendanceRecords', fields);
+      var newRow = [];
+      for (var x = 0; x < headers.length; x++) newRow.push('');
+      Object.keys(fields).forEach(function (k) {
+        var c = colIdx[String(k).toLowerCase()];
+        if (c !== undefined) newRow[c] = fields[k];
+      });
+      data.push(newRow);
+      rowIndexById[recordId] = data.length - 1;
     }
     saved++;
   });
+
+  if (saved > 0) {
+    sh.getRange(1, 1, data.length, headers.length).setValues(data);
+  }
   writeAudit_(caller.userId, 'saveAttendance', 'AttendanceRecords', branchId + ' ' + date, 'saved=' + saved + ' type=' + sessionType);
   return { success: true, saved: saved, date: date, branchId: branchId, sessionType: sessionType, eventId: eventId };
 }
@@ -4248,6 +4296,9 @@ function handleGetAttendanceSessions_(p) {
     return new Date(parts[0], parts[1] - 1, parts[2]).getDay();
   }
 
+  // ★ 效能：AttendanceRecords 只讀一次，唔好喺 loop 入面重複讀（會卡）
+  var attRows = readTable_('AttendanceRecords');
+
   var meetings = [];
   var seen = {};
   var now = new Date();
@@ -4267,24 +4318,30 @@ function handleGetAttendanceSessions_(p) {
       meetings.push({ id: key, date: iso, label: rule.title, time: (rule.startTime || '') + '-' + (rule.endTime || ''), location: rule.location || '', weekday: Number(rule.weekday) });
     }
   });
-  // 併入已點名但非規律的日期（例如補辦的集會）
-  readTable_('AttendanceRecords').forEach(function (r) {
+
+  // 一次過收集：會議 hasRecords 及 活動 hasRecords
+  var meetingRecDates = {};
+  var activityRecEventIds = {};
+  attRows.forEach(function (r) {
     if (String(getField_(r, 'branchId')) !== branchId) return;
-    if (String(getField_(r, 'sessionType') || 'meeting') !== 'meeting') return;
+    var type = String(getField_(r, 'sessionType') || 'meeting');
     var d = fmtDate_(getField_(r, 'date'));
-    var key = 'meeting|' + branchId + '|' + d;
-    if (seen[key]) return;
-    seen[key] = true;
-    meetings.push({ id: key, date: d, label: '已點名集會', time: '', location: '', weekday: weekdayOf_(d) });
-  });
-  meetings.sort(function (a, b) { return a.date < b.date ? 1 : -1; });
-  var recDates = {};
-  readTable_('AttendanceRecords').forEach(function (r) {
-    if (String(getField_(r, 'branchId')) === branchId && String(getField_(r, 'sessionType') || 'meeting') === 'meeting') {
-      recDates[fmtDate_(getField_(r, 'date'))] = true;
+    if (type === 'meeting') {
+      meetingRecDates[d] = true;
+      // 併入已點名但非規律的日期（例如補辦的集會）
+      var key = 'meeting|' + branchId + '|' + d;
+      if (!seen[key]) {
+        seen[key] = true;
+        meetings.push({ id: key, date: d, label: '已點名集會', time: '', location: '', weekday: weekdayOf_(d) });
+      }
+    } else if (type === 'activity') {
+      var evId = String(getField_(r, 'eventId') || '');
+      if (evId) activityRecEventIds[evId] = true;
     }
   });
-  meetings.forEach(function (m) { m.hasRecords = !!recDates[m.date]; });
+
+  meetings.sort(function (a, b) { return a.date < b.date ? 1 : -1; });
+  meetings.forEach(function (m) { m.hasRecords = !!meetingRecDates[m.date]; });
 
   var activities = mapEvents_().filter(function (e) {
     if (e.kind !== 'activity') return false;
@@ -4292,11 +4349,7 @@ function handleGetAttendanceSessions_(p) {
     if (e.scope === 'troop') return true;
     return e.branchId === branchId;
   }).map(function (e) {
-    var has = false;
-    readTable_('AttendanceRecords').forEach(function (r) {
-      if (String(getField_(r, 'sessionType') || 'meeting') === 'activity' && String(getField_(r, 'eventId') || '') === e.id) has = true;
-    });
-    return { id: e.id, date: e.date, label: e.title, location: e.location || '', branchId: e.branchId, scope: e.scope, hasRecords: has };
+    return { id: e.id, date: e.date, label: e.title, location: e.location || '', branchId: e.branchId, scope: e.scope, hasRecords: !!activityRecEventIds[e.id] };
   }).sort(function (a, b) { return a.date < b.date ? 1 : -1; });
 
   return { success: true, branchId: branchId, today: today, meetings: meetings, activities: activities };
