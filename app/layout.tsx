@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import TopNav from '@/components/layout/TopNav';
 import BottomNav from '@/components/layout/BottomNav';
+import SiteFooter from '@/components/layout/SiteFooter';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -14,10 +15,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body>
         <TopNav />
         <main className="page-container">{children}</main>
-        {/* © Copyright */}
-        <footer className="pt-2 pb-16 text-center">
-          <p className="text-[11px] text-slate-500">© 2026 Scout System · 旅團管理系統</p>
-        </footer>
+        <SiteFooter />
         <BottomNav />
       </body>
     </html>

@@ -5,7 +5,7 @@
    ═══════════════════════════════════════════════════ */
 
 const TEMPLATES = [
-  { icon: '📋', name: '活動通告格式', desc: 'Excel 格式，填好活動日期、地點、收費等資料後可上傳到 Drive 再貼連結到活動通告度。', file: '/templates/activity_notice_template.xlsx' },
+  { icon: '📋', name: '活動通告格式', desc: '填好活動日期、地點、收費等資料後使用。', file: '/templates/activity_notice_template.xlsx' },
   { icon: '📝', name: '集會點名表', desc: 'Excel 格式，按支部印出嚟點名用。', file: '/templates/attendance_template.xlsx' },
   { icon: '📊', name: '成員資料表', desc: '匯入成員用嘅 CSV 格式。', file: '/templates/member_import_template.csv' },
   { icon: '💰', name: '收費紀錄表', desc: '紀錄成員繳費情況嘅 Excel 格式。', file: '/templates/payment_template.xlsx' },
@@ -20,7 +20,7 @@ export default function TemplatesPage() {
         <h1 className="font-bold text-lg m-0">模板下載</h1>
       </div>
       <p className="text-[11px] text-slate-500 m-0 -mt-2 leading-relaxed">
-        按需要下載模板，填好後可上傳到 Google Drive 再貼到活動通告／公告度使用。詳細說明去「活動」頁嘅通告管理。
+        按需要下載模板。活動通告的填寫及加入方式，會在「活動管理」頁面說明。
       </p>
 
       <div className="grid gap-2.5">

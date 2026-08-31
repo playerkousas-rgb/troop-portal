@@ -25,21 +25,23 @@ export default function TopNav() {
   }, [pathname]);
 
   const admin = isAdmin(user?.role as Role);
-  // 首頁（登入旅團頁）、/login 本身，以及「新旅團申請及教學」（/setup、/onboard）都唔需要登入鈕：
-  // 1) 成頁都係登入，再放登入鈕好怪；2) 「我要申請，點會要我登入？」
-  const hideAuth =
-    pathname === '/' ||
-    pathname === '/login' ||
-    pathname === '/dashboard/login' ||
-    pathname === '/setup' ||
-    pathname === '/onboard';
-
   // 已登入 → 回到該角色的真實控制台（不是 /dashboard 的 mock 展示樹）
   const home =
     user?.role === 'parent' ? '/parent' :
     user?.role === 'member' ? '/member' :
     admin || user?.role === 'group_leader' || user?.role === 'branch_leader' || user?.role === 'coach' ? '/admin' :
     '/calendar';
+
+  // /dashboard/** 是完全獨立的 MOCK 展示樹；首頁只保留申請入口，不顯示登入。
+  const isMockPreview = pathname?.startsWith('/dashboard');
+  const isHome = pathname === '/';
+  const showHomeSetup = isHome;
+  const hideAuth =
+    isHome ||
+    isMockPreview ||
+    pathname === '/login' ||
+    pathname === '/setup' ||
+    pathname === '/onboard';
 
   function logout() {
     // 防呆：登出前確認，避免誤按直接踢走
@@ -74,74 +76,85 @@ export default function TopNav() {
           </div>
         </Link>
 
-        {/* 右：操作（首頁／申請頁隱藏） */}
-        {!hideAuth && (
-        <div className="flex items-center gap-1 flex-shrink-0">
-          {admin && (
-            <>
-              <Link href="/admin/settings" className="w-7 h-7 flex items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-600 transition" title="系統設定">
-                <span className="text-sm">⚙️</span>
-              </Link>
-              <Link href="/admin/plugins" className="w-7 h-7 flex items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-600 transition" title="元件管理">
-                <span className="text-sm">🧩</span>
-              </Link>
-            </>
-          )}
-          {/* 已登入：恆常顯示「改密碼」＋「登出」icon（唔使撳開選單先搵到） */}
-          {user && (
-            <>
-              <Link href="/profile" className="w-7 h-7 flex items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-600 transition" title="改密碼">
-                <span className="text-sm">🔑</span>
-              </Link>
-              <button onClick={logout} className="w-7 h-7 flex items-center justify-center rounded-lg text-slate-500 hover:bg-rose-50 hover:text-rose-600 transition bg-transparent border-0 cursor-pointer" title="登出">
-                <span className="text-sm">🚪</span>
-              </button>
-            </>
-          )}
-          {user ? (
-            <div className="relative">
-              <button
-                onClick={() => setShowMenu(!showMenu)}
-                className="text-[11px] font-bold text-slate-600 bg-slate-100 px-2 py-1 rounded-lg hover:bg-slate-200 transition flex items-center gap-1"
+        {/* 右：首頁只放「新旅團申請及教學」；其他頁才顯示帳戶操作 */}
+        {(showHomeSetup || !hideAuth) && (
+          <div className="flex items-center gap-1 flex-shrink-0">
+            {showHomeSetup ? (
+              <Link
+                href="/setup"
+                className="inline-flex items-center gap-1.5 no-underline text-[11px] sm:text-xs font-bold text-violet-700 bg-violet-50 border border-violet-200 px-2.5 py-1.5 rounded-xl hover:bg-violet-100 transition whitespace-nowrap"
               >
-                <span>⋮</span>
-              </button>
-              {showMenu && (
-                <>
-                  <div className="fixed inset-0 z-40" onClick={() => setShowMenu(false)} />
-                  <div className="absolute right-0 top-full mt-1 bg-white rounded-xl border border-slate-200 shadow-xl py-1 z-50 min-w-[140px]">
-                    <Link href="/equipment" className="flex items-center gap-2 px-3 py-2 text-xs text-slate-700 hover:bg-slate-50 no-underline" onClick={() => setShowMenu(false)}>
-                      <span>📦</span> 借用物資
+                <span aria-hidden>📖</span> 新旅團申請及教學
+              </Link>
+            ) : (
+              <>
+                {admin && (
+                  <>
+                    <Link href="/admin/settings" className="w-7 h-7 flex items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-600 transition" title="系統設定">
+                      <span className="text-sm">⚙️</span>
                     </Link>
-                    <Link href="/profile" className="flex items-center gap-2 px-3 py-2 text-xs text-slate-700 hover:bg-slate-50 no-underline" onClick={() => setShowMenu(false)}>
-                      <span>👤</span> 我的資料
+                    <Link href="/admin/plugins" className="w-7 h-7 flex items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-600 transition" title="元件管理">
+                      <span className="text-sm">🧩</span>
                     </Link>
-                    <Link href="/profile" className="flex items-center gap-2 px-3 py-2 text-xs text-slate-700 hover:bg-slate-50 no-underline" onClick={() => setShowMenu(false)}>
-                      <span>🔑</span> 改密碼
+                  </>
+                )}
+                {/* 已登入：恆常顯示改密碼及登出 */}
+                {user && (
+                  <>
+                    <Link href="/profile" className="w-7 h-7 flex items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-600 transition" title="改密碼">
+                      <span className="text-sm">🔑</span>
                     </Link>
-                    <Link href={home} className="flex items-center gap-2 px-3 py-2 text-xs text-slate-700 hover:bg-slate-50 no-underline" onClick={() => setShowMenu(false)}>
-                      <span>🏠</span> 我的控制台
-                    </Link>
-                    <div className="border-t border-slate-100 my-1" />
-                    <button
-                      onClick={logout}
-                      className="flex items-center gap-2 px-3 py-2 text-xs text-rose-600 hover:bg-rose-50 w-full text-left border-0 bg-transparent cursor-pointer"
-                    >
-                      <span>🚪</span> 登出
+                    <button onClick={logout} className="w-7 h-7 flex items-center justify-center rounded-lg text-slate-500 hover:bg-rose-50 hover:text-rose-600 transition bg-transparent border-0 cursor-pointer" title="登出">
+                      <span className="text-sm">🚪</span>
                     </button>
+                  </>
+                )}
+                {user ? (
+                  <div className="relative">
+                    <button
+                      onClick={() => setShowMenu(!showMenu)}
+                      className="text-[11px] font-bold text-slate-600 bg-slate-100 px-2 py-1 rounded-lg hover:bg-slate-200 transition flex items-center gap-1"
+                    >
+                      <span>⋮</span>
+                    </button>
+                    {showMenu && (
+                      <>
+                        <div className="fixed inset-0 z-40" onClick={() => setShowMenu(false)} />
+                        <div className="absolute right-0 top-full mt-1 bg-white rounded-xl border border-slate-200 shadow-xl py-1 z-50 min-w-[140px]">
+                          <Link href="/equipment" className="flex items-center gap-2 px-3 py-2 text-xs text-slate-700 hover:bg-slate-50 no-underline" onClick={() => setShowMenu(false)}>
+                            <span>📦</span> 借用物資
+                          </Link>
+                          <Link href="/profile" className="flex items-center gap-2 px-3 py-2 text-xs text-slate-700 hover:bg-slate-50 no-underline" onClick={() => setShowMenu(false)}>
+                            <span>👤</span> 我的資料
+                          </Link>
+                          <Link href="/profile" className="flex items-center gap-2 px-3 py-2 text-xs text-slate-700 hover:bg-slate-50 no-underline" onClick={() => setShowMenu(false)}>
+                            <span>🔑</span> 改密碼
+                          </Link>
+                          <Link href={home} className="flex items-center gap-2 px-3 py-2 text-xs text-slate-700 hover:bg-slate-50 no-underline" onClick={() => setShowMenu(false)}>
+                            <span>🏠</span> 我的控制台
+                          </Link>
+                          <div className="border-t border-slate-100 my-1" />
+                          <button
+                            onClick={logout}
+                            className="flex items-center gap-2 px-3 py-2 text-xs text-rose-600 hover:bg-rose-50 w-full text-left border-0 bg-transparent cursor-pointer"
+                          >
+                            <span>🚪</span> 登出
+                          </button>
+                        </div>
+                      </>
+                    )}
                   </div>
-                </>
-              )}
-            </div>
-          ) : (
-            <Link
-              href="/login"
-              className="text-[11px] font-bold text-white bg-brand-600 px-2.5 py-1 rounded-lg hover:bg-brand-700 transition"
-            >
-              登入
-            </Link>
-          )}
-        </div>
+                ) : (
+                  <Link
+                    href="/login"
+                    className="text-[11px] font-bold text-white bg-brand-600 px-2.5 py-1 rounded-lg hover:bg-brand-700 transition"
+                  >
+                    登入
+                  </Link>
+                )}
+              </>
+            )}
+          </div>
         )}
       </div>
     </header>
