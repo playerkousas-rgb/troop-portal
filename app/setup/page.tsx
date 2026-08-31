@@ -4,10 +4,29 @@ import Link from 'next/link';
 export default function Setup(){
 return <div className="stack">
 <section className="hero">
-  <span className="badge gold">🧩 接入教學</span>
+  <span className="badge gold">📖 新旅團申請及教學</span>
   <h1>如何接入 2026 Scout System</h1>
-  <p>6 步完成。最後一步提交申請，等管理員開通即可使用。</p>
-  <Link className="btn gold" href="/onboard">開始接入 →</Link>
+  <p>6 步完成。所需 GS 模組已放喺呢度，唔使跳出嚟下載。最後一步提交申請，等管理員開通即可使用。</p>
+  <div className="row">
+    <Link className="btn gold" href="/onboard">開始接入 →</Link>
+    <a className="btn primary" href="/downloads/SCOUTSYSTEM_2_SETUP.gs.txt" download>⬇️ 下載 GS 模組（必要）</a>
+  </div>
+</section>
+
+<section className="card">
+  <h3>📦 必要下載（一次過攞晒）</h3>
+  <div className="grid-wide">
+    <a className="card feature-card" href="/downloads/SCOUTSYSTEM_2_SETUP.gs.txt" download>
+      <h3>🧩 GS 初始化模組</h3>
+      <p className="muted">建立工作表、Config、角色、支部及預設欄位。接入必裝。</p>
+      <span className="btn block">下載</span>
+    </a>
+    <a className="card feature-card" href="/downloads">
+      <h3>⬇️ 其他模板</h3>
+      <p className="muted">活動／集會通告格式、Word 模板等。</p>
+      <span className="btn block">去模板下載</span>
+    </a>
+  </div>
 </section>
 
 <section className="grid-wide">

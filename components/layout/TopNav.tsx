@@ -26,6 +26,8 @@ export default function TopNav() {
   }, [pathname]);
 
   const admin = isAdmin(user?.role as Role);
+  // 首頁（登入旅團頁）：頂欄只顯示 Scout System，右邊唔顯示登入／帳戶選單
+  const isLanding = pathname === '/';
 
   // 已登入 → 回到該角色的真實控制台（不是 /dashboard 的 mock 展示樹）
   const home =
@@ -58,14 +60,15 @@ export default function TopNav() {
               </>
             ) : (
               <>
-                <div className="font-bold text-xs text-scout-blue truncate">{troop?.name || '旅團管理系統'}</div>
-                <div className="text-[11px] text-slate-500 font-semibold">2026 Scout System</div>
+                <div className="font-bold text-xs text-scout-blue truncate">{isLanding ? 'Scout System' : troop?.name || '旅團管理系統'}</div>
+                {!isLanding && <div className="text-[11px] text-slate-500 font-semibold">2026 Scout System</div>}
               </>
             )}
           </div>
         </Link>
 
-        {/* 右：操作 */}
+        {/* 右：操作（首頁隱藏） */}
+        {!isLanding && (
         <div className="flex items-center gap-1 flex-shrink-0">
           {admin && (
             <>
@@ -121,6 +124,7 @@ export default function TopNav() {
             </Link>
           )}
         </div>
+        )}
       </div>
     </header>
   );
