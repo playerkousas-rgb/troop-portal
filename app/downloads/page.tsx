@@ -67,7 +67,7 @@ export default function Downloads() {
       </div>
 
       <p className="text-[11px] text-slate-500 m-0 leading-relaxed">
-        💡 列印用嘅通告 Word 模板同埋行事曆 Excel 模板，之後會直接放喺「公告」同「行事曆」頁，方便旅團即場攞用。
+        💡 列印用嘅 Word 通告模板之後會直接放喺「公告」頁，活動用嘅 Excel 模板則會放喺「活動」頁，方便旅團即場攞用。
       </p>
     </div>
   );

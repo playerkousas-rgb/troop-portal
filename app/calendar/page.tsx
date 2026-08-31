@@ -3,6 +3,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { AppState, loadStateSlice, replyStatus, isMeetingCancelled } from '@/lib/store';
 import { apiToggleMeetingCancel } from '@/lib/api';
 import { getSession, Session } from '@/lib/session';
+import { publicViewEnabled } from '@/lib/model';
+import PublicLocked from '@/components/ui/PublicLocked';
 import Link from 'next/link';
 
 function ic(t?:string){return t==='registered'?'✅':t==='declined'?'❌':t==='interested'?'❤️':''}
@@ -100,6 +102,8 @@ export default function Calendar(){
 
   // ===== 公開行事曆（已選旅團但未登入）=====
   if(!session){
+    // 旅團管理員可以關閉公開瀏覽 → 未登入乜都睇唔到
+    if(!publicViewEnabled(s.config)) return <PublicLocked troopName={s.config?.TROOP_NAME} />;
     try {
       const pubEvents=(s.events||[]).filter(e=>e.status==='published');
       const pubRegularMeetings=(s.regularMeetings||[]).filter(r=>r.enabled);

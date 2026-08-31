@@ -3,6 +3,8 @@ import { useState } from 'react';
 
 export default function SettingsPage() {
   const [tab, setTab] = useState<'config' | 'status' | 'repair'>('config');
+  // 未登入可唔可以睇公開資料（對應 SystemConfig 的 PUBLIC_VIEW）
+  const [publicView, setPublicView] = useState(true);
 
   return (
     <main className="max-w-3xl mx-auto px-4 py-4 pb-24 space-y-4">
@@ -15,6 +17,27 @@ export default function SettingsPage() {
 
       {tab === 'config' && (
         <div className="space-y-3">
+          {/* 公開瀏覽開關：決定未登入的人可唔可以睇公開行事曆／公告／活動 */}
+          <div className="bg-white rounded-xl border border-slate-200 p-3">
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <label className="text-[11px] font-bold text-slate-500 uppercase">公開瀏覽（PUBLIC_VIEW）</label>
+                <p className="text-[11px] text-slate-500 mt-1 m-0 leading-relaxed">
+                  {publicView
+                    ? '開放中：任何人揀咗旅團就可以睇公開行事曆／公告／活動，唔使開帳戶。'
+                    : '已關閉：必須登入先睇到，未登入的人乜都睇唔到。'}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPublicView(v => !v)}
+                className={`flex-shrink-0 text-[11px] font-bold px-3 py-1.5 rounded-lg border ${publicView ? 'bg-emerald-100 text-emerald-700 border-emerald-200' : 'bg-slate-200 text-slate-600 border-slate-200'}`}
+              >
+                {publicView ? '✅ 開放' : '🔒 必須登入'}
+              </button>
+            </div>
+          </div>
+
           {[
             { key: 'troop_name', label: '旅團名稱', value: '第82旅' },
             { key: 'troop_id', label: '旅團編號', value: '0082' },

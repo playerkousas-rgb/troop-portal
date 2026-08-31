@@ -27,7 +27,7 @@ export default function TopNav() {
   const admin = isAdmin(user?.role as Role);
   // 首頁（登入旅團頁）同 /login 本身都係登入頁：
   // 頂欄只顯示 Scout System，右邊唔顯示登入／帳戶選單（成頁都係登入，再放登入鈕好怪）
-  const isLanding = pathname === '/' || pathname === '/login';
+  const isLanding = pathname === '/' || pathname === '/login' || pathname === '/dashboard/login';
 
   // 已登入 → 回到該角色的真實控制台（不是 /dashboard 的 mock 展示樹）
   const home =

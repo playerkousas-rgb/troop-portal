@@ -21,6 +21,7 @@ const FRIENDLY_LABELS: Record<string, string> = {
   ANNOUNCEMENT_FOLDER_ID: '公告 PDF Drive 資料夾 ID',
   REGISTRY_URL: '元件市場 Registry URL',
   STAFF_TOKEN: '首次登入 STAFF_TOKEN',
+  PUBLIC_VIEW: '公開瀏覽（未登入可唔可以睇公開資料）',
   system_locked: '系統鎖定（true / false）',
 };
 
@@ -37,6 +38,15 @@ export default function Page(){
     catch(e:any){setErr(e.message)}finally{setSaving('')}
   }
 
+  /** 未登入可唔可以睇公開資料（TRUE / FALSE） */
+  async function togglePublicView(){
+    if(!s) return;
+    const on = String(s.config.PUBLIC_VIEW || '').trim().toLowerCase();
+    const next = ['false','0','off','no'].includes(on) || !on ? 'FALSE' : 'TRUE';
+    // 未設定過 → 第一次按即係關閉公開瀏覽
+    await save('PUBLIC_VIEW', on ? next : 'FALSE');
+  }
+
   async function toggleLock(){
     if(!s) return;
     const next = String(s.config.system_locked || '').toLowerCase()==='true' ? 'false' : 'true';
@@ -45,6 +55,8 @@ export default function Page(){
 
   if(!s)return <div className="card">{err||'載入中...'}</div>;
   const locked = String(s.config.system_locked || '').toLowerCase()==='true';
+  // 未設定 PUBLIC_VIEW → 預設開放（保持舊旅團現有行為）
+  const publicOn = !['false','0','off','no'].includes(String(s.config.PUBLIC_VIEW || '').trim().toLowerCase());
 
   return <div className="stack"><section className="hero"><span className="badge gold">全前端控制</span><h1>系統設定 / 控制中心</h1><p>日常操作不需要打開 Google Sheet：開戶、成員、活動、行事曆、元件及 SystemConfig 都可在前端完成。</p></section>
     {err&&<p className="badge red">{err}</p>}{ok&&<p className="badge green">{ok}</p>}
@@ -55,6 +67,12 @@ export default function Page(){
         <h3>服務開關</h3>
         <p className="muted">鎖定後一般用戶暫停登入；技術測試帳號仍可進入排查。</p>
         <button className={`btn ${locked?'primary':'gold'}`} disabled={!!saving} onClick={toggleLock}>{locked?'解除鎖定':'暫停服務 / 鎖定系統'}</button>
+      </div>
+      <div className="card stack">
+        <span className={`badge ${publicOn?'green':'red'}`}>{publicOn?'公開瀏覽：開放':'公開瀏覽：已關閉'}</span>
+        <h3>未登入可唔可以睇公開資料</h3>
+        <p className="muted">開放：任何人揀咗旅團就可以睇公開行事曆／公告／活動（唔使開帳戶）。關閉：必須登入先睇到，其他人乜都睇唔到。</p>
+        <button className={`btn ${publicOn?'gold':'primary'}`} disabled={!!saving} onClick={togglePublicView}>{publicOn?'關閉公開瀏覽（改為必須登入）':'開放公開瀏覽'}</button>
       </div>
       <div className="card stack">
         <span className="badge blue">小白友善</span>
