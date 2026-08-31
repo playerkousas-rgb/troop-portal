@@ -85,7 +85,7 @@ export default function DashboardPage() {
             { href: '/dashboard/profile', label: '👤 我的' },
             { href: '/dashboard/updates', label: '🆕 更新公告' },
             { href: '/dashboard/templates', label: '📂 模板下載' },
-            { href: '/dashboard/admin/members', label: '🛠 管理後台' },
+            { href: '/dashboard/admin', label: '🛠 管理中心' },
           ].map(l => (
             <Link key={l.href + l.label} href={l.href} className="text-[11px] font-bold px-2.5 py-1.5 rounded-lg bg-white border border-amber-200 text-amber-800 no-underline hover:bg-amber-100 transition">
               {l.label}
@@ -97,7 +97,7 @@ export default function DashboardPage() {
       {/* ── Demo 切換 ── */}
       <div className="flex gap-1.5 flex-wrap">
         <span className="text-[11px] text-slate-500 mr-1 self-center">Demo：</span>
-        {(['admin', 'branch_leader', 'coach', 'parent', 'member'] as Role[]).map(r => (
+        {(['admin', 'group_leader', 'branch_leader', 'coach', 'parent', 'member'] as Role[]).map(r => (
           <button key={r} onClick={() => setRole(r)}
             className={`text-[11px] px-2.5 py-1 rounded-full border transition font-bold ${
               role === r ? 'bg-brand-600 text-white border-brand-600 shadow' : 'bg-white text-slate-500 border-slate-200 hover:border-brand-300'
@@ -159,7 +159,7 @@ export default function DashboardPage() {
             { icon: '📅', label: '行事曆', desc: '集會·活動·會議', href: '/dashboard/calendar', tone: 'from-blue-600 to-blue-800' },
             { icon: '📢', label: '公告', desc: '通知類訊息', href: '/dashboard/notices', tone: 'from-amber-500 to-amber-700' },
             { icon: '📝', label: '點名', desc: '出席紀錄', href: '/dashboard/attendance', tone: 'from-violet-600 to-violet-800' },
-            { icon: '🔧', label: '管理中心', desc: '活動·報名·會議·物資·帳戶', href: '#admin-center', tone: 'from-slate-600 to-slate-800' },
+            { icon: '🔧', label: '管理中心', desc: '統計·管理項目', href: '/dashboard/admin', tone: 'from-slate-600 to-slate-800' },
           ].map(t => (
             <Link key={t.label} href={t.href} className="no-underline text-inherit">
               <div className={`bg-gradient-to-br ${t.tone} text-white rounded-2xl p-3.5 card-hover text-center h-full`}>
@@ -327,96 +327,7 @@ export default function DashboardPage() {
         </section>
       )}
 
-      {/* ═══════════════════════════════════════════
-          管理中心（管理員/團長/支部領袖）—— 對照用戶：
-          「管理中心最上方就是統計資料,再看到各樣管理項目,點進卡片進行管理」
-          六大模組：活動管理(=通告) 行事曆管理 報名管理 會議管理 物資管理 帳戶管理
-          ═══════════════════════════════════════════ */}
-      {isManager && (
-        <section id="admin-center" className="scroll-mt-20">
-          <div className="flex items-center gap-2 mb-3">
-            <span className="w-6 h-6 bg-slate-600 text-white rounded-lg flex items-center justify-center text-[11px]">🔧</span>
-            <h3 className="font-bold text-sm">管理中心</h3>
-          </div>
-
-          {/* 統計資料（最上方） */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-3">
-            {[
-              { label: '用戶', value: 45, tone: 'bg-blue-50 text-blue-700' },
-              { label: '待審批', value: 2, tone: 'bg-rose-50 text-rose-700' },
-              { label: '已發布活動', value: 12, tone: 'bg-emerald-50 text-emerald-700' },
-              { label: '通告', value: 8, tone: 'bg-amber-50 text-amber-700' },
-            ].map(s => (
-              <div key={s.label} className={`${s.tone} rounded-xl px-3 py-2.5 text-center`}>
-                <div className="text-xl font-black leading-none">{s.value}</div>
-                <div className="text-[11px] font-bold mt-1 opacity-80">{s.label}</div>
-              </div>
-            ))}
-          </div>
-
-          {/* 六大管理模組：點進卡片管理 */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
-            <Link href="/dashboard/activities" className="no-underline text-inherit">
-              <div className="bg-white rounded-2xl border border-slate-200 p-3 card-hover text-center h-full">
-                <div className="text-2xl mb-1.5">🎯</div>
-                <div className="font-bold text-[11px]">活動管理（=通告）</div>
-                <div className="text-[11px] text-slate-500 mt-0.5">活動·通告·過期區</div>
-              </div>
-            </Link>
-            <Link href="/dashboard/calendar" className="no-underline text-inherit">
-              <div className="bg-white rounded-2xl border border-slate-200 p-3 card-hover text-center h-full">
-                <div className="text-2xl mb-1.5">📅</div>
-                <div className="font-bold text-[11px]">行事曆管理</div>
-                <div className="text-[11px] text-slate-500 mt-0.5">集會·活動·標籤</div>
-              </div>
-            </Link>
-            <Link href="/dashboard/admin/registrations" className="no-underline text-inherit">
-              <div className="bg-white rounded-2xl border border-slate-200 p-3 card-hover text-center h-full">
-                <div className="text-2xl mb-1.5">🎫</div>
-                <div className="font-bold text-[11px]">報名管理</div>
-                <div className="text-[11px] text-slate-500 mt-0.5">內部·外部·付款</div>
-              </div>
-            </Link>
-            <Link href="/dashboard/meetings" className="no-underline text-inherit">
-              <div className="bg-white rounded-2xl border border-slate-200 p-3 card-hover text-center h-full">
-                <div className="text-2xl mb-1.5">🤝</div>
-                <div className="font-bold text-[11px]">會議管理</div>
-                <div className="text-[11px] text-slate-500 mt-0.5">議程·紀錄·文件</div>
-              </div>
-            </Link>
-            <Link href="/dashboard/admin/equipment" className="no-underline text-inherit">
-              <div className="bg-white rounded-2xl border border-slate-200 p-3 card-hover text-center h-full">
-                <div className="text-2xl mb-1.5">📦</div>
-                <div className="font-bold text-[11px]">物資管理</div>
-                <div className="text-[11px] text-slate-500 mt-0.5">清單·借用·庫存</div>
-              </div>
-            </Link>
-            <Link href="/dashboard/admin/users" className="no-underline text-inherit">
-              <div className="bg-white rounded-2xl border border-slate-200 p-3 card-hover text-center h-full">
-                <div className="text-2xl mb-1.5">👤</div>
-                <div className="font-bold text-[11px]">帳戶管理</div>
-                <div className="text-[11px] text-slate-500 mt-0.5">帳號·角色·權限</div>
-              </div>
-            </Link>
-          </div>
-
-          {/* 系統設定（次要入口，收埋一行） */}
-          <div className="grid grid-cols-2 gap-2.5 mt-2.5">
-            <Link href="/dashboard/admin/settings" className="no-underline text-inherit">
-              <div className="bg-white rounded-xl border border-slate-200 p-2.5 card-hover text-center">
-                <div className="text-lg mb-1">⚙️</div>
-                <div className="font-bold text-[11px]">系統設定</div>
-              </div>
-            </Link>
-            <Link href="/dashboard/admin/applications" className="no-underline text-inherit">
-              <div className="bg-white rounded-xl border border-slate-200 p-2.5 card-hover text-center">
-                <div className="text-lg mb-1">✅</div>
-                <div className="font-bold text-[11px]">批核中心</div>
-              </div>
-            </Link>
-          </div>
-        </section>
-      )}
+      {/* 管理中心獨立頁：由上方四格的「管理中心」進入，統計資料會置頂。 */}
 
       <div className="h-4" />
     </main>

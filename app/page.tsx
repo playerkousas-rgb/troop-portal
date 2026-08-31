@@ -44,11 +44,11 @@ export default function HomePage() {
     router.push('/login');
   }
 
-  /** 演示旅團：同樣一按即進入（模擬登入頁） */
+  /** 演示旅團：直接進入 MOCK 控制台，不會誤入真實登入流程。 */
   function enterDemo() {
     setMockMode(true);
     localStorage.setItem(TROOP_KEY, JSON.stringify({ key: MOCK_TROOP.key, id: MOCK_TROOP.id, name: MOCK_TROOP.name }));
-    router.push('/login');
+    router.push('/dashboard');
   }
 
   function exitDemo() {
@@ -94,17 +94,7 @@ export default function HomePage() {
   return (
     <div className="max-w-3xl mx-auto px-4 py-6 pb-24 space-y-5">
 
-      {/* ── 右上：新旅團申請及教學 ── */}
-      <div className="flex justify-end">
-        <Link
-          href="/setup"
-          className="no-underline text-[11px] font-bold bg-violet-600 text-white px-3 py-1.5 rounded-full hover:bg-violet-700 transition flex items-center gap-1"
-        >
-          📖 新旅團申請及教學
-        </Link>
-      </div>
-
-      {/* ── 頁首（簡單）── */}
+      {/* 頁首（申請入口已放到最上方 Scout System 導覽列） */}
       <section className="text-center">
         <div className="text-5xl text-brand-600 mb-2" aria-hidden>⚜</div>
         <h1 className="text-2xl sm:text-3xl font-black text-brand-700 leading-tight m-0">2026 童軍系統</h1>
@@ -173,6 +163,11 @@ export default function HomePage() {
           看不到你的旅團？代表尚未開通，請用右上角「新旅團申請及教學」。
         </p>
       </section>
+
+      {/* 固定底部快捷列上方的版權資訊 */}
+      <footer className="pt-5 pb-1 text-center">
+        <p className="text-[11px] text-slate-500 m-0">© 2026 Scout System · 旅團管理系統</p>
+      </footer>
     </div>
   );
 }

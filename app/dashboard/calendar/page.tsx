@@ -7,7 +7,7 @@ import { useMemo, useState } from 'react';
    （真實版會用同一套版式，改接 apiCreateEvent / apiUpdateEvent / …）
    ═══════════════════════════════════════════════════ */
 
-type Ev = { id: string; title: string; date: string; branch: string; location: string; kind: 'event' | 'meeting'; tag: string };
+type Ev = { id: string; title: string; date: string; time: string; branch: string; location: string; kind: 'event' | 'meeting'; tag: string; audience: string };
 type Rule = { id: string; branch: string; weekday: string; time: string; location: string; active: boolean };
 
 const BRANCHES = ['小童軍', '幼童軍', '童軍', '深資', '樂行', '全旅'];
@@ -18,10 +18,10 @@ const BRANCH_COLORS: Record<string, string> = {
 };
 
 const SEED_EVENTS: Ev[] = [
-  { id: 'e1', title: '旅團露營', date: '2026-09-20', branch: '全旅', location: '西貢', kind: 'event', tag: '活動' },
-  { id: 'e2', title: '區運會', date: '2026-10-05', branch: '全旅', location: '九龍公園', kind: 'event', tag: '活動' },
-  { id: 'e3', title: '親子日營', date: '2026-10-12', branch: '童軍', location: '大埔', kind: 'event', tag: '活動' },
-  { id: 'e4', title: '旅務會議', date: '2026-09-12', branch: '領袖', location: '旅團部', kind: 'event', tag: '會議' },
+  { id: 'e1', title: '旅團露營', date: '2026-09-20', time: '09:00', branch: '全旅', location: '西貢', kind: 'event', tag: '活動', audience: '全旅' },
+  { id: 'e2', title: '區運會', date: '2026-10-05', time: '10:00', branch: '全旅', location: '九龍公園', kind: 'event', tag: '活動', audience: '幼童軍、童軍' },
+  { id: 'e3', title: '親子日營', date: '2026-10-12', time: '09:00', branch: '童軍', location: '大埔', kind: 'event', tag: '活動', audience: '童軍及家長' },
+  { id: 'e4', title: '旅務會議', date: '2026-09-12', time: '20:00-21:30', branch: '領袖', location: '旅團部', kind: 'meeting', tag: '會議', audience: '領袖' },
 ];
 
 /** 預設分類標籤（團長／管理員可以加新標籤，純粹幫佢哋分類同篩選） */
@@ -34,7 +34,7 @@ const SEED_RULES: Rule[] = [
 
 const WEEKDAY_INDEX: Record<string, number> = { 星期日: 0, 星期一: 1, 星期二: 2, 星期三: 3, 星期四: 4, 星期五: 5, 星期六: 6 };
 
-const emptyForm = { id: '', title: '', date: '', branch: '全旅', location: '', kind: 'event' as 'event' | 'meeting', tag: '活動' };
+const emptyForm = { id: '', title: '', date: '', time: '', branch: '全旅', location: '', kind: 'event' as 'event' | 'meeting', tag: '活動', audience: '全旅' };
 
 export default function CalendarPage() {
   const [role, setRole] = useState('parent');
@@ -84,7 +84,7 @@ export default function CalendarPage() {
   }
 
   function copySubscribe() {
-    const sub = 'https://troop-router.vercel.app/api/calendar.ics?u=0082&role=' + role;
+    const sub = 'https://troop-portal.example/api/calendar.ics?troop=0088&role=' + role;
     if (navigator.clipboard) navigator.clipboard.writeText(sub).catch(() => {});
     setCopied(true);
     setTimeout(() => setCopied(false), 1800);
@@ -108,7 +108,7 @@ export default function CalendarPage() {
   function itemsForDay(day: number) {
     const date = `${year}-${String(mo + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
     const items: { title: string; time?: string; branch: string; cancelled?: boolean }[] = [];
-    events.filter(e => e.date === date && (tagFilter === 'all' || e.tag === tagFilter)).forEach(e => items.push({ title: e.title, branch: e.branch }));
+    events.filter(e => e.date === date && (tagFilter === 'all' || e.tag === tagFilter)).forEach(e => items.push({ title: e.title, time: e.time, branch: e.branch }));
     if (tagFilter === 'all' || tagFilter === '恆常集會') {
       meetingItems.filter(m => m.date === date).forEach(m => {
         if (m.cancelled && !isLeader) return; // 成員唔會睇到已取消嘅集會
@@ -120,13 +120,13 @@ export default function CalendarPage() {
 
   const listItems = useMemo(() => {
     const daysInMonth = new Date(year, mo + 1, 0).getDate();
-    const rows: { date: string; title: string; time?: string; branch: string; cancelled?: boolean; type: 'event' | 'meeting'; id: string; location?: string; tag?: string }[] = [];
+    const rows: { date: string; title: string; time?: string; branch: string; cancelled?: boolean; type: 'event' | 'meeting'; source: 'event' | 'regular'; id: string; location?: string; tag?: string; audience?: string }[] = [];
     for (let d = 1; d <= daysInMonth; d++) {
       const date = `${year}-${String(mo + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
       events.filter(e => e.date === date && (branchFilter === 'all' || e.branch === branchFilter) && (tagFilter === 'all' || e.tag === tagFilter))
-        .forEach(e => rows.push({ date, title: e.title, branch: e.branch, type: 'event', id: e.id, location: e.location, tag: e.tag }));
+        .forEach(e => rows.push({ date, title: e.title, time: e.time, branch: e.branch, type: e.kind, source: 'event', id: e.id, location: e.location, tag: e.tag, audience: e.audience }));
       meetingItems.filter(m => m.date === date && (branchFilter === 'all' || m.branch === branchFilter) && (tagFilter === 'all' || tagFilter === '恆常集會'))
-        .forEach(m => { if (!m.cancelled || isLeader) rows.push({ date, title: m.title, time: m.time, branch: m.branch, type: 'meeting', id: m.ruleId, cancelled: m.cancelled, tag: '恆常集會' }); });
+        .forEach(m => { if (!m.cancelled || isLeader) rows.push({ date, title: m.title, time: m.time, branch: m.branch, type: 'meeting', source: 'regular', id: m.ruleId, cancelled: m.cancelled, tag: '恆常集會' }); });
     }
     return rows;
   }, [events, meetingItems, branchFilter, tagFilter, year, mo, isLeader]);
@@ -231,10 +231,10 @@ export default function CalendarPage() {
       {/* Demo 角色切換 */}
       <div className="flex gap-1.5 flex-wrap items-center">
         <span className="text-[11px] text-slate-500 mr-1">Demo：</span>
-        {['parent', 'member', 'branch_leader', 'admin'].map(r => (
+        {['parent', 'member', 'group_leader', 'branch_leader', 'admin'].map(r => (
           <button key={r} onClick={() => { setRole(r); setMsg(''); }}
             className={`text-[11px] px-2 py-0.5 rounded-full border font-bold ${role === r ? 'bg-brand-600 text-white border-brand-600' : 'bg-white text-slate-500 border-slate-200'}`}>
-            {r === 'parent' ? '家長' : r === 'member' ? '成員' : r === 'branch_leader' ? '支部領袖' : '管理員'}
+            {r === 'parent' ? '家長' : r === 'member' ? '成員' : r === 'group_leader' ? '團長' : r === 'branch_leader' ? '支部領袖' : '管理員'}
           </button>
         ))}
         {isLeader && <span className="text-[11px] text-emerald-700 font-bold">· 你可直接喺本頁管理</span>}
@@ -245,12 +245,13 @@ export default function CalendarPage() {
         <h1 className="font-bold text-lg m-0">📅 行事曆</h1>
         <div className="flex gap-1.5 items-center">
           {isLeader && (
-            <button onClick={openNew} className="text-[11px] px-2.5 py-1 rounded-lg font-bold bg-brand-600 text-white">+ 新增活動</button>
+            <button onClick={openNew} className="text-[11px] px-2.5 py-1 rounded-lg font-bold bg-brand-600 text-white">+ 新增日曆項目</button>
           )}
           <button onClick={() => setView('month')} className={`text-[11px] px-2.5 py-1 rounded-lg font-bold ${view === 'month' ? 'bg-brand-600 text-white' : 'bg-white border border-slate-200 text-slate-600'}`}>月曆</button>
           <button onClick={() => setView('list')} className={`text-[11px] px-2.5 py-1 rounded-lg font-bold ${view === 'list' ? 'bg-brand-600 text-white' : 'bg-white border border-slate-200 text-slate-600'}`}>清單</button>
         </div>
       </div>
+      <p className="text-[11px] text-slate-500 m-0 -mt-2">活動及會議儲存後會自動出現在行事曆；新增時可設定誰可以看到、分類標籤及地點。</p>
 
       {msg && <div className="text-[11px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-xl px-3 py-2">{msg}</div>}
 
@@ -274,7 +275,7 @@ export default function CalendarPage() {
               <div className="font-bold text-slate-700">方法一：訂閱（推薦，自動同步）</div>
               <p className="m-0">複製下面訂閱網址 → 喺 Google 日曆左邊「其他日曆」→「從網址新增」貼上，就永久同步。</p>
               <div className="flex gap-2">
-                <input readOnly value={`https://troop-router.vercel.app/api/calendar.ics?u=0082&role=${role}`} className="flex-1 rounded-lg border border-slate-200 px-2 py-1.5 text-xs bg-white" />
+                <input readOnly value={`https://troop-portal.example/api/calendar.ics?troop=0088&role=${role}`} className="flex-1 rounded-lg border border-slate-200 px-2 py-1.5 text-xs bg-white" />
                 <button onClick={copySubscribe} className="text-[11px] font-bold bg-brand-600 text-white px-3 py-1.5 rounded-lg">{copied ? '✅ 已複製' : '📋 複製'}</button>
               </div>
             </div>
@@ -354,14 +355,14 @@ export default function CalendarPage() {
                   {item.cancelled && <span className="text-[11px] bg-rose-100 text-rose-700 px-1 py-0.5 rounded font-bold">已取消</span>}
                   <span className="font-bold text-xs">{item.title}</span>
                 </div>
-                <div className="text-[11px] text-slate-500 mt-0.5">{item.date} {item.time && `· ${item.time}`} · {item.branch}{item.location ? ` · ${item.location}` : ''}{item.tag ? ` · 🏷️ ${item.tag}` : ''}</div>
+                <div className="text-[11px] text-slate-500 mt-0.5">{item.date} {item.time && `· ${item.time}`} · {item.branch}{item.location ? ` · ${item.location}` : ''}{item.audience ? ` · 👀 ${item.audience}` : ''}{item.tag ? ` · 🏷️ ${item.tag}` : ''}</div>
               </div>
               <span className={`text-[11px] px-1.5 py-0.5 rounded font-bold ${item.type === 'event' ? 'bg-blue-100 text-blue-700' : 'bg-emerald-100 text-emerald-700'}`}>
-                {item.type === 'event' ? '活動' : '集會'}
+                {item.type === 'event' ? '活動' : item.tag === '會議' ? '會議' : '集會'}
               </span>
               {isLeader && (
                 <div className="flex gap-1 flex-shrink-0">
-                  {item.type === 'event' ? (
+                  {item.source === 'event' ? (
                     <>
                       <button onClick={() => openEdit(item.id)} className="text-[11px] text-slate-600 px-1.5 py-0.5 rounded hover:bg-slate-100" title="編輯">✏️</button>
                       <button onClick={() => deleteEvent(item.id)} className="text-[11px] text-rose-600 px-1.5 py-0.5 rounded hover:bg-rose-50" title="刪除">🗑</button>
@@ -445,12 +446,21 @@ export default function CalendarPage() {
             <h3 className="font-bold text-sm m-0">{form.id ? '✏️ 編輯活動' : '➕ 新增活動'}</h3>
             <label className="flex items-center gap-2 text-[11px] font-bold text-slate-600">名稱<input className={inputCls} value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} placeholder="例如：旅團露營" /></label>
             <label className="flex items-center gap-2 text-[11px] font-bold text-slate-600">日期<input type="date" className={inputCls} value={form.date} onChange={e => setForm({ ...form, date: e.target.value })} /></label>
+            <label className="flex items-center gap-2 text-[11px] font-bold text-slate-600">時間<input className={inputCls} value={form.time} onChange={e => setForm({ ...form, time: e.target.value })} placeholder="例如：19:00-21:00" /></label>
+            <label className="flex items-center gap-2 text-[11px] font-bold text-slate-600">類型
+              <select className={inputCls} value={form.kind} onChange={e => setForm({ ...form, kind: e.target.value as 'event' | 'meeting', tag: e.target.value === 'meeting' ? '會議' : form.tag })}>
+                <option value="event">活動</option>
+                <option value="meeting">會議</option>
+              </select>
+            </label>
             <label className="flex items-center gap-2 text-[11px] font-bold text-slate-600">支部
+
               <select className={inputCls} value={form.branch} onChange={e => setForm({ ...form, branch: e.target.value })}>
                 {BRANCHES.map(b => <option key={b} value={b}>{b}</option>)}
               </select>
             </label>
             <label className="flex items-center gap-2 text-[11px] font-bold text-slate-600">地點<input className={inputCls} value={form.location} onChange={e => setForm({ ...form, location: e.target.value })} placeholder="例如：西貢" /></label>
+            <label className="flex items-center gap-2 text-[11px] font-bold text-slate-600">可見對象<input className={inputCls} value={form.audience} onChange={e => setForm({ ...form, audience: e.target.value })} placeholder="例如：全旅、童軍及家長、領袖" /></label>
             <label className="flex items-center gap-2 text-[11px] font-bold text-slate-600">分類標籤
               <select className={inputCls} value={form.tag} onChange={e => setForm({ ...form, tag: e.target.value })}>
                 {tags.map(t => <option key={t} value={t}>{t}</option>)}

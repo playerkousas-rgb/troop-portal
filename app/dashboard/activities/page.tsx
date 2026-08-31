@@ -1,4 +1,5 @@
 'use client';
+import Link from 'next/link';
 import { useState } from 'react';
 
 /* ═══════════════════════════════════════════════════
@@ -13,6 +14,7 @@ type NoticeLink = {
   kind: 'link' | 'inline';   // link＝Drive／外部連結；inline＝直接喺 APP 內建內容
   url?: string;
   body?: string;
+  source?: 'link' | 'template' | 'inline' | 'library';
 };
 
 /** Drive 連結轉做可內嵌預覽嘅 /preview 網址 */
@@ -31,6 +33,7 @@ type Act = {
   deadline: string;
   location: string;
   branch: string;
+  tag: string;
   fee: string;
   summary: string;              // 內文摘要：領袖自己填（系統唔自動翻譯通告）
   notices: NoticeLink[];        // 通告（可多張 → 下拉式清單）
@@ -44,7 +47,7 @@ type Act = {
 const SEED: Act[] = [
   {
     id: 'a1', title: '旅團露營（9月）', kind: 'internal', date: '2026-09-20', deadline: '2026-09-15',
-    location: '西貢白沙灣', branch: '全旅', fee: '$300',
+    location: '西貢白沙灣', branch: '全旅', tag: '露營', fee: '$300',
     summary: '兩日一夜旅團露營，含晚間營火會及周日早會。請自備水壺、電筒及個人藥品。9月18日 19:00 旅團部集合。',
     notices: [
       { label: '露營通告（家長須簽署）', kind: 'link', url: 'https://drive.google.com/file/d/demo1/view' },
@@ -54,7 +57,7 @@ const SEED: Act[] = [
   },
   {
     id: 'a2', title: '童軍支部日營', kind: 'internal', date: '2026-10-12', deadline: '2026-10-05',
-    location: '大埔滘', branch: '童軍', fee: '$120',
+    location: '大埔滘', branch: '童軍', tag: '訓練', fee: '$120',
     summary: '支部日營，含先鋒工程及定向活動。名額優先俾未參加過日營嘅成員。',
     notices: [
       { label: '日營通告', kind: 'link', url: 'https://drive.google.com/file/d/demo2/view' },
@@ -64,14 +67,14 @@ const SEED: Act[] = [
   },
   {
     id: 'a3', title: '九龍地域領袖訓練工作坊', kind: 'external', date: '2026-09-28', deadline: '2026-09-20',
-    location: '九龍塘童軍中心', branch: '領袖', fee: '免費',
+    location: '九龍塘童軍中心', branch: '領袖', tag: '訓練', fee: '免費',
     summary: '地域總會舉辦，內容係支部節目設計。有興趣嘅領袖請直接搵團長報名，名額有限。',
     notices: [{ label: '地域通告（連結）', kind: 'link', url: 'https://www.scout.org.hk/demo-notice' }],
     registerWay: 'leader', quota: 0, registered: 0, myStatus: 'unresponded',
   },
   {
     id: 'a4', title: '區錦標賽（游泳）', kind: 'external', date: '2026-11-08', deadline: '2026-10-25',
-    location: '九龍公園游泳池', branch: '童軍', fee: '$50',
+    location: '九龍公園游泳池', branch: '童軍', tag: '比賽', fee: '$50',
     summary: '區會舉辦嘅游泳錦標賽，成員可自行睇下有冇興趣，有興趣請搵支部領袖報名及交表。',
     notices: [{ label: '區會通告及報名表（連結）', kind: 'link', url: 'https://www.scout.org.hk/demo-swim' }],
     registerWay: 'leader', quota: 0, registered: 0, myStatus: 'interested',
@@ -79,7 +82,7 @@ const SEED: Act[] = [
   // 過期區示例：活動過咗期 → 移入過期區，唔刪除（已報名嘅成員／家長仍然睇到集合時間地點）
   {
     id: 'a9', title: '8月旅團集會（已過期）', kind: 'internal', date: '2026-08-24', deadline: '2026-08-20',
-    location: '旅團部', branch: '全旅', fee: '',
+    location: '旅團部', branch: '全旅', tag: '集會', fee: '',
     summary: '常規集會。已結束，留存作紀錄。',
     notices: [{ label: '集會通告', kind: 'inline', body: '集合：8月24日 19:00 旅團部\n解散：21:00\n當日內容：小隊會議 + 團務' }],
     registerWay: 'app', quota: 0, registered: 15, myStatus: 'registered', expired: true,
@@ -87,9 +90,14 @@ const SEED: Act[] = [
 ];
 
 const BRANCHES = ['全旅', '小童軍', '幼童軍', '童軍', '深資', '樂行', '領袖'];
+const ACTIVITY_TAGS = ['露營', '訓練', '服務', '比賽', '集會', '其他'];
+const LIBRARY_NOTICES = [
+  { id: 'lib1', title: '第 118 屆周年童軍週', source: '香港童軍總會', url: 'https://www.scout.org.hk/demo-library-118' },
+  { id: 'lib2', title: '秋季跨旅遠足', source: '十一區', url: 'https://www.scout.org.hk/demo-library-hike' },
+];
 
 const emptyForm: Act = {
-  id: '', title: '', kind: 'internal', date: '', deadline: '', location: '', branch: '全旅', fee: '',
+  id: '', title: '', kind: 'internal', date: '', deadline: '', location: '', branch: '全旅', tag: '其他', fee: '',
   summary: '', notices: [], registerWay: 'app', quota: 0, registered: 0, myStatus: 'unresponded',
 };
 
@@ -103,8 +111,9 @@ export default function ActivitiesPage() {
   const [msg, setMsg] = useState('');
   const [noticeDraft, setNoticeDraft] = useState<NoticeLink>({ label: '', kind: 'link', url: '', body: '' });
   const [preview, setPreview] = useState<string | null>(null);
-  // 新增：追蹤通告來源方法
-  const [noticeSourcingMethod, setNoticeSourcingMethod] = useState<'link' | 'inline' | 'import_troop' | 'import_district'>('link');
+  // 旅團活動三種處理方法；區／地域總會活動兩種處理方法。
+  const [noticeSourcingMethod, setNoticeSourcingMethod] = useState<'link' | 'template' | 'inline' | 'library'>('link');
+  const [libraryNoticeId, setLibraryNoticeId] = useState(LIBRARY_NOTICES[0].id);
 
   const isLeader = ['admin', 'group_leader', 'branch_leader', 'coach'].includes(role);
   const activeList = (filter === 'all' ? items : items.filter(a => a.kind === filter)).filter(a => !a.expired);
@@ -116,11 +125,18 @@ export default function ActivitiesPage() {
 
   function openNew(kind: 'internal' | 'external') {
     setFormErr(''); setMsg('');
+    setNoticeSourcingMethod(kind === 'external' ? 'library' : 'template');
+    setNoticeDraft({ label: '', kind: 'link', url: '', body: '' });
     setForm({ ...emptyForm, kind, registerWay: kind === 'internal' ? 'app' : 'leader', notices: [] });
   }
   function openEdit(id: string) {
     const a = items.find(x => x.id === id);
-    if (a) { setFormErr(''); setMsg(''); setForm({ ...a, notices: [...a.notices] }); }
+    if (a) {
+      setFormErr(''); setMsg('');
+      setNoticeSourcingMethod(a.kind === 'external' ? 'link' : 'template');
+      setNoticeDraft({ label: '', kind: 'link', url: '', body: '' });
+      setForm({ ...a, notices: [...a.notices] });
+    }
   }
 
   function save() {
@@ -171,35 +187,39 @@ export default function ActivitiesPage() {
 
   function addNotice() {
     if (!form) return;
-    if (!noticeDraft.label.trim()) { setFormErr('請填寫通告名稱（例如「露營通告」）。'); return; }
-    // 根據 noticeSourcingMethod 來決定儲存哪種類型的通告
-    if (noticeSourcingMethod === 'link') {
+    const label = noticeDraft.label.trim();
+
+    if (noticeSourcingMethod === 'library') {
+      const libraryNotice = LIBRARY_NOTICES.find(n => n.id === libraryNoticeId);
+      if (!libraryNotice) { setFormErr('請先選擇圖書館通告。'); return; }
+      setForm({
+        ...form,
+        notices: [...form.notices, { label: `${libraryNotice.title} · ${libraryNotice.source}`, kind: 'link', url: libraryNotice.url, source: 'library' }],
+      });
+      setMsg(`✅ 已從圖書館加入「${libraryNotice.title}」，請再設定活動標籤及截止日期。`);
+    } else if (noticeSourcingMethod === 'template') {
+      setForm({
+        ...form,
+        notices: [...form.notices, { label: label || '活動通告模板', kind: 'link', url: '/downloads/SCOUTSYSTEM_ACTIVITY_NOTICE_TEMPLATE.txt', source: 'template' }],
+      });
+      setMsg('✅ 已加入活動通告模板連結，填妥後可替換成旅團自己的 Drive 連結。');
+    } else if (!label) {
+      setFormErr('請填寫通告名稱（例如「露營通告」）。'); return;
+    } else if (noticeSourcingMethod === 'link') {
       if (!/^https?:\/\/.+/.test((noticeDraft.url || '').trim())) { setFormErr('請貼上完整連結（要 http:// 或 https:// 開頭）。'); return; }
       setForm({
         ...form,
-        notices: [...form.notices, {
-          label: noticeDraft.label.trim(),
-          kind: 'link',
-          url: noticeDraft.url!.trim(),
-        }],
+        notices: [...form.notices, { label, kind: 'link', url: noticeDraft.url!.trim(), source: 'link' }],
       });
-    } else if (noticeSourcingMethod === 'inline') {
+    } else {
       if (!(noticeDraft.body || '').trim()) { setFormErr('請輸入通告內容。'); return; }
       setForm({
         ...form,
-        notices: [...form.notices, {
-          label: noticeDraft.label.trim(),
-          kind: 'inline',
-          body: noticeDraft.body!.trim(),
-        }],
+        notices: [...form.notices, { label, kind: 'inline', body: noticeDraft.body!.trim(), source: 'inline' }],
       });
-    } else {
-      // 匯入方法：目前僅為佔位符，不實際儲存通告內容
-      setFormErr('匯入圖書館功能尚未實裝，請改用其他方法新增通告。');
-      return;
     }
-    setNoticeDraft({ label: '', kind: 'link', url: '', body: '' }); // Reset draft, default to 'link'
-    setNoticeSourcingMethod('link'); // Reset to default method
+    setNoticeDraft({ label: '', kind: 'link', url: '', body: '' });
+    setNoticeSourcingMethod(form.kind === 'external' ? 'library' : 'template');
     setFormErr('');
   }
 
@@ -264,7 +284,7 @@ export default function ActivitiesPage() {
         {activeList.map(a => (
           <div key={a.id} className="bg-white rounded-2xl border border-slate-200 p-3.5 card-hover">
             <button onClick={() => { setDetail(a.id); setPreview(null); }} className="w-full text-left bg-transparent border-0 p-0 cursor-pointer">
-              <div className="flex items-center gap-1.5 flex-wrap">{kindBadge(a.kind)}<span className="font-bold text-[13px]">{a.title}</span></div>
+              <div className="flex items-center gap-1.5 flex-wrap">{kindBadge(a.kind)}<span className="font-bold text-[13px]">{a.title}</span><span className="text-[11px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded font-bold">🏷️ {a.tag}</span></div>
               <div className="text-[11px] text-slate-500 mt-1">{a.date} · {a.location || '待定'} · {a.branch}{a.fee ? ` · ${a.fee}` : ''}</div>
               <div className="text-[11px] text-slate-500 mt-0.5">
                 {a.deadline ? `報名截止 ${a.deadline} · ` : ''}
@@ -305,6 +325,7 @@ export default function ActivitiesPage() {
               <div key={a.id} className="bg-white rounded-xl border border-slate-200 p-3 card-hover">
                 <button onClick={() => { setDetail(a.id); setPreview(null); }} className="w-full text-left bg-transparent border-0 p-0 cursor-pointer">
                   <div className="flex items-center gap-1.5 flex-wrap">{kindBadge(a.kind)}<span className="font-bold text-[13px]">{a.title}</span>
+                    <span className="text-[11px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded font-bold">🏷️ {a.tag}</span>
                     {a.expired && <span className="text-[11px] bg-slate-200 text-slate-600 px-1.5 py-0.5 rounded font-bold">已過期</span>}
                   </div>
                   <div className="text-[11px] text-slate-500 mt-1">{a.date} · {a.location || '待定'} · {a.branch}</div>
@@ -340,6 +361,7 @@ export default function ActivitiesPage() {
               <div>📅 日期：{current.date}{current.deadline ? ` · 報名截止 ${current.deadline}` : ''}</div>
               <div>📍 地點：{current.location || '待定'}</div>
               <div>👥 對象：{current.branch}{current.fee ? ` · 💰 ${current.fee}` : ''}</div>
+              <div>🏷️ 標籤：{current.tag}</div>
               {current.registerWay === 'app' && <div>🎟️ 名額：{current.quota ? `${current.registered}/${current.quota}` : '不限'}</div>}
             </div>
             {current.summary && (
@@ -423,10 +445,9 @@ export default function ActivitiesPage() {
             </p>
             {form.kind === 'external' && !form.id && (
               <div className="rounded-xl border border-violet-200 bg-violet-50 p-3">
-                <div className="text-[11px] font-bold text-violet-800 mb-1">引入方式（兩種都得，可以並用）</div>
+                <div className="text-[11px] font-bold text-violet-800 mb-1">區／地域總會活動：兩種引入方式</div>
                 <p className="text-[11px] text-violet-700 m-0 leading-relaxed">
-                  ① <strong>圖書館自動引入</strong>：系統已接嘅區／地域／總會通告會自動出現，揀一下就引入（見「圖書館接入」）。<br />
-                  ② <strong>手動輸入</strong>：好似而家咁自己填資料同貼通告連結。
+                  ① 從已接入的圖書館選通告；或 ② 直接貼上外部連結。兩種方式都要在這裡補上活動標籤及報名截止日期。
                 </p>
               </div>
             )}
@@ -439,6 +460,11 @@ export default function ActivitiesPage() {
                 {BRANCHES.map(b => <option key={b} value={b}>{b}</option>)}
               </select>
             </label>
+            <label className="flex items-center gap-2 text-[11px] font-bold text-slate-600">分類標籤
+              <select className={inputCls} value={form.tag} onChange={e => setForm({ ...form, tag: e.target.value })}>
+                {ACTIVITY_TAGS.map(t => <option key={t} value={t}>{t}</option>)}
+              </select>
+            </label>
             <label className="flex items-center gap-2 text-[11px] font-bold text-slate-600">費用<input className={inputCls} value={form.fee} onChange={e => setForm({ ...form, fee: e.target.value })} placeholder="例如：$300 或 免費" /></label>
             {form.kind === 'internal' && (
               <label className="flex items-center gap-2 text-[11px] font-bold text-slate-600">名額<input type="number" min={0} className={inputCls} value={form.quota} onChange={e => setForm({ ...form, quota: Number(e.target.value) })} placeholder="0＝不限" /></label>
@@ -447,48 +473,78 @@ export default function ActivitiesPage() {
               <textarea rows={3} className="rounded-lg border border-slate-200 px-2 py-1.5 text-xs" value={form.summary} onChange={e => setForm({ ...form, summary: e.target.value })} placeholder="重點內容、集合時間、要帶咩" />
             </label>
 
-            {/* 通告：三種方法，可加多張 → 詳情頁會變下拉式 */}
+            {/* 通告：旅團活動三種方法；區／地域總會活動兩種方法 */}
             <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-3 space-y-2">
-              <div className="text-[11px] font-bold text-slate-600">📎 通告（三種方法任揀，可加多張）</div>
+              <div>
+                <div className="text-[11px] font-bold text-slate-600">📎 活動通告（可加入多張）</div>
+                <p className="text-[11px] text-slate-500 m-0 mt-1 leading-relaxed">
+                  {form.kind === 'internal'
+                    ? '旅團自辦活動：模板、貼現成連結、或直接輸入內容，三種都可以。'
+                    : '區／地域總會活動：從圖書館引入，或直接貼上外部連結。'}
+                </p>
+              </div>
 
               {form.notices.map((n, i) => (
-                <div key={i} className="flex items-center gap-2">
-                  <span className="text-[11px] bg-white border border-slate-200 rounded px-1.5 py-0.5 flex-shrink-0">{n.kind === 'inline' ? '📝 APP 內建' : '🔗 連結'}</span>
+                <div key={i} className="flex items-center gap-2 bg-white rounded-lg border border-slate-200 px-2 py-1.5">
+                  <span className="text-[11px] bg-slate-100 text-slate-600 rounded px-1.5 py-0.5 flex-shrink-0">
+                    {n.source === 'library' ? '📚 圖書館' : n.source === 'template' ? '📋 模板' : n.kind === 'inline' ? '📝 內建' : '🔗 連結'}
+                  </span>
                   <span className="flex-1 min-w-0 text-[11px] text-slate-700 truncate">{n.label}</span>
-                  <button onClick={() => removeNotice(i)} className="text-[11px] text-rose-600 px-1.5 py-0.5 rounded hover:bg-rose-50">移除</button>
+                  <button type="button" onClick={() => removeNotice(i)} className="text-[11px] text-rose-600 px-1.5 py-0.5 rounded hover:bg-rose-50">移除</button>
                 </div>
               ))}
 
-              {/* 方法切換 */}
-              <div className="flex gap-1">
-                {([{ id: 'link', label: '🔗 貼連結' }, { id: 'inline', label: '📝 APP 內建內容' }] as const).map(m => (
-                  <button key={m.id} type="button" onClick={() => { setNoticeDraft({ ...noticeDraft, kind: m.id }); setFormErr(''); }}
-                    className={`text-[11px] font-bold px-2.5 py-1 rounded-lg border ${noticeDraft.kind === m.id ? 'bg-slate-700 text-white border-slate-700' : 'bg-white text-slate-600 border-slate-200'}`}>
-                    {m.label}
-                  </button>
-                ))}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-1.5">
+                {form.kind === 'internal' ? (
+                  ([
+                    { id: 'template' as const, label: '📋 用活動模板' },
+                    { id: 'link' as const, label: '🔗 貼上連結' },
+                    { id: 'inline' as const, label: '📝 直接輸入' },
+                  ]).map(method => (
+                    <button key={method.id} type="button" onClick={() => { setNoticeSourcingMethod(method.id); setNoticeDraft({ ...noticeDraft, kind: method.id === 'inline' ? 'inline' : 'link' }); setFormErr(''); }}
+                      className={`text-[11px] font-bold px-2 py-1.5 rounded-lg border ${noticeSourcingMethod === method.id ? 'bg-slate-700 text-white border-slate-700' : 'bg-white text-slate-600 border-slate-200'}`}>
+                      {method.label}
+                    </button>
+                  ))
+                ) : (
+                  ([
+                    { id: 'library' as const, label: '📚 從圖書館引入' },
+                    { id: 'link' as const, label: '🔗 貼上外部連結' },
+                  ]).map(method => (
+                    <button key={method.id} type="button" onClick={() => { setNoticeSourcingMethod(method.id); setNoticeDraft({ ...noticeDraft, kind: 'link' }); setFormErr(''); }}
+                      className={`text-[11px] font-bold px-2 py-1.5 rounded-lg border ${noticeSourcingMethod === method.id ? 'bg-violet-700 text-white border-violet-700' : 'bg-white text-slate-600 border-slate-200'}`}>
+                      {method.label}
+                    </button>
+                  ))
+                )}
               </div>
 
-              <input className="w-full rounded-lg border border-slate-200 px-2 py-1.5 text-xs" placeholder="通告名稱（例如：露營通告）" value={noticeDraft.label} onChange={e => setNoticeDraft({ ...noticeDraft, label: e.target.value })} />
-
-              {noticeDraft.kind === 'link' ? (
+              {noticeSourcingMethod === 'library' ? (
                 <>
+                  <select className="w-full rounded-lg border border-slate-200 px-2 py-1.5 text-xs" value={libraryNoticeId} onChange={e => setLibraryNoticeId(e.target.value)}>
+                    {LIBRARY_NOTICES.map(n => <option key={n.id} value={n.id}>{n.title} · {n.source}</option>)}
+                  </select>
+                  <p className="text-[11px] text-violet-700 m-0 leading-relaxed">揀選後會帶入圖書館通告連結；活動標籤及截止日期仍由你決定。</p>
+                </>
+              ) : noticeSourcingMethod === 'template' ? (
+                <>
+                  <input className="w-full rounded-lg border border-slate-200 px-2 py-1.5 text-xs" placeholder="通告名稱（例如：露營通告）" value={noticeDraft.label} onChange={e => setNoticeDraft({ ...noticeDraft, label: e.target.value })} />
+                  <p className="text-[11px] text-slate-500 m-0 leading-relaxed">先下載模板填寫，之後可上傳到 Drive，再用「貼上連結」加入旅團自己的檔案。</p>
+                  <Link href="/dashboard/templates" className="inline-flex text-[11px] font-bold text-brand-700 bg-brand-50 border border-brand-200 rounded-lg px-2.5 py-1.5 no-underline">⬇️ 下載活動通告模板</Link>
+                </>
+              ) : noticeSourcingMethod === 'link' ? (
+                <>
+                  <input className="w-full rounded-lg border border-slate-200 px-2 py-1.5 text-xs" placeholder={form.kind === 'internal' ? '通告名稱（例如：露營通告）' : '通告名稱（例如：區會報名表）'} value={noticeDraft.label} onChange={e => setNoticeDraft({ ...noticeDraft, label: e.target.value })} />
                   <input className="w-full rounded-lg border border-slate-200 px-2 py-1.5 text-xs" placeholder="https://…（Drive 或外部網址）" value={noticeDraft.url || ''} onChange={e => setNoticeDraft({ ...noticeDraft, url: e.target.value })} />
-                  <p className="text-[11px] text-slate-500 m-0 leading-relaxed">
-                    方法一：用自己旅團嘅格式放 Drive 貼連結（詳情頁會內嵌預覽）。
-                    方法二：未有格式可以先去「模板下載」攞「活動通告格式」，填好上傳再貼連結。
-                  </p>
                 </>
               ) : (
                 <>
-                  <textarea rows={4} className="w-full rounded-lg border border-slate-200 px-2 py-1.5 text-xs" placeholder="直接輸入通告內容：日期、地點、費用、要帶咩、集合時間…" value={noticeDraft.body || ''} onChange={e => setNoticeDraft({ ...noticeDraft, body: e.target.value })} />
-                  <p className="text-[11px] text-slate-500 m-0 leading-relaxed">
-                    方法三：打破「一定要出一張通告」嘅框框 —— 直接喺 APP 輸入內容，成員即刻睇到，唔使開檔案。
-                  </p>
+                  <input className="w-full rounded-lg border border-slate-200 px-2 py-1.5 text-xs" placeholder="通告名稱（例如：集合及裝備資料）" value={noticeDraft.label} onChange={e => setNoticeDraft({ ...noticeDraft, label: e.target.value })} />
+                  <textarea rows={4} className="w-full rounded-lg border border-slate-200 px-2 py-1.5 text-xs" placeholder="直接輸入日期、地點、費用、集合時間、要帶甚麼…" value={noticeDraft.body || ''} onChange={e => setNoticeDraft({ ...noticeDraft, body: e.target.value })} />
                 </>
               )}
 
-              <button onClick={addNotice} className="w-full text-[11px] font-bold bg-slate-700 text-white px-2.5 py-1.5 rounded-lg">＋ 加入通告</button>
+              <button type="button" onClick={addNotice} className="w-full text-[11px] font-bold bg-slate-700 text-white px-2.5 py-1.5 rounded-lg">＋ 加入通告</button>
             </div>
 
             {formErr && <p className="text-[11px] font-bold text-rose-700 bg-rose-50 rounded-lg px-2 py-1.5 m-0">{formErr}</p>}
