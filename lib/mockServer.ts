@@ -69,6 +69,7 @@ const seed: AppState = {
     ADMIN_EMAIL: 'admin@demo.scout',
     REGISTRY_URL: 'https://troop-router.vercel.app/api/registry.json',
     ANNOUNCEMENT_FOLDER_ID: '',
+    MEETINGS_FOLDER_ID: '',
   },
   patrols: [
     { id: 'p01', branchId: 'b1', name: 'BEE', short: 'B', memberIds: [], enabled: true, order: 1 },
@@ -162,6 +163,11 @@ const seed: AppState = {
   meetings: [
     { id: 'mt1', title: '九月領袖會議(議程)', type: 'agenda', date: '2026-09-02', startTime: '20:00', endTime: '21:30', location: '本中心', status: 'published', targetRoles: ['leader'] },
     { id: 'mt2', title: '八月領袖會議(記錄)', type: 'minutes', date: '2026-08-04', status: 'published' },
+  ],
+  latestNews: [
+    { id: 'news1', text: '9 月 20 日旅團露營因天氣不穩定順延至 10 月 18-19 日，地點不變。', authorUserId: 'u_gl', authorName: '李偉國', createdAt: '2026-09-01' },
+    { id: 'news2', text: '9 月團費 $80，請於 15 日前經轉數快或集會時繳交。', authorUserId: 'u_gl', authorName: '李偉國', createdAt: '2026-08-30' },
+    { id: 'news3', text: '深資支部 10 月遠征現正招募隊員，有興趣請向支部領袖報名。', authorUserId: 'u_bl', authorName: '黃志遠', createdAt: '2026-08-28' },
   ],
   plugins: [
     { id: 'troop_lib', title: '旅團圖書館', icon: '📚', tier: 2, url: 'https://scout-circulars.vercel.app/', embed: true, minRole: 'member', enabled: true, order: 1 },
@@ -297,7 +303,7 @@ export function buildMockState(userId: string): AppState {
     announcements: [], announcementPdfs: [],
     regularMeetings: [], cancelledMeetings: [],
     meetings: [], plugins: [], pluginSettings: [],
-    equipment: [], equipmentLoans: [],
+    equipment: [], equipmentLoans: [], latestNews: [],
     audits: [], config: { ...store.config }, userFeatures: featuresFor(userId, role),
   };
 
@@ -384,6 +390,9 @@ export function buildMockState(userId: string): AppState {
   // 審計
   if (['super_admin', 'troop_super', 'admin'].includes(role)) out.audits = [...store.audits];
 
+  // 最新消息：登入後所有人都見到（最多 3 條）
+  if (!guest) out.latestNews = [...store.latestNews];
+
   return out;
 }
 
@@ -397,7 +406,7 @@ function sliceState(full: AppState, keys: string): AppState {
     announcements: [], announcementPdfs: [],
     regularMeetings: [], cancelledMeetings: [],
     meetings: [], plugins: [], pluginSettings: [],
-    equipment: [], equipmentLoans: [],
+    equipment: [], equipmentLoans: [], latestNews: [],
     audits: [], config: full.config || {}, userFeatures: full.userFeatures || [],
   };
   keyList.forEach(k => {
@@ -653,6 +662,20 @@ function handleRegistrationSummary(p: Record<string, any>) {
 
 const S = (operatedBy: string) => ({ success: true, state: buildMockState(String(operatedBy || '')) });
 
+/** 寫入操作紀錄（審核紀錄與操作紀錄合併在同一份，前端再分類） */
+function logAudit(userId: string, action: string, entity: string, entityId: string, detail: string) {
+  store.audits.unshift({
+    id: uid('log'),
+    userId: String(userId || 'system'),
+    action,
+    entity,
+    entityId: String(entityId || ''),
+    createdAt: new Date().toISOString().slice(0, 10),
+    detail: String(detail || ''),
+  });
+  if (store.audits.length > 300) store.audits = store.audits.slice(0, 300);
+}
+
 function handleMutate(action: string, p: Record<string, any>) {
   const ob = String(p.operatedBy || '');
   const findIdx = (arr: any[], idField: string, id: string) => arr.findIndex(x => x[idField] === id);
@@ -661,6 +684,7 @@ function handleMutate(action: string, p: Record<string, any>) {
     // 成員
     case 'createMember':
       store.members.push({ id: uid('m'), ymNumber: String(p.ymNumber || ''), name: String(p.name || ''), email: String(p.email || ''), branchId: String(p.branchId || ''), patrolId: String(p.patrolId || ''), age: 0, dateOfBirth: String(p.dateOfBirth || ''), parentUserId: String(p.parentUserId || ''), active: true });
+      logAudit(ob, 'createMember', '成員', '', String(p.name || ''));
       return S(ob);
     case 'updateMember': {
       const i = findIdx(store.members, 'id', String(p.memberId || ''));
@@ -819,7 +843,7 @@ function handleMutate(action: string, p: Record<string, any>) {
       const defaults = FEATURES[role] || [];
       const overrides: Record<string, boolean> = {};
       (USER_FEATURE_OVERRIDES[tu?.id || ''] || []).forEach(f => { overrides[f] = true; });
-      const allFeatures = ['branches', 'members', 'applications', 'events', 'registrations', 'attendance', 'attendance_all', 'library_import', 'notices', 'users', 'settings', 'audit', 'calendar'];
+      const allFeatures = ['branches', 'members', 'applications', 'events', 'registrations', 'attendance', 'attendance_all', 'library_import', 'notices', 'users', 'settings', 'meetings', 'equipment', 'plugins', 'audit', 'calendar'];
       return {
         success: true,
         role,
@@ -839,16 +863,33 @@ function handleMutate(action: string, p: Record<string, any>) {
     // 活動
     case 'createEvent': {
       const id = uid('e');
-      store.events.push({ id, title: String(p.title || ''), date: String(p.date || ''), location: String(p.location || ''), scope: (p.scope || 'troop') as any, branchId: String(p.branchId || ''), kind: 'activity', status: p.status || 'draft', source: '手動新增', targetMemberIds: [], fee: String(p.fee || ''), paymentUrl: String(p.paymentUrl || '') });
+      const category = p.category === 'district' ? 'district' : 'self';
+      const source = category === 'district'
+        ? (String(p.source || '區地域總會活動'))
+        : (String(p.source || '自行舉辦'));
+      store.events.push({
+        id, title: String(p.title || ''), date: String(p.date || ''), location: String(p.location || ''),
+        scope: (p.scope || 'troop') as any, branchId: String(p.branchId || ''),
+        kind: category === 'district' ? 'notice_troop_participation' : 'activity',
+        category, status: p.status || 'draft', source,
+        targetMemberIds: [], fee: String(p.fee || ''), paymentUrl: String(p.paymentUrl || ''),
+        dutyPatrol: String(p.dutyPatrol || ''), calendarTag: String(p.calendarTag || ''),
+      });
+      logAudit(ob, 'createEvent', '活動', id, String(p.title || ''));
       return S(ob);
     }
     case 'updateEvent': {
       const i = findIdx(store.events, 'id', String(p.eventId || ''));
-      if (i >= 0) Object.assign(store.events[i], Object.fromEntries(Object.entries(p).filter(([k]) => !['action', 'operatedBy', 'eventId'].includes(k))));
+      if (i >= 0) {
+        Object.assign(store.events[i], Object.fromEntries(Object.entries(p).filter(([k]) => !['action', 'operatedBy', 'eventId'].includes(k))));
+        if (p.category === 'district') store.events[i].kind = 'notice_troop_participation';
+        if (p.category === 'self') store.events[i].kind = 'activity';
+        logAudit(ob, 'updateEvent', '活動', String(p.eventId || ''), String(p.title || store.events[i].title || ''));
+      }
       return S(ob);
     }
-    case 'publishEvent': { const i = findIdx(store.events, 'id', String(p.eventId || '')); if (i >= 0) store.events[i].status = 'published'; return S(ob); }
-    case 'deleteEvent': store.events = store.events.filter(e => e.id !== p.eventId); store.replies = store.replies.filter(r => r.eventId !== p.eventId); return S(ob);
+    case 'publishEvent': { const i = findIdx(store.events, 'id', String(p.eventId || '')); if (i >= 0) { store.events[i].status = 'published'; logAudit(ob, 'publishEvent', '活動', String(p.eventId || ''), store.events[i].title || ''); } return S(ob); }
+    case 'deleteEvent': store.events = store.events.filter(e => e.id !== p.eventId); store.replies = store.replies.filter(r => r.eventId !== p.eventId); logAudit(ob, 'deleteEvent', '活動', String(p.eventId || ''), String(p.title || '')); return S(ob);
     // 報名
     case 'setReply': {
       const replyId = `${p.eventId}_${p.memberId}`;
@@ -863,7 +904,11 @@ function handleMutate(action: string, p: Record<string, any>) {
     // 申請
     case 'decideApplication': {
       const i = findIdx(store.applications, 'id', String(p.applicationId || ''));
-      if (i >= 0) store.applications[i].status = p.status as any;
+      if (i >= 0) {
+        store.applications[i].status = p.status as any;
+        store.applications[i].decidedAt = new Date().toISOString().slice(0, 10);
+        logAudit(ob, 'decideApplication', '申請審核', String(p.applicationId || ''), `${store.applications[i].name} → ${p.status === 'approved' ? '批核' : '拒絕'}`);
+      }
       return S(ob);
     }
     case 'applyJoin':
@@ -880,6 +925,7 @@ function handleMutate(action: string, p: Record<string, any>) {
         scope: String(p.scope || 'troop'), branchId: String(p.branchId || ''), status: 'published',
         createdAt: new Date().toISOString().slice(0, 10),
       });
+      logAudit(ob, 'addAnnouncement', '公告', '', String(p.title || ''));
       return S(ob);
     }
     case 'updateAnnouncement': {
@@ -889,6 +935,25 @@ function handleMutate(action: string, p: Record<string, any>) {
     }
     case 'deleteAnnouncement':
       store.announcements = store.announcements.filter(a => a.announcementId !== p.announcementId);
+      logAudit(ob, 'deleteAnnouncement', '公告', String(p.announcementId || ''), '');
+      return S(ob);
+    // 最新消息（最多 3 條）
+    case 'addLatestNews': {
+      const text = String(p.text || '').trim();
+      if (!text) return { success: false, error: '請填寫最新消息內容。', state: buildMockState(ob) };
+      if (store.latestNews.length >= 3) return { success: false, error: '最新消息最多 3 條，請先刪除一條再新增。', state: buildMockState(ob) };
+      const me = findUser(ob);
+      store.latestNews.unshift({
+        id: uid('news'), text,
+        authorUserId: ob, authorName: me?.name || '',
+        createdAt: new Date().toISOString().slice(0, 10),
+      });
+      logAudit(ob, 'addLatestNews', '最新消息', store.latestNews[0].id, text);
+      return S(ob);
+    }
+    case 'deleteLatestNews':
+      store.latestNews = store.latestNews.filter(n => n.id !== p.id);
+      logAudit(ob, 'deleteLatestNews', '最新消息', String(p.id || ''), '');
       return S(ob);
     case 'updateBookmark': { const i = findIdx(store.bookmarks, 'id', String(p.bookmarkId || '')); if (i >= 0) Object.assign(store.bookmarks[i], Object.fromEntries(Object.entries(p).filter(([k]) => !['action', 'operatedBy', 'bookmarkId'].includes(k)))); return S(ob); }
     case 'deleteBookmark': store.bookmarks = store.bookmarks.filter(b => b.id !== p.bookmarkId); return S(ob);
@@ -903,17 +968,19 @@ function handleMutate(action: string, p: Record<string, any>) {
       const i = findIdx(store.cancelledMeetings, 'date', String(p.date || ''));
       if (i >= 0) store.cancelledMeetings.splice(i, 1);
       else store.cancelledMeetings.push({ id: uid('cm'), branchId: String(p.branchId || ''), date: String(p.date || ''), reason: String(p.reason || ''), markedBy: ob, markedAt: new Date().toISOString().slice(0, 10) });
+      logAudit(ob, 'toggleMeetingCancel', '集會', `${p.branchId}/${p.date}`, String(p.reason || ''));
       return S(ob);
     }
     // 領袖會議
     case 'createMeeting':
-      store.meetings.push({ id: uid('mt'), title: String(p.title || ''), type: (p.type || 'agenda') as any, date: String(p.date || ''), startTime: String(p.startTime || ''), endTime: String(p.endTime || ''), location: String(p.location || ''), status: 'draft', branchId: String(p.branchId || '') });
+      store.meetings.push({ id: uid('mt'), title: String(p.title || ''), type: (p.type || 'agenda') as any, date: String(p.date || ''), startTime: String(p.startTime || ''), endTime: String(p.endTime || ''), location: String(p.location || ''), status: 'draft', branchId: String(p.branchId || ''), calendarTag: String(p.calendarTag || '') });
+      logAudit(ob, 'createMeeting', '會議', '', String(p.title || ''));
       return S(ob);
     case 'updateMeeting': { const i = findIdx(store.meetings, 'id', String(p.meetingId || '')); if (i >= 0) Object.assign(store.meetings[i], Object.fromEntries(Object.entries(p).filter(([k]) => !['action', 'operatedBy', 'meetingId'].includes(k)))); return S(ob); }
     case 'deleteMeeting': store.meetings = store.meetings.filter(m => m.id !== p.meetingId); return S(ob);
     case 'publishMeeting': { const i = findIdx(store.meetings, 'id', String(p.meetingId || '')); if (i >= 0) store.meetings[i].status = 'published'; return S(ob); }
     // 設定
-    case 'saveConfig': (store.config as any)[String(p.key || '')] = String(p.value ?? ''); return S(ob);
+    case 'saveConfig': (store.config as any)[String(p.key || '')] = String(p.value ?? ''); logAudit(ob, 'saveConfig', '系統設定', String(p.key || ''), String(p.value ?? '')); return S(ob);
     case 'savePluginSetting': {
       const i = findIdx(store.pluginSettings, 'pluginId', String(p.pluginId || ''));
       if (i >= 0) Object.assign(store.pluginSettings[i], Object.fromEntries(Object.entries(p).filter(([k]) => !['action', 'operatedBy', 'pluginId'].includes(k))));
@@ -946,6 +1013,7 @@ const READ_SLICES: Record<string, string> = {
   getAuditLogs: 'audits',
   getMeetings: 'meetings',
   getEquipment: 'equipment,equipmentLoans,members',
+  getLatestNews: 'latestNews',
 };
 
 export function handleMockRequest(action: string, params: Record<string, any> = {}): any {

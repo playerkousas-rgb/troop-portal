@@ -1,5 +1,6 @@
 'use client';
 import { useState } from 'react';
+import { useConfirm, kv } from '@/components/ConfirmProvider';
 
 /* ═══════════════════════════════════════════════════
    MOCK 公告 = announcement（提示類）
@@ -70,6 +71,7 @@ export default function NoticesPage() {
   const [formErr, setFormErr] = useState('');
   const [msg, setMsg] = useState('');
   const [showExpired, setShowExpired] = useState(false);
+  const { confirm } = useConfirm();
 
   const isLeader = ['admin', 'group_leader', 'branch_leader', 'coach'].includes(role);
   const isExpired = (a: Announcement) => !!a.validUntil && a.validUntil < TODAY;
@@ -98,11 +100,17 @@ export default function NoticesPage() {
     setForm(null);
   }
 
-  function del(id: string) {
+  async function del(id: string) {
     const a = items.find(x => x.id === id);
     if (!a) return;
     // 防呆：刪除前確認
-    if (!window.confirm(`確定刪除公告「${a.title}」？刪除後成員就唔會再見到。`)) return;
+    const ok = await confirm({
+      title: '確認刪除公告',
+      message: kv([['公告', a.title], ['提示', '刪除後成員就唔會再見到']]),
+      confirmLabel: '確認刪除',
+      danger: true,
+    });
+    if (!ok) return;
     setItems(prev => prev.filter(x => x.id !== id));
     setMsg(`🗑 已刪除公告「${a.title}」`);
   }

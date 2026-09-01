@@ -3,16 +3,31 @@ import { useEffect, useState } from 'react';
 import { AppState, loadStateSlice } from '@/lib/store';
 import { apiDecideApplication } from '@/lib/api';
 import { ROLE_LABEL, branches } from '@/lib/model';
+import { useConfirm, kv } from '@/components/ConfirmProvider';
 
 export default function Page(){
   const [s,setS]=useState<AppState|null>(null);
   const [err,setErr]=useState('');
   const [popup,setPopup]=useState<{name:string;status:string}|null>(null);
   const [processingId,setProcessingId]=useState('');
+  const { confirm } = useConfirm();
 
   useEffect(()=>{loadStateSlice(['applications']).then(setS).catch(e=>setErr(e.message))},[]);
 
   async function decide(id:string,name:string,status:'approved'|'rejected'){
+    const a=s?.applications.find(x=>x.id===id);
+    const ok=await confirm({
+      title:status==='approved'?'確認批核申請':'確認拒絕申請',
+      message:kv([
+        ['申請人',name],
+        ['身份',ROLE_LABEL[a?.role as any]||a?.role||'—'],
+        ['支部',branches.find(b=>b.id===a?.branchId)?.name||'—'],
+        ...(status==='approved'?[['注意','批核後即建立使用者帳號'] as [string,string]]:[]),
+      ]),
+      confirmLabel:status==='approved'?'確認批核':'確認拒絕',
+      danger:status==='rejected',
+    });
+    if(!ok)return;
     setErr('');setProcessingId(id);
     try{
       const fresh=await apiDecideApplication(id,status);

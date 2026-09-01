@@ -5,6 +5,7 @@ import { apiUpdateMember, apiUpdateUserField } from '@/lib/api';
 import { getSession, Session } from '@/lib/session';
 import { branches, ROLE_LABEL, LEADER_ROLES } from '@/lib/model';
 import Link from 'next/link';
+import { useConfirm, kv } from '@/components/ConfirmProvider';
 
 /* ═══════════════════════════════════════════════════
    個人資料 —— MOCK 乾淨版式：大頭像 + 白卡表單
@@ -16,6 +17,7 @@ export default function Profile() {
   const [err, setErr] = useState('');
   const [ok, setOk] = useState('');
   const [saving, setSaving] = useState(false);
+  const { confirm } = useConfirm();
   // 不能在 render 期直接 getSession()：SSR 拿不到 localStorage 會渲染「請先登入」，
   // client 第一次 render 卻有 session → hydration mismatch（React error #425）。
   const [session, setSession] = useState<Session | null | undefined>(undefined);
@@ -44,6 +46,17 @@ export default function Profile() {
   }, [session]);
 
   async function save() {
+    const ok = await confirm({
+      title: '確認儲存個人資料',
+      message: kv([
+        ['姓名', name],
+        ...(password ? [['密碼', '（已輸入新密碼）'] as [string, string]] : []),
+        ...(email ? [['Email', email] as [string, string]] : []),
+        ...(phone ? [['電話', phone] as [string, string]] : []),
+      ]),
+      confirmLabel: '確認儲存',
+    });
+    if (!ok) return;
     setErr(''); setOk(''); setSaving(true);
     try {
       if (session?.role === 'member' && session.memberId) {

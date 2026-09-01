@@ -1,17 +1,19 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { AppState, loadStateSlice } from '@/lib/store';
-import { apiToggleUser, apiCreateUser, apiUpdateUserRole, apiDeleteUser, apiGrantFeature, apiRevokeFeature, apiGetUserFeatures, apiUpdateUserPermissions, apiBatchCreateUsers, apiBatchCreateMembers } from '@/lib/api';
+import { apiToggleUser, apiCreateUser, apiUpdateUserRole, apiDeleteUser, apiGetUserFeatures, apiUpdateUserPermissions, apiBatchCreateUsers, apiBatchCreateMembers, apiDecideApplication, apiUpdateMember, apiLinkParent, apiDeleteMember } from '@/lib/api';
 import { ROLE_LABEL, branches, LEADER_ROLES } from '@/lib/model';
 import { checkEditPermission, assignableRoles } from '@/lib/permissions';
 import { getSession } from '@/lib/session';
 import type { Role } from '@/lib/model';
+import { useConfirm, kv } from '@/components/ConfirmProvider';
 
 const FEATURE_LABELS: Record<string,string> = {
   branches: '支部管理', members: '成員資料庫', applications: '審核 / 申請管理',
-  events: '活動管理', registrations: '報名管理', attendance: '簽到／點名', attendance_all: '全旅點名（跨支部）', library_import: '圖書館引入',
-  notices: '通告管理', users: '使用者管理', settings: '系統設定',
-  audit: '審核紀錄', calendar: '行事曆管理',
+  events: '活動管理', registrations: '報名管理', attendance: '簽到／點名', attendance_all: '全旅點名（跨支部）', library_import: '區地域總會活動引入',
+  notices: '通告管理', users: '使用者管理', settings: '系統設定', meetings: '會議管理',
+  equipment: '物資管理', plugins: '單位元件設定',
+  audit: '操作紀錄', calendar: '行事曆管理',
 };
 
 type BulkRow = {
@@ -144,27 +146,54 @@ export default function Page(){
   const [permsUserId,setPermsUserId]=useState<string|null>(null);
   const [perms,setPerms]=useState<any[]>([]);
   const [isMemberPerms, setIsMemberPerms] = useState(false);
+  const [tab,setTab]=useState<'accounts'|'members'|'applications'>('accounts');
+  const [appProcessing,setAppProcessing]=useState('');
   const session=getSession();
+  const { confirm } = useConfirm();
 
-  useEffect(()=>{loadStateSlice(['patrols','users','members']).then(setS).catch(e=>setErr(e.message))},[]);
+  useEffect(()=>{loadStateSlice(['patrols','users','members','applications']).then(setS).catch(e=>setErr(e.message))},[]);
   useEffect(()=>{
     if (s && typeof window !== 'undefined' && window.location.hash === '#bulk-onboard') {
       setShowBulk(true);
       window.history.replaceState(null, '', window.location.pathname);
       setTimeout(()=>previewBulk(),0);
     }
+    if (s && typeof window !== 'undefined' && window.location.hash === '#applications') {
+      setTab('applications');
+      window.history.replaceState(null, '', window.location.pathname);
+    }
   },[s]);
 
-  async function toggle(id:string){setErr('');try{const f=await apiToggleUser(id);setS(f)}catch(e:any){setErr(e.message)}}
-  async function changeRole(userId:string,newRole:Role){setErr('');try{const f=await apiUpdateUserRole(userId,newRole);setS(f)}catch(e:any){setErr(e.message)}}
-  async function del(id:string,userName:string){if(!confirm(`確定刪除 ${userName}？`))return;setErr('');try{const f=await apiDeleteUser(id);setS(f)}catch(e:any){setErr(e.message)}}
+  async function toggle(id:string){
+    const u=s?.users.find(x=>x.id===id);
+    const ok=await confirm({title:u?.approved?'確認停用帳號':'確認啟用帳號',message:kv([['帳號',u?.name||id],['變更後狀態',u?.approved?'🔴 停用':'🟢 啟用']]),confirmLabel:'確認'});
+    if(!ok)return;
+    setErr('');try{const f=await apiToggleUser(id);setS(f)}catch(e:any){setErr(e.message)}
+  }
+  async function changeRole(userId:string,newRole:Role){
+    const u=s?.users.find(x=>x.id===userId);
+    const ok=await confirm({title:'確認更改角色',message:kv([['帳號',u?.name||userId],['新角色',ROLE_LABEL[newRole]||newRole]]),confirmLabel:'確認更改'});
+    if(!ok)return;
+    setErr('');try{const f=await apiUpdateUserRole(userId,newRole);setS(f)}catch(e:any){setErr(e.message)}
+  }
+  async function del(id:string,userName:string){
+    const ok=await confirm({title:'確認刪除帳號',message:kv([['帳號',userName]]),confirmLabel:'確認刪除',danger:true});
+    if(!ok)return;
+    setErr('');try{const f=await apiDeleteUser(id);setS(f)}catch(e:any){setErr(e.message)}
+  }
   async function add(){
     if(!name||!email){setErr('請填姓名及 Email');return;}
+    const children = role === 'parent'
+      ? childRows.filter(c => c.ym.trim() || c.name.trim()).map(c => ({ ymNumber: c.ym.trim() || undefined, name: c.name.trim() || undefined, branchId: newChildBranch || 'b1' }))
+      : undefined;
+    const ok=await confirm({title:'確認建立使用者',message:kv([
+      ['姓名',name],['Email',email],['角色',ROLE_LABEL[role]||role],
+      ['支部',LEADER_ROLES.includes(role)?(branches.find(b=>b.id===branchId)?.name||branchId||'（未選）'):'—'],
+      ...(children?.length?[['子女', children.map(c=>c.name||c.ymNumber).join('、')] as [string,string]]:[]),
+    ]),confirmLabel:'確認建立'});
+    if(!ok)return;
     setErr('');setLoading(true);
     try{
-      const children = role === 'parent'
-        ? childRows.filter(c => c.ym.trim() || c.name.trim()).map(c => ({ ymNumber: c.ym.trim() || undefined, name: c.name.trim() || undefined, branchId: newChildBranch || 'b1' }))
-        : undefined;
       const res = await apiCreateUser({name,email,password:pw,role,branchId:LEADER_ROLES.includes(role)?branchId:'',children});
       setS(res.state);setShowAdd(false);setName('');setEmail('');setChildRows([{ym:'',name:''}]);
       setOk(children?.length ? `✅ 已建立 ${name} 的帳號 — 連結已有成員 ${res.linked.length} 名、新建成員紀錄(無登入帳號) ${res.created.length} 名。` : '✅ 帳號已建立。');
@@ -315,7 +344,16 @@ export default function Page(){
         emergencyContactName: r.emergencyContactName, emergencyContactPhone: r.emergencyContactPhone, note: r.note,
       };
     });
-    if (!confirm(`確定批量開戶？\n帳號：${userRows.length} 個\n成員：${memberRows.length} 名${bulkWarnings.length ? `\n(另有 ${bulkWarnings.length} 項選填提示)` : ''}`)) return;
+    const ok = await confirm({
+      title: '確認批量開戶',
+      message: kv([
+        ['帳號', `${userRows.length} 個`],
+        ['成員', `${memberRows.length} 名`],
+        ...(bulkWarnings.length ? [['選填提示', `${bulkWarnings.length} 項（不影響開戶）`] as [string, string]] : []),
+      ]),
+      confirmLabel: '確認一次寫入',
+    });
+    if (!ok) return;
     setLoading(true); setErr(''); setOk('');
     try {
       let fresh: AppState | null = null;
@@ -350,9 +388,19 @@ export default function Page(){
 
   async function savePermsBatch() {
     if (!permsUserId) return;
+    const enabledFeatures = perms.filter(p => p.enabled).map(p => p.feature);
+    const targetName = isMemberPerms ? s?.members.find(m => m.id === permsUserId)?.name : s?.users.find(u => u.id === permsUserId)?.name;
+    const ok = await confirm({
+      title: '確認寫入功能授權',
+      message: kv([
+        ['對象', targetName || permsUserId],
+        ['啟用功能', enabledFeatures.map(f => FEATURE_LABELS[f] || f).join('、') || '（無）'],
+      ]),
+      confirmLabel: '確認批次寫入',
+    });
+    if (!ok) return;
     setLoading(true); setErr(''); setOk('');
     try {
-      const enabledFeatures = perms.filter(p => p.enabled).map(p => p.feature);
       const freshState = await apiUpdateUserPermissions(permsUserId, enabledFeatures);
       setOk('✅ 授權設定已完整批次寫入！');
       setS(freshState);
@@ -360,19 +408,43 @@ export default function Page(){
     } catch (e: any) { setErr(e.message); } finally { setLoading(false); }
   }
 
-  async function toggleFeature(userId:string,feature:string,enabled:boolean){
-    setLoading(true);setErr('');
-    try{
-      if(enabled){
-        await apiGrantFeature(userId,feature,true);
-      }else{
-        await apiRevokeFeature(userId,feature);
-      }
-      // Reload perms
-      const result=await apiGetUserFeatures(userId);
-      if(result.success) setPerms(result.features||[]);
-      setOk('✅ 已更新權限');
-    }catch(e:any){setErr(e.message)}finally{setLoading(false)}
+  async function decideApp(id:string,status:'approved'|'rejected'){
+    const a=s?.applications.find(x=>x.id===id);
+    const ok=await confirm({
+      title:status==='approved'?'確認批核申請':'確認拒絕申請',
+      message:kv([
+        ['申請人',a?.name||id],
+        ['身份',ROLE_LABEL[a?.role as Role]||a?.role||'—'],
+        ['支部',branches.find(b=>b.id===a?.branchId)?.name||'—'],
+        ...(status==='approved'?[['注意','批核後即建立使用者帳號'] as [string,string]]:[]),
+      ]),
+      confirmLabel:status==='approved'?'確認批核':'確認拒絕',
+      danger:status==='rejected',
+    });
+    if(!ok)return;
+    setErr('');setAppProcessing(id);
+    try{const f=await apiDecideApplication(id,status);setS(f);setOk(status==='approved'?'✅ 已批核申請':'✅ 已拒絕申請')}
+    catch(e:any){setErr(e.message)}finally{setAppProcessing('')}
+  }
+  async function linkMemberParent(mid:string,pid:string){
+    const m=s?.members.find(x=>x.id===mid);
+    const ok=await confirm({
+      title:'確認連結家長',
+      message:kv([
+        ['成員',m?.name||mid],
+        ['家長', pid ? s?.users.find(u=>u.id===pid)?.name||pid : '未連結'],
+      ]),
+      confirmLabel:'確認連結',
+    });
+    if(!ok)return;
+    setErr('');
+    try{const f=await apiLinkParent(mid,pid);setS(f)}catch(e:any){setErr(e.message)}
+  }
+  async function delMember(id:string,name:string){
+    const ok=await confirm({title:'確認刪除成員',message:kv([['成員',name]]),confirmLabel:'確認刪除',danger:true});
+    if(!ok)return;
+    setErr('');
+    try{const f=await apiDeleteMember(id);setS(f)}catch(e:any){setErr(e.message)}
   }
 
   if(!s)return <div className="card">{err||'載入中...'}</div>;
@@ -388,10 +460,18 @@ export default function Page(){
   });
 
   return <div className="stack">
-    <section className="hero"><span className="badge gold">使用者管理</span><h1>使用者管理</h1><p>管理帳號、角色、功能權限。上級可授權下級額外功能。</p></section>
+    <section className="hero"><span className="badge gold">使用者管理</span><h1>👥 使用者管理</h1><p>帳號、成員資料庫與審核申請已合併喺一處，用下方分頁切換。上級可授權下級額外功能。</p></section>
     {err&&<p className="badge red">{err}</p>}
     {ok&&<p className="badge green">{ok}</p>}
 
+    {/* 分頁：帳號 / 成員資料 / 申請審核 */}
+    <div className="row" style={{ gap: 6, flexWrap: 'wrap' }}>
+      <button type="button" className={`btn ${tab==='accounts'?'primary':''}`} onClick={()=>setTab('accounts')}>👤 帳號（{s.users.length}）</button>
+      <button type="button" className={`btn ${tab==='members'?'primary':''}`} onClick={()=>setTab('members')}>👥 成員資料（{s.members.length}）</button>
+      <button type="button" className={`btn ${tab==='applications'?'primary':''}`} onClick={()=>setTab('applications')}>✅ 申請審核（{s.applications.filter(a=>a.status==='pending').length}）</button>
+    </div>
+
+    {tab==='accounts'&&<>
     <section className="card row">
       <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="搜尋姓名或 Email" style={{flex:1}}/>
       <select value={filterRole} onChange={e=>setFilterRole(e.target.value)}>
@@ -573,5 +653,70 @@ export default function Page(){
         ))}</tbody>
       </table>
     </section>
+    </>}
+
+    {/* ── 成員資料（合併自成員資料庫）── */}
+    {tab==='members'&&<section className="card">
+      <div className="row" style={{justifyContent:'space-between'}}>
+        <h3 style={{margin:0}}>👥 成員資料</h3>
+        <a className="btn gold" href="/admin/members">完整成員編輯頁 →</a>
+      </div>
+      <table className="table responsive">
+        <thead><tr><th>姓名</th><th>YMIS</th><th>支部</th><th>小隊</th><th>年齡</th><th>家長連結</th><th>操作</th></tr></thead>
+        <tbody>{s.members.map(m=>{
+          const p=s.patrols.find(x=>x.id===m.patrolId);
+          return <tr key={m.id}>
+            <td data-label="姓名">{m.name}</td>
+            <td data-label="YMIS">{m.ymNumber}</td>
+            <td data-label="支部">{branches.find(b=>b.id===m.branchId)?.short||m.branchId}</td>
+            <td data-label="小隊">{p?.name||'未分隊'}</td>
+            <td data-label="年齡">{m.age>0?m.age:'—'}</td>
+            <td data-label="家長連結"><select value={m.parentUserId||''} onChange={e=>linkMemberParent(m.id,e.target.value)}><option value="">未連結</option>{s.users.filter(u=>u.role==='parent').map(u=><option key={u.id} value={u.id}>{u.name}</option>)}</select></td>
+            <td data-label="操作"><a className="btn" style={{fontSize:'0.8em'}} href="/admin/members">✏️</a> <button className="btn" style={{fontSize:'0.8em',color:'#d93025'}} onClick={()=>delMember(m.id,m.name)}>🗑️</button></td>
+          </tr>;
+        })}</tbody>
+      </table>
+      {s.members.length===0&&<p className="muted">尚無成員。</p>}
+    </section>}
+
+    {/* ── 申請審核（合併自審核申請管理）── */}
+    {tab==='applications'&&<>
+      <section className="card">
+        <h3>待審批申請（{s.applications.filter(a=>a.status==='pending').length}）</h3>
+        <table className="table responsive">
+          <thead><tr><th>姓名</th><th>類型</th><th>身份</th><th>支部</th><th>YMIS</th><th>Email</th><th>狀態</th><th>操作</th></tr></thead>
+          <tbody>{s.applications.filter(a=>a.status==='pending').map(a=>
+            <tr key={a.id}>
+              <td data-label="姓名">{a.name}</td>
+              <td data-label="類型">{a.type}</td>
+              <td data-label="身份">{ROLE_LABEL[a.role]||a.role}</td>
+              <td data-label="支部">{branches.find(b=>b.id===a.branchId)?.short||'-'}</td>
+              <td data-label="YMIS">{a.ymNumbers||'-'}</td>
+              <td data-label="Email">{a.email||'-'}</td>
+              <td data-label="狀態"><span className="badge gold">待批核</span></td>
+              <td data-label="操作">
+                {appProcessing===a.id?<span className="badge gold">處理中...</span>:<>
+                  <button className="btn primary" style={{fontSize:'0.8em'}} onClick={()=>decideApp(a.id,'approved')}>✅ 批核</button>
+                  <button className="btn" style={{fontSize:'0.8em'}} onClick={()=>decideApp(a.id,'rejected')}>✖ 拒絕</button>
+                </>}
+              </td>
+            </tr>)}</tbody>
+        </table>
+        {s.applications.filter(a=>a.status==='pending').length===0&&<p className="muted">沒有待審批申請。</p>}
+      </section>
+      {s.applications.filter(a=>a.status!=='pending').length>0&&<section className="card">
+        <h3>已處理</h3>
+        <table className="table responsive">
+          <thead><tr><th>姓名</th><th>身份</th><th>結果</th><th>處理時間</th></tr></thead>
+          <tbody>{s.applications.filter(a=>a.status!=='pending').map(a=>
+            <tr key={a.id}>
+              <td data-label="姓名">{a.name}</td>
+              <td data-label="身份">{ROLE_LABEL[a.role]||a.role}</td>
+              <td data-label="結果"><span className={`badge ${a.status==='approved'?'green':'red'}`}>{a.status==='approved'?'已批核':'已拒絕'}</span></td>
+              <td data-label="處理時間">{a.decidedAt||'—'}</td>
+            </tr>)}</tbody>
+        </table>
+      </section>}
+    </>}
   </div>;
 }

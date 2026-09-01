@@ -1,8 +1,9 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { AppState, loadStateSlice } from '@/lib/store';
-import { apiCreateMeeting, apiPublishMeeting, apiDeleteMeeting, apiUpdateMeeting } from '@/lib/api';
+import { apiCreateMeeting, apiPublishMeeting, apiDeleteMeeting, apiUpdateMeeting, apiSaveConfig } from '@/lib/api';
 import { branches } from '@/lib/model';
+import { useConfirm, kv } from '@/components/ConfirmProvider';
 
 export default function MeetingsAdmin() {
   const [s, setS] = useState<AppState | null>(null);
@@ -20,19 +21,52 @@ export default function MeetingsAdmin() {
   const [targetRoles, setTargetRoles] = useState('');
   const [branchId, setBranchId] = useState('');
   const [url, setUrl] = useState('');
+  const [calendarTag, setCalendarTag] = useState('');
+  const [folderId, setFolderId] = useState('');
+  const { confirm } = useConfirm();
 
-  useEffect(() => { loadStateSlice(['meetings']).then(setS).catch(e => setErr(e.message)) }, []);
+  useEffect(() => {
+    loadStateSlice(['meetings', 'config']).then(st => { setS(st); setFolderId(st.config.MEETINGS_FOLDER_ID || ''); }).catch(e => setErr(e.message));
+  }, []);
 
   async function add() {
     if (!title.trim() || !date) { setErr('請填寫標題和日期'); return; }
+    if (date && !calendarTag.trim()) { setErr('此會議有日期，請加入「行事曆標籤」以便加入行事曆。'); return; }
+    const ok = await confirm({
+      title: '確認新增會議（草稿）',
+      message: kv([
+        ['會議標題', title],
+        ['類型', type === 'agenda' ? '會議議程' : '會議紀錄'],
+        ['日期', date],
+        ['時間', `${startTime || '—'} 至 ${endTime || '—'}`],
+        ['行事曆標籤', calendarTag],
+        ['地點', location],
+        ['對象', targetRoles],
+        ['支部', branchId || '全旅'],
+      ]),
+      confirmLabel: '確認新增',
+    });
+    if (!ok) return;
     try {
-      const fresh = await apiCreateMeeting({ title, type, date, startTime, endTime, location, targetRoles, branchId, url });
+      const fresh = await apiCreateMeeting({ title, type, date, startTime, endTime, location, targetRoles, branchId, url, calendarTag });
       setS(fresh); setShowAdd(false); resetForm();
     } catch (e: any) { setErr(e.message) }
   }
 
   function resetForm() {
-    setTitle(''); setType('agenda'); setDate(''); setStartTime(''); setEndTime(''); setLocation(''); setTargetRoles(''); setBranchId(''); setUrl('');
+    setTitle(''); setType('agenda'); setDate(''); setStartTime(''); setEndTime(''); setLocation(''); setTargetRoles(''); setBranchId(''); setUrl(''); setCalendarTag('');
+  }
+
+  async function saveFolder() {
+    setErr('');
+    const ok = await confirm({
+      title: '確認儲存會議文件 Drive 資料夾',
+      message: kv([['MEETINGS_FOLDER_ID', folderId]]),
+      confirmLabel: '確認儲存',
+    });
+    if (!ok) return;
+    try { const f = await apiSaveConfig('MEETINGS_FOLDER_ID', folderId); setS(f); }
+    catch (e: any) { setErr(e.message); }
   }
 
   if (!s) return <div className="card">載入中...</div>;
@@ -70,10 +104,22 @@ export default function MeetingsAdmin() {
               {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
             </select>
             <input value={url} onChange={e => setUrl(e.target.value)} placeholder="文件連結 (Google Drive)" />
+            <input value={calendarTag} onChange={e => setCalendarTag(e.target.value)} placeholder="行事曆標籤 🏷️ (如：領袖會議)" />
           </div>
+          <p className="muted" style={{ margin: 0 }}>💡 有日期的會議請加入「行事曆標籤」，方便喺行事曆分類顯示。</p>
           <button className="btn primary" onClick={add}>儲存草稿</button>
         </section>
       )}
+
+      {/* Drive 資料夾設定（亦可喺單位元件設定嗰度設定） */}
+      <section className="card stack">
+        <h3>🗂 會議文件 Drive 資料夾設定</h3>
+        <p className="muted" style={{ margin: 0 }}>把會議文件 PDF 放入指定 Google Drive 資料夾，前端自動列出。亦可在「單位元件設定」統一設定。資料夾需設為「知道連結的人都可檢視」。</p>
+        <div className="row">
+          <input value={folderId} onChange={e => setFolderId(e.target.value)} placeholder="https://drive.google.com/drive/folders/XXXX 或直接填 XXXX" style={{ flex: 1 }} />
+          <button className="btn gold" onClick={saveFolder}>儲存</button>
+        </div>
+      </section>
 
       <div className="row" style={{ marginTop: '1.5rem', borderBottom: '2px solid #eee', gap: '0' }}>
         <button className={`btn tab ${activeTab === 'all' ? 'active' : ''}`} onClick={() => setActiveTab('all')} style={tabStyle(activeTab === 'all')}>全旅</button>
@@ -90,12 +136,19 @@ export default function MeetingsAdmin() {
               <span className={`badge ${m.status === 'published' ? 'green' : 'gold'}`}>{m.status}</span>
               <h3>{m.title}</h3>
               <p className="muted">{m.date} {m.startTime}-{m.endTime} | {m.location || '待定'}</p>
+              {m.calendarTag && <p className="muted" style={{ margin: 0 }}>🏷️ 行事曆標籤：{m.calendarTag}</p>}
               <p className="muted">對象：{m.targetRoles?.join(', ') || '全體'}</p>
               {m.url && <a href={m.url} target="_blank" rel="noopener noreferrer" className="btn gold" style={{display:'inline-block', marginTop: 8, fontSize: '0.85rem'}}>📄 查看會議文件</a>}
             </div>
             <div className="row">
-              {m.status === 'draft' && <button className="btn primary" onClick={async () => setS(await apiPublishMeeting(m.id))}>發布</button>}
-              <button className="btn red" onClick={async () => { if (confirm('確定刪除？')) setS(await apiDeleteMeeting(m.id)) }}>🗑️</button>
+              {m.status === 'draft' && <button className="btn primary" onClick={async () => {
+                const ok = await confirm({ title: '確認發布會議', message: kv([['會議', m.title]]), confirmLabel: '確認發布' });
+                if (ok) setS(await apiPublishMeeting(m.id));
+              }}>發布</button>}
+              <button className="btn red" onClick={async () => {
+                const ok = await confirm({ title: '確認刪除會議', message: kv([['會議', m.title]]), confirmLabel: '確認刪除', danger: true });
+                if (ok) setS(await apiDeleteMeeting(m.id));
+              }}>🗑️</button>
             </div>
           </div>
         ))}

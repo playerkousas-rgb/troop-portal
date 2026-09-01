@@ -1,6 +1,7 @@
 'use client';
 import Link from 'next/link';
 import { useState } from 'react';
+import { useConfirm, kv } from '@/components/ConfirmProvider';
 
 /* ═══════════════════════════════════════════════════
    MOCK 活動 —— 對照用戶定義：
@@ -130,6 +131,7 @@ export default function ActivitiesPage() {
   // 旅團活動三種處理方法；區／地域總會活動兩種處理方法。
   const [noticeSourcingMethod, setNoticeSourcingMethod] = useState<'link' | 'template' | 'inline' | 'library'>('link');
   const [libraryNoticeId, setLibraryNoticeId] = useState(LIBRARY_NOTICES[0].id);
+  const { confirm } = useConfirm();
 
   const isLeader = ['admin', 'group_leader', 'branch_leader', 'coach'].includes(role);
   const activeList = (filter === 'all' ? items : items.filter(a => a.kind === filter)).filter(a => !a.expired);
@@ -176,11 +178,21 @@ export default function ActivitiesPage() {
     setForm(null);
   }
 
-  function del(id: string) {
+  async function del(id: string) {
     const a = items.find(x => x.id === id);
     if (!a) return;
     // 防呆：刪除前確認（刪除後已報名嘅人會睇唔到集合資料）
-    if (!window.confirm(`確定永久刪除「${a.title}」？已報名嘅成員／家長之後就睇唔到集合時間地點，建議改用「移入過期區」。${a.kind === 'internal' ? '行事曆上嘅呢個活動都會一併移除。' : ''}`)) return;
+    const ok = await confirm({
+      title: '確認永久刪除活動',
+      message: kv([
+        ['活動', a.title],
+        ['提示', '已報名嘅成員／家長之後就睇唔到集合時間地點，建議改用「移入過期區」'],
+        ...(a.kind === 'internal' ? [['行事曆', '此活動會一併移除'] as [string, string]] : []),
+      ]),
+      confirmLabel: '確認刪除',
+      danger: true,
+    });
+    if (!ok) return;
     setItems(prev => prev.filter(x => x.id !== id));
     setDetail(null);
     setMsg(`🗑 已永久刪除「${a.title}」`);

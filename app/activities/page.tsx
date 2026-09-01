@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import EmptyState from '@/components/ui/EmptyState';
-import { AppState, loadStateSlice } from '@/lib/store';
+import { AppState, loadStateSlice, eventCategory } from '@/lib/store';
 import Link from 'next/link';
 import { getSession } from '@/lib/session';
 import { publicViewEnabled } from '@/lib/model';
@@ -24,8 +24,8 @@ export default function Activities() {
   const published = s.events.filter(e => e.status === 'published');
   const visible = published.filter(e =>
     filter === 'all' ? true
-    : filter === 'internal' ? e.kind !== 'notice_troop_participation'
-    : e.kind === 'notice_troop_participation');
+    : filter === 'internal' ? eventCategory(e) === 'self'
+    : eventCategory(e) === 'district');
 
   return (
     <main className="max-w-4xl mx-auto px-4 py-4 pb-24 space-y-4">
@@ -33,14 +33,14 @@ export default function Activities() {
         <h1 className="font-bold text-xl m-0">🎯 活動</h1>
         {!session && <Link href="/login" className="no-underline text-sm font-bold bg-brand-600 text-white px-3 py-2 rounded-xl hover:bg-brand-700 transition">登入查看詳情</Link>}
       </div>
-      <p className="text-sm text-slate-500 m-0 -mt-2">旅團或支部要報名參與嘅事項。登入後可回覆參加／不參加。</p>
+      <p className="text-sm text-slate-500 m-0 -mt-2">活動統一分成兩類：自行舉辦 與 區地域總會活動。登入後可回覆參加／不參加。</p>
 
       {/* 篩選 chips */}
       <div className="flex gap-1 overflow-x-auto pb-1 -mx-1 px-1">
         {([
           { id: 'all' as const, label: '全部' },
-          { id: 'internal' as const, label: '旅團自辦' },
-          { id: 'library' as const, label: '圖書館轉入' },
+          { id: 'internal' as const, label: '🏠 自行舉辦' },
+          { id: 'library' as const, label: '🗺️ 區地域總會活動' },
         ]).map(f => (
           <button key={f.id} onClick={() => setFilter(f.id)}
             className={`text-sm px-2.5 py-1 rounded-full font-bold whitespace-nowrap border cursor-pointer ${filter === f.id ? 'bg-slate-700 text-white border-slate-700' : 'bg-white text-slate-600 border-slate-200'}`}>
@@ -60,8 +60,8 @@ export default function Activities() {
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
                   <div className="flex items-center gap-1.5 flex-wrap">
-                    <span className={`text-sm px-1.5 py-0.5 rounded font-bold ${e.kind === 'notice_troop_participation' ? 'bg-violet-100 text-violet-700' : 'bg-blue-100 text-blue-700'}`}>
-                      {e.kind === 'notice_troop_participation' ? '📚 圖書館轉入 · 旅團參與' : '🏠 旅團 / 支部活動'}
+                    <span className={`text-sm px-1.5 py-0.5 rounded font-bold ${eventCategory(e) === 'district' ? 'bg-violet-100 text-violet-700' : 'bg-blue-100 text-blue-700'}`}>
+                      {eventCategory(e) === 'district' ? '🗺️ 區地域總會活動' : '🏠 自行舉辦'}
                     </span>
                   </div>
                   <h3 className="font-bold text-base text-slate-800 m-0 mt-1.5">{e.title}</h3>

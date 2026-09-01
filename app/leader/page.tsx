@@ -13,21 +13,23 @@ import { AppState, loadStateSlice, computeStats, replyStatus } from '@/lib/store
 import { apiSetReply } from '@/lib/api';
 import { getSession } from '@/lib/session';
 import { ROLE_LABEL } from '@/lib/model';
+import { useConfirm, kv } from '@/components/ConfirmProvider';
 
 // 領袖常用功能：全部歸入一張大卡（可收合）
 const LEADER_TOOLS: ConsoleTool[] = [
   { id: 'members', icon: '👥', label: '成員資料庫', desc: '查看及管理所屬支部成員。', href: '/admin/members' },
   { id: 'events', icon: '🗓️', label: '活動管理', desc: '新增、發布及管理活動。', href: '/admin/events' },
-  { id: 'registrations', icon: '📋', label: '報名管理', desc: '查看報名狀態及匯出。', href: '/admin/registrations' },
+  { id: 'registrations', icon: '📊', label: '活動統計', desc: '自行舉辦／區地域總會活動統計及匯出。', href: '/admin/registrations' },
   { id: 'equipment', icon: '📦', label: '物資借用管理', desc: '物資清單、批核借用、歸還回補庫存。', href: '/admin/equipment' },
   { id: 'applications', icon: '✅', label: '審核申請', desc: '審核家長／成員申請。', href: '/admin/applications' },
-  { id: 'library', icon: '📚', label: '圖書館標記', desc: '由通告圖書館引入通告。', href: '/library/import' },
+  { id: 'library', icon: '🗺️', label: '區地域總會活動', desc: '引入區／地域／總會活動（原圖書館）。', href: '/library/import' },
   { id: 'calendar', icon: '📅', label: '行事曆', desc: '查看及管理行事曆。', href: '/calendar' },
 ];
 
 export default function Leader(){
   const [s,setS]=useState<AppState|null>(null);const [err,setErr]=useState('');
   const [loadingId,setLoadingId]=useState('');
+  const { confirm } = useConfirm();
   // 按需載入：領袖摘要（computeStats 用到 users/applications/events/bookmarks）+ 活動回覆
   useEffect(()=>{loadStateSlice(['events','plugins','pluginSettings','users','applications','bookmarks','replies']).then(setS).catch(e=>setErr(e.message))},[]);
   const stats=s?computeStats(s):{users:0,pending:0,activities:0,notices:0};
@@ -35,7 +37,12 @@ export default function Leader(){
   const myId = session?.userId || '';
 
   async function act(eid:string,type:'registered'|'declined'|'interested'){
-    if(!myId)return;setErr('');setLoadingId(eid+type);
+    if(!myId)return;
+    const ev=s?.events.find(e=>e.id===eid);
+    const label={registered:'✅ 確定參加',declined:'❌ 婉拒不參加',interested:'❤️ 有興趣'}[type]||type;
+    const ok=await confirm({title:'確認回覆活動',message:kv([['活動',ev?.title||eid],['回覆',label]]),confirmLabel:'確認回覆'});
+    if(!ok)return;
+    setErr('');setLoadingId(eid+type);
     try{const f=await apiSetReply({eventId:eid,memberId:myId,type});setS(f)}catch(e:any){setErr(e.message)}finally{setLoadingId('')}
   }
 

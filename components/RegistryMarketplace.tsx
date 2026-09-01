@@ -5,6 +5,7 @@ import { buildPluginUrl, fetchRegistry, Registry, REGISTRY_URL, resolvePlugins, 
 import { isCoreNotPlugin } from '@/lib/attendance';
 import { getSession } from '@/lib/session';
 import { apiSavePluginSetting } from '@/lib/api';
+import { useConfirm, kv } from '@/components/ConfirmProvider';
 
 function visibleRolesFromMin(minRole: Role) {
   const idx = ROLE_ORDER.indexOf(minRole);
@@ -65,6 +66,7 @@ export function MarketplacePage() {
 
 function PluginCard({ plugin, unitCode, role }: { plugin: ResolvedPlugin; unitCode: string; role: Role }) {
   const [minRole, setMinRole] = useState<Role>(plugin.minRole);
+  const { confirm } = useConfirm();
   const session = getSession();
   const visible = visibleRolesFromMin(minRole);
   const target = buildPluginUrl(plugin, unitCode, role, plugin.embed, session?.memberId);
@@ -88,6 +90,12 @@ function PluginCard({ plugin, unitCode, role }: { plugin: ResolvedPlugin; unitCo
     </div>
     <div className="row">
       <button className="btn primary" disabled={!plugin.available} onClick={async ()=>{
+        const ok = await confirm({
+          title: '確認安裝元件',
+          message: kv([['元件', plugin.title], ['級別', `第 ${plugin.tier} 級`], ['ID', plugin.id]]),
+          confirmLabel: '確認安裝',
+        });
+        if (!ok) return;
         try {
           await apiSavePluginSetting({ pluginId: plugin.id, title: plugin.title, icon: plugin.icon, tier: plugin.tier });
           alert('✅ 已加入控制台');

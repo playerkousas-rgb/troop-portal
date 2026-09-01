@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { branches } from '@/lib/model';
 import { apiApplyJoin } from '@/lib/api';
+import { useConfirm, kv } from '@/components/ConfirmProvider';
 
 type ApplyType = 'parent' | 'leader' | 'member' | 'admin';
 
@@ -21,6 +22,7 @@ export default function Apply() {
   const [memberDob, setMemberDob] = useState('');
   const [msg, setMsg] = useState('');
   const [loading, setLoading] = useState(false);
+  const { confirm } = useConfirm();
 
   useEffect(() => {
     try { setTroop(JSON.parse(localStorage.getItem('scoutsystem2_selected_troop') || 'null')); } catch {}
@@ -32,6 +34,17 @@ export default function Apply() {
     if (!name.trim()) { setMsg('請填姓名。'); return; }
     if (type !== 'member' && !email.trim()) { setMsg('請填 Email。'); return; }
     if (type === 'member' && !memberNumber.trim()) { setMsg('請填 YMIS / 成員編號。'); return; }
+    const ok = await confirm({
+      title: '確認提交加入申請',
+      message: kv([
+        ['申請類型', ({ parent: '家長', leader: '領袖', member: '成員', admin: '管理員' } as Record<string, string>)[type]],
+        ['姓名', name.trim()],
+        ['Email', email.trim() || memberEmail.trim()],
+        ['支部', type === 'parent' || type === 'admin' ? '—' : branches.find(b => b.id === branchId)?.name || branchId],
+      ]),
+      confirmLabel: '確認提交',
+    });
+    if (!ok) return;
     setLoading(true);
     try {
       const role = type === 'parent' ? 'parent' : type === 'leader' ? leaderRole : type === 'admin' ? 'admin' : 'member';

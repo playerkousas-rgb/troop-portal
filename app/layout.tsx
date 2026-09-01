@@ -1,7 +1,9 @@
 import type { Metadata } from 'next';
 import TopNav from '@/components/layout/TopNav';
+import LatestNewsBar from '@/components/LatestNewsBar';
 import BottomNav from '@/components/layout/BottomNav';
 import SiteFooter from '@/components/layout/SiteFooter';
+import ConfirmProvider from '@/components/ConfirmProvider';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -13,10 +15,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="zh-HK">
       <body>
-        <TopNav />
-        <main className="page-container">{children}</main>
-        <SiteFooter />
-        <BottomNav />
+        <ConfirmProvider>
+          <TopNav />
+          <LatestNewsBar />
+          <main className="page-container">{children}</main>
+          <SiteFooter />
+          <BottomNav />
+        </ConfirmProvider>
       </body>
     </html>
   );

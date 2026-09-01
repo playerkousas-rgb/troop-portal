@@ -6,6 +6,7 @@ import { apiImportBookmark } from '@/lib/api';
 import { parseNoticeText, ParsedNotice } from '@/lib/noticeParser';
 import { branches } from '@/lib/model';
 import { getSession } from '@/lib/session';
+import { useConfirm, kv } from '@/components/ConfirmProvider';
 
 const NOTICE_TYPES = ['訓練班', '比賽', '服務', '工作坊', '活動', '其他'];
 
@@ -23,6 +24,7 @@ export default function NoticeUpload(){
   const [selectedAudience,setSelectedAudience]=useState<string[]>([]);
   const [internalDeadline,setInternalDeadline]=useState('');
   const fileRef=useRef<HTMLInputElement>(null);
+  const { confirm } = useConfirm();
 
   const AUDIENCE_OPTIONS = ['全旅', '領袖', '成年成員', '小童軍', '幼童軍', '童軍', '深資童軍', '樂行童軍', '家長'];
 
@@ -59,10 +61,22 @@ export default function NoticeUpload(){
     if(!parsed){setErr('請先抽取通告內容。');return;}
     setErr('');setMsg('');
     const session=getSession();
+    const finalType = noticeType==='其他' ? customType : noticeType;
+    const branchTags=selectedBranches.length>0?selectedBranches.map(id=>branches.find(b=>b.id===id)?.short||id).join(','):'全旅';
+    const audienceTags=selectedAudience.join(',');
+    const ok = await confirm({
+      title: '確認上傳通告',
+      message: kv([
+        ['標題', parsed.title || '未命名通告'],
+        ['模式', mode === 'troop_participation' ? '旅團參與（加入行事曆）' : '資訊性'],
+        ['活動日期', parsed.eventDate || internalDeadline || ''],
+        ['收費', parsed.fee],
+        ['類型', finalType],
+      ]),
+      confirmLabel: '確認儲存',
+    });
+    if (!ok) return;
     try{
-      const finalType = noticeType==='其他' ? customType : noticeType;
-      const branchTags=selectedBranches.length>0?selectedBranches.map(id=>branches.find(b=>b.id===id)?.short||id).join(','):'全旅';
-      const audienceTags=selectedAudience.join(',');
       if(mode==='troop_participation'){
         const { apiCreateEvent } = await import('@/lib/api');
         await apiCreateEvent({

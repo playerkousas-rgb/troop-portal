@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { AppState, loadState, loadStateSlice } from '@/lib/store';
 import { apiCreateMember, apiLinkParent, apiUpdateMember, apiDeleteMember } from '@/lib/api';
 import { branches } from '@/lib/model';
+import { useConfirm, kv } from '@/components/ConfirmProvider';
 
 function roleLabel(r?:string){return r==='leader'?'隊長':r==='deputy'?'副隊長':r==='member'?'隊員':'—'}
 function branchName(id?:string){return branches.find(b=>b.id===id)?.short||id||'—'}
@@ -23,6 +24,7 @@ export default function Page(){
   const [ePatrol,setEPatrol]=useState('');const [eDob,setEDob]=useState('');const [ePhone,setEPhone]=useState('');
   const [eEmergencyName,setEEmergencyName]=useState('');const [eParent,setEParent]=useState('');const [ePw,setEPw]=useState('');
   const [eEmail,setEEmail]=useState('');const [eSpecialRole,setESpecialRole]=useState('');
+  const { confirm } = useConfirm();
 
   useEffect(()=>{loadStateSlice(['patrols','users','members']).then(setS).catch(e=>setErr(e.message))},[]);
 
@@ -30,6 +32,17 @@ export default function Page(){
 
   async function add(){
     if(!name||!ym){setErr('請填姓名及 YMIS');return;}
+    const ok=await confirm({
+      title:'確認新增成員',
+      message:kv([
+        ['姓名',name],['YMIS',ym],['支部',branchName(branch)],
+        ['小隊',patrolName(patrol)],['特別身份',specialRole],
+        ['出生日期',dob],['緊急聯絡人',emergencyName],['電話',phone],
+        ['家長', parents?.find(p=>p.id===parent)?.name || '未連結'],
+      ]),
+      confirmLabel:'確認新增',
+    });
+    if(!ok)return;
     setErr('');setAdding(true);
     try{
       const fresh=await apiCreateMember({name,ymNumber:ym,branchId:branch,patrolId:patrol,specialRole:specialRole||undefined,dateOfBirth:dob,parentUserId:parent||undefined,emergencyContactPhone:phone,emergencyContactName:emergencyName,password:memberPw||ym});
@@ -48,6 +61,18 @@ export default function Page(){
 
   async function saveEdit(){
     if(!editing)return;
+    const ok=await confirm({
+      title:'確認儲存成員修改',
+      message:kv([
+        ['姓名',eName],['YMIS',eYm],['支部',branchName(eBranch)],
+        ['小隊',patrolName(ePatrol)],['特別身份',eSpecialRole],
+        ['出生日期',eDob],['Email',eEmail],
+        ['家長', parents?.find(p=>p.id===eParent)?.name || '未連結'],
+        ['密碼', ePw ? '（已輸入新密碼）' : '（不變）'],
+      ]),
+      confirmLabel:'確認儲存',
+    });
+    if(!ok)return;
     setErr('');
     try{
       const fresh=await apiUpdateMember({
@@ -66,12 +91,29 @@ export default function Page(){
   }
 
   async function linkParent(mid:string,pid:string){
+    const m=s?.members.find(x=>x.id===mid);
+    const ok=await confirm({
+      title:'確認連結家長',
+      message:kv([
+        ['成員',m?.name||mid],
+        ['家長', pid ? parents?.find(p=>p.id===pid)?.name||pid : '未連結'],
+      ]),
+      confirmLabel:'確認連結',
+    });
+    if(!ok)return;
     setErr('');
     try{const fresh=await apiLinkParent(mid,pid);setS(fresh)}catch(e:any){setErr(e.message)}
   }
 
   async function del(id:string){
-    if(!confirm('確定刪除此成員？'))return;
+    const m=s?.members.find(x=>x.id===id);
+    const ok=await confirm({
+      title:'確認刪除成員',
+      message:kv([['成員',m?.name||id]]),
+      confirmLabel:'確認刪除',
+      danger:true,
+    });
+    if(!ok)return;
     setErr('');
     try{const f=await apiDeleteMember(id);setS(f);if(editing===id)setEditing(null)}catch(e:any){setErr(e.message)}
   }

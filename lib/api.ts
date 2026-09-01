@@ -287,13 +287,13 @@ export function apiUpdateMember(p: Record<string, string>) {
 
 // ==================== 活動 / 報名 ====================
 
-export function apiCreateEvent(p: { title: string; scope?: string; branchId?: string; date?: string; location?: string; kind?: string; status?: string; source?: string; fee?: string; paymentUrl?: string; dutyPatrol?: string; targetMemberIds?: string }) {
+export function apiCreateEvent(p: { title: string; scope?: string; branchId?: string; date?: string; location?: string; kind?: string; status?: string; source?: string; fee?: string; paymentUrl?: string; dutyPatrol?: string; targetMemberIds?: string; category?: string; calendarTag?: string }) {
   return apiMutate('createEvent', p as any);
 }
 export function apiPublishEvent(eventId: string) {
   return apiMutate('publishEvent', { eventId });
 }
-export function apiUpdateEvent(p: { eventId: string; title?: string; date?: string; location?: string; scope?: string; branchId?: string; fee?: string; paymentUrl?: string; dutyPatrol?: string; status?: string }) {
+export function apiUpdateEvent(p: { eventId: string; title?: string; date?: string; location?: string; scope?: string; branchId?: string; fee?: string; paymentUrl?: string; dutyPatrol?: string; status?: string; category?: string; calendarTag?: string }) {
   return apiMutate('updateEvent', p as any);
 }
 export function apiDeleteEvent(eventId: string) {
@@ -408,6 +408,15 @@ export function apiDeleteRegularMeeting(meetingId: string) {
   return apiMutate('deleteRegularMeeting', { meetingId });
 }
 
+// ==================== 最新消息（首頁最上方 BAR，最多 3 條） ====================
+
+export function apiAddLatestNews(p: { text: string }) {
+  return apiMutate('addLatestNews', p as any);
+}
+export function apiDeleteLatestNews(id: string) {
+  return apiMutate('deleteLatestNews', { id });
+}
+
 // ==================== 內部公告 ====================
 
 export async function apiGetAnnouncements() {
@@ -437,7 +446,7 @@ export function apiTogglePluginStatus(pluginId: string) {
 
 // ==================== Meetings ====================
 
-export function apiCreateMeeting(p: { title: string; type: 'agenda' | 'minutes'; date: string; startTime?: string; endTime?: string; location?: string; targetRoles?: string; branchId?: string; url?: string }) {
+export function apiCreateMeeting(p: { title: string; type: 'agenda' | 'minutes'; date: string; startTime?: string; endTime?: string; location?: string; targetRoles?: string; branchId?: string; url?: string; calendarTag?: string }) {
   return apiMutate('createMeeting', p as any);
 }
 export function apiUpdateMeeting(p: any) {

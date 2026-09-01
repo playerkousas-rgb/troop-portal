@@ -1,8 +1,9 @@
 'use client';
 import { Suspense, useEffect, useState } from 'react';
-import { AppState, loadState, loadStateSlice, replyStatus } from '@/lib/store';
+import { AppState, loadState, loadStateSlice, replyStatus, eventCategory } from '@/lib/store';
 import { apiTogglePaid } from '@/lib/api';
 import { useSearchParams } from 'next/navigation';
+import { useConfirm, kv } from '@/components/ConfirmProvider';
 
 const GROUP_DEFS = [
   { id: 'b1', name: '🎒 小童軍', full: '小童軍支部', color: '#ff9800', text: '#b06000', border: '#ffe0b2' },
@@ -26,9 +27,16 @@ function RegistrationsInner(){
   const [expandedGroup, setExpandedGroup] = useState<string | null>(null);
   const [expandedBranchStatus, setExpandedBranchStatus] = useState<{ branchId: string; status: string } | null>(null);
   const [activeListTab, setActiveListTab] = useState<string>('all');
+  const { confirm } = useConfirm();
 
   useEffect(()=>{loadStateSlice(['patrols','users','members','events','replies']).then(st=>{setS(st);const q=search?.get('eventId');setEventId(q||st.events[0]?.id||'')}).catch(e=>setErr(e.message))},[]);
-  async function togglePaid(mid:string){setErr('');try{const f=await apiTogglePaid(eventId,mid);setS(f)}catch(e:any){setErr(e.message)}}
+  async function togglePaid(mid:string){
+    const m=s?.members.find(x=>x.id===mid);
+    const cur=!!replyStatus(s,eventId,mid)?.paid;
+    const ok=await confirm({title:'確認切換付款狀態',message:kv([['成員',m?.name||mid],['變更後狀態',cur?'❌ 未付款':'💰 已付款']]),confirmLabel:'確認'});
+    if(!ok)return;
+    setErr('');try{const f=await apiTogglePaid(eventId,mid);setS(f)}catch(e:any){setErr(e.message)}
+  }
 
   function getIsPaid(mid: string) {
     if (!s) return false;
@@ -46,6 +54,15 @@ function RegistrationsInner(){
     if (!s) return;
     const keys = Object.keys(paidOverrides);
     if (keys.length === 0) return;
+    const ok = await confirm({
+      title: '確認批次寫入付款狀態',
+      message: kv([
+        ['筆數', `${keys.length} 筆`],
+        ['變更', keys.map(mid => `${s.members.find(m => m.id === mid)?.name || mid} → ${paidOverrides[mid] ? '💰 已付款' : '❌ 未付款'}`).join('、')],
+      ]),
+      confirmLabel: '確認一次寫入',
+    });
+    if (!ok) return;
     setLoadingBatch(true);
     try {
       for (const mid of keys) {
@@ -64,8 +81,8 @@ function RegistrationsInner(){
   if(!s)return <div className="card">{err||'載入中...'}</div>;
   const event=s.events.find(e=>e.id===eventId);
   
-  const internalEvents = s.events.filter(e => e.kind !== 'notice_troop_participation' && e.source !== '圖書館引入');
-  const externalEvents = s.events.filter(e => e.kind === 'notice_troop_participation' || e.source === '圖書館引入');
+  const internalEvents = s.events.filter(e => eventCategory(e) === 'self');
+  const externalEvents = s.events.filter(e => eventCategory(e) === 'district');
 
   const memberTargets = event ? s.members.filter(m => event.targetMemberIds.includes(m.id)) : [];
   const userTargets = event ? s.users.filter(u => event.targetMemberIds.includes(u.id) && !memberTargets.some(m => m.id === u.id)) : [];
@@ -113,25 +130,25 @@ function RegistrationsInner(){
 
   return <div className="stack">
     <section className="hero">
-      <span className="badge gold">報名統計與分層對賬</span>
-      <h1>活動報名名單與分層對賬管理</h1>
-      <p>雙下拉選單分流自辦與外部通告，7大直式格完整呈現各支部與領袖出席，點選狀態即可展開具體名單，雙大格直列童軍及幼童軍成員意願與付款。</p>
+      <span className="badge gold">活動統計</span>
+      <h1>📊 活動統計（自行舉辦 ＝ 區地域總會 ＝ 通告統計）</h1>
+      <p>活動統計統一在此：雙下拉選單分流「自行舉辦」與「區地域總會活動（原圖書館引入）」，7大直式格完整呈現各支部與領袖出席，點選狀態即可展開具體名單。</p>
     </section>
     {err&&<p className="badge red">{err}</p>}
 
     {/* 1. 雙下拉選單選擇活動 */}
     <section className="grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 16 }}>
       <div className="card stack" style={{ borderTop: '4px solid #1a73e8', background: '#f8fafc' }}>
-        <strong style={{ fontSize: '1.05rem', color: '#1a73e8' }}>🎪 旅團內部主辦／自辦活動：</strong>
+        <strong style={{ fontSize: '1.05rem', color: '#1a73e8' }}>🏠 自行舉辦（原旅團自辦）：</strong>
         <select value={eventId} onChange={e=>{setEventId(e.target.value);setPaidOverrides({});setExpandedGroup(null);setExpandedOverallStatus(null);setExpandedBranchStatus(null);}}>
-          {internalEvents.length===0&&<option value="">無自辦活動</option>}
+          {internalEvents.length===0&&<option value="">無自行舉辦活動</option>}
           {internalEvents.map(e=><option key={e.id} value={e.id}>{e.title} ({e.date})</option>)}
         </select>
       </div>
       <div className="card stack" style={{ borderTop: '4px solid #f9ab00', background: '#fffef0' }}>
-        <strong style={{ fontSize: '1.05rem', color: '#b06000' }}>📚 外部接入／圖書館引入通告：</strong>
+        <strong style={{ fontSize: '1.05rem', color: '#b06000' }}>🗺️ 區地域總會活動（原圖書館引入）：</strong>
         <select value={eventId} onChange={e=>{setEventId(e.target.value);setPaidOverrides({});setExpandedGroup(null);setExpandedOverallStatus(null);setExpandedBranchStatus(null);}}>
-          {externalEvents.length===0&&<option value="">無外部接入通告</option>}
+          {externalEvents.length===0&&<option value="">無區地域總會活動</option>}
           {externalEvents.map(e=><option key={e.id} value={e.id}>{e.title} ({e.date})</option>)}
         </select>
       </div>
