@@ -3,16 +3,32 @@ import { branches } from '@/lib/model';
 import { AppState, loadStateSlice } from '@/lib/store';
 import { apiCreatePatrol, apiTogglePatrol, apiDeletePatrol } from '@/lib/api';
 import { useEffect, useState } from 'react';
+import { useConfirm, kv } from '@/components/ConfirmProvider';
 function branchHint(id:string){ if(id==='b1') return '小童軍預設沒有分隊。'; if(id==='b2') return '幼童軍按九種顏色分隊（紅、黃、藍、白、灰、綠、棕、黑、橙）。'; if(id==='b3') return '童軍按動物名稱小隊。'; return '此支部預設沒有分隊，如需要可自行新增。'; }
 export default function Page(){
   const [s,setS]=useState<AppState|null>(null);const [err,setErr]=useState('');
   const [loadingId,setLoadingId]=useState('');
   const [selected,setSelected]=useState('b3');const [name,setName]=useState('');const [short,setShort]=useState('');
+  const { confirm } = useConfirm();
   useEffect(()=>{loadStateSlice(['patrols','members']).then(setS).catch(e=>setErr(e.message))},[]);
   function memberName(id?:string){return s?.members.find(m=>m.id===id)?.name||'未指定'}
-  async function add(){if(!name.trim())return;setErr('');setLoadingId('add');try{const f=await apiCreatePatrol({branchId:selected,name,short});setS(f);setName('');setShort('')}catch(e:any){setErr(e.message)}finally{setLoadingId('')}}
-  async function toggle(id:string){setErr('');setLoadingId(id);try{const f=await apiTogglePatrol(id);setS(f)}catch(e:any){setErr(e.message)}finally{setLoadingId('')}}
-  async function del(id:string,pname:string){if(!confirm(`確定要刪除小隊「${pname}」嗎？`))return;setErr('');setLoadingId(id+'del');try{const f=await apiDeletePatrol(id);setS(f)}catch(e:any){setErr(e.message)}finally{setLoadingId('')}}
+  async function add(){
+    if(!name.trim())return;
+    const ok=await confirm({title:'確認新增小隊',message:kv([['支部',branches.find(b=>b.id===selected)?.name||selected],['名稱',name],['簡稱',short]]),confirmLabel:'確認新增'});
+    if(!ok)return;
+    setErr('');setLoadingId('add');try{const f=await apiCreatePatrol({branchId:selected,name,short});setS(f);setName('');setShort('')}catch(e:any){setErr(e.message)}finally{setLoadingId('')}
+  }
+  async function toggle(id:string){
+    const p=s?.patrols.find(x=>x.id===id);
+    const ok=await confirm({title:p?.enabled?'確認停用小隊':'確認啟用小隊',message:kv([['小隊',p?.name||id],['變更後狀態',p?.enabled?'🔴 停用':'🟢 啟用']]),confirmLabel:'確認'});
+    if(!ok)return;
+    setErr('');setLoadingId(id);try{const f=await apiTogglePatrol(id);setS(f)}catch(e:any){setErr(e.message)}finally{setLoadingId('')}
+  }
+  async function del(id:string,pname:string){
+    const ok=await confirm({title:'確認刪除小隊',message:kv([['小隊',pname]]),confirmLabel:'確認刪除',danger:true});
+    if(!ok)return;
+    setErr('');setLoadingId(id+'del');try{const f=await apiDeletePatrol(id);setS(f)}catch(e:any){setErr(e.message)}finally{setLoadingId('')}
+  }
   if(!s)return <div className="card">{err||'載入中...'}</div>;
   const ps=s.patrols.filter(p=>p.branchId===selected);
   return <div className="stack"><section className="hero"><span className="badge gold">支部管理</span><h1>支部與小隊設定</h1><p>新增、啟用／停用及刪除各支部小隊。</p></section>

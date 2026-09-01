@@ -5,6 +5,7 @@ import { apiGetEquipment } from '@/lib/api';
 import { getSession } from '@/lib/session';
 import { AppState, EQUIPMENT_BORROW_BRANCHES, Equipment, EquipmentLoan, LOAN_STATUS_LABEL, LOAN_STATUS_TONE } from '@/lib/store';
 import { branches } from '@/lib/model';
+import { useConfirm, kv } from '@/components/ConfirmProvider';
 
 const LEADER_ROLES = ['super_admin', 'troop_super', 'admin', 'group_leader', 'branch_leader', 'coach'];
 
@@ -21,6 +22,7 @@ export default function EquipmentPage() {
   const [borrowDate, setBorrowDate] = useState(today());
   const [returnDueDate, setReturnDueDate] = useState(today());
   const [quantities, setQuantities] = useState<Record<string, string>>({});
+  const { confirm } = useConfirm();
 
   const session = typeof window === 'undefined' ? null : getSession();
   const role = session?.role || 'guest';
@@ -75,6 +77,20 @@ export default function EquipmentPage() {
     if (!selected.length) { setErr('請在想借的物資旁填寫數量。'); return; }
     if (!borrowDate || !returnDueDate) { setErr('請填寫借出日期及預計歸還日期。'); return; }
     if (returnDueDate < borrowDate) { setErr('預計歸還日期不可早於借出日期。'); return; }
+    const ok = await confirm({
+      title: '確認遞交借用申請',
+      message: kv([
+        ['用途', purpose.trim()],
+        ['借出日期', borrowDate],
+        ['預計歸還', returnDueDate],
+        ['物資', selected.map(i => {
+          const eq = equipment.find(e => e.id === i.equipmentId);
+          return `${eq?.name || i.equipmentId} ×${i.qty}`;
+        }).join('、')],
+      ]),
+      confirmLabel: '確認遞交',
+    });
+    if (!ok) return;
     await run('submit', () => import('@/lib/api').then(m => m.apiRequestEquipmentLoan({
       items: selected, borrowDate, returnDueDate, purpose: purpose.trim(),
       memberId: session?.userId || '',
@@ -83,34 +99,59 @@ export default function EquipmentPage() {
   }
 
   async function decide(loan: EquipmentLoan, decision: 'approved' | 'rejected') {
-    let note = '';
-    if (decision === 'rejected') {
-      const input = prompt('拒絕原因（可留空）：');
-      if (input === null) return;
-      note = input;
-    }
+    const ok = await confirm({
+      title: decision === 'approved' ? '確認批准並扣庫存' : '確認拒絕借用申請',
+      message: kv([
+        ['申請人', loan.memberName || loan.memberId],
+        ['物資', `${loan.equipmentName} ×${loan.qty} ${loan.unit || ''}`],
+        ...(decision === 'approved' ? [['注意', '批准後即時扣除庫存'] as [string, string]] : []),
+      ]),
+      confirmLabel: decision === 'approved' ? '確認批准' : '確認拒絕',
+      danger: decision === 'rejected',
+    });
+    if (!ok) return;
     const { apiDecideEquipmentLoan } = await import('@/lib/api');
-    await run('dec' + loan.id, () => apiDecideEquipmentLoan(loan.id, decision, note),
+    await run('dec' + loan.id, () => apiDecideEquipmentLoan(loan.id, decision, ''),
       decision === 'approved' ? '已批准，庫存已扣除' : '已拒絕');
   }
 
   async function markReturned(loan: EquipmentLoan) {
-    if (!confirm(`確認 ${loan.memberName} 已歸還 ${loan.equipmentName} ×${loan.qty}？`)) return;
+    const ok = await confirm({
+      title: '確認已歸還',
+      message: kv([
+        ['借用人', loan.memberName || loan.memberId],
+        ['物資', `${loan.equipmentName} ×${loan.qty} ${loan.unit || ''}`],
+        ['注意', '標記後庫存即時回補'],
+      ]),
+      confirmLabel: '確認已歸還',
+    });
+    if (!ok) return;
     const { apiReturnEquipmentLoan } = await import('@/lib/api');
     await run('ret' + loan.id, () => apiReturnEquipmentLoan(loan.id), '已標記歸還，庫存已回補');
   }
 
   async function cancelLoan(loan: EquipmentLoan) {
-    if (!confirm(`取消借用申請：${loan.equipmentName} ×${loan.qty}？`)) return;
+    const ok = await confirm({
+      title: '確認取消借用申請',
+      message: kv([['物資', `${loan.equipmentName} ×${loan.qty} ${loan.unit || ''}`]]),
+      confirmLabel: '確認取消',
+      danger: true,
+    });
+    if (!ok) return;
     const { apiCancelEquipmentLoan } = await import('@/lib/api');
     await run('can' + loan.id, () => apiCancelEquipmentLoan(loan.id), '已取消申請');
   }
 
   async function updateLoanQty(loan: EquipmentLoan) {
-    const input = prompt(`修改借用數量（${loan.equipmentName}，現時 ${loan.qty} ${loan.unit}）：`, String(loan.qty));
-    if (input === null) return;
-    const qty = Math.floor(Number(input));
+    // 數量由「改數量」後在行內輸入（見下方 render），此處僅保留相容入口
+    const qty = Number(loan.qty);
     if (!(qty > 0)) { setErr('數量必須大於 0。'); return; }
+    const ok = await confirm({
+      title: '確認修改借用數量',
+      message: kv([['物資', loan.equipmentName], ['新數量', `${qty} ${loan.unit || ''}`]]),
+      confirmLabel: '確認修改',
+    });
+    if (!ok) return;
     const { apiUpdateEquipmentLoan } = await import('@/lib/api');
     await run('upd' + loan.id, () => apiUpdateEquipmentLoan({ loanId: loan.id, qty }), '已更新數量');
   }

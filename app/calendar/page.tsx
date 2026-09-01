@@ -8,6 +8,7 @@ import { getSession, Session } from '@/lib/session';
 import { publicViewEnabled } from '@/lib/model';
 import PublicLocked from '@/components/ui/PublicLocked';
 import Link from 'next/link';
+import { useConfirm, kv } from '@/components/ConfirmProvider';
 
 /* ═══════════════════════════════════════════════════
    行事曆 —— MOCK 乾淨版式 + 真實後台
@@ -79,6 +80,7 @@ export default function Calendar() {
   const [ruleForm, setRuleForm] = useState<typeof emptyRule | null>(null);
   const [formErr, setFormErr] = useState('');
   const [loading, setLoading] = useState(false);
+  const { confirm } = useConfirm();
 
   useEffect(() => {
     loadStateSlice(['users', 'members', 'events', 'regularMeetings', 'cancelledMeetings', 'meetings', 'replies', 'config'])
@@ -163,6 +165,20 @@ export default function Calendar() {
     if (!form.title.trim()) { setFormErr('請填寫活動名稱。'); return; }
     if (!/^\d{4}-\d{2}-\d{2}$/.test(form.date)) { setFormErr('請選擇日期（YYYY-MM-DD）。'); return; }
     if (form.date && !form.calendarTag.trim()) { setFormErr('此項目有日期，請加入「行事曆標籤」以便加入行事曆。'); return; }
+    const ok = await confirm({
+      title: form.id ? '確認更新日曆項目' : '確認新增日曆項目',
+      message: kv([
+        ['名稱', form.title.trim()],
+        ['分類', form.category === 'district' ? '區地域總會活動' : '自行舉辦'],
+        ['日期', form.date],
+        ['行事曆標籤', form.calendarTag],
+        ['支部', BRANCH_OPTIONS.find(b => b.id === form.branchId)?.label || form.branchId],
+        ['地點', form.location],
+        ['費用', form.fee],
+      ]),
+      confirmLabel: form.id ? '確認更新' : '確認新增並發布',
+    });
+    if (!ok) return;
     setLoading(true); setErr('');
     try {
       if (form.id) {
@@ -178,7 +194,8 @@ export default function Calendar() {
   }
 
   async function deleteEvent(id: string, title: string) {
-    if (!confirm(`確定刪除「${title}」？刪除後成員就唔會再見到呢個活動。`)) return;
+    const ok = await confirm({ title: '確認刪除日曆項目', message: kv([['活動', title]]), confirmLabel: '確認刪除', danger: true });
+    if (!ok) return;
     setLoading(true); setErr('');
     try { await apiDeleteEvent(id); setMsg(`🗑 已刪除「${title}」`); await reload(); }
     catch (e: any) { setErr(e.message) } finally { setLoading(false) }
@@ -187,6 +204,18 @@ export default function Calendar() {
   async function saveRule() {
     if (!ruleForm) return;
     if (!ruleForm.title.trim()) { setFormErr('請填寫集會名稱。'); return; }
+    const ok = await confirm({
+      title: ruleForm.id ? '確認更新集會規則' : '確認新增集會規則',
+      message: kv([
+        ['名稱', ruleForm.title.trim()],
+        ['支部', BRANCH_OPTIONS.find(b => b.id === ruleForm.branchId)?.label || ruleForm.branchId],
+        ['星期', WEEKDAY_NAMES[Number(ruleForm.weekday) || 0]],
+        ['時間', `${ruleForm.startTime}-${ruleForm.endTime}`],
+        ['地點', ruleForm.location],
+      ]),
+      confirmLabel: ruleForm.id ? '確認更新' : '確認新增',
+    });
+    if (!ok) return;
     setLoading(true); setErr('');
     try {
       const p = { branchId: ruleForm.branchId, title: ruleForm.title.trim(), weekday: ruleForm.weekday, frequency: ruleForm.frequency, startTime: ruleForm.startTime, endTime: ruleForm.endTime, location: ruleForm.location };
@@ -203,13 +232,20 @@ export default function Calendar() {
   }
 
   async function deleteRule(id: string, title: string) {
-    if (!confirm(`確定刪除「${title}」恆常集會規則？`)) return;
+    const ok = await confirm({ title: '確認刪除集會規則', message: kv([['集會', title]]), confirmLabel: '確認刪除', danger: true });
+    if (!ok) return;
     setLoading(true); setErr('');
     try { await apiDeleteRegularMeeting(id); setMsg(`🗑 已刪除「${title}」`); await reload(); }
     catch (e: any) { setErr(e.message) } finally { setLoading(false) }
   }
 
   async function toggleRule(r: RegularMeeting) {
+    const ok = await confirm({
+      title: r.enabled ? '確認停用集會規則' : '確認啟用集會規則',
+      message: kv([['集會', r.title], ['變更後狀態', r.enabled ? '🔴 停用' : '🟢 啟用']]),
+      confirmLabel: '確認',
+    });
+    if (!ok) return;
     setLoading(true); setErr('');
     try { await apiToggleRegularMeeting(r.id); setMsg(r.enabled ? `⏸ 已停用「${r.title}」` : `▶️ 已啟用「${r.title}」`); await reload(); }
     catch (e: any) { setErr(e.message) } finally { setLoading(false) }
@@ -217,14 +253,18 @@ export default function Calendar() {
 
   async function cancelDay(branchId: string, date: string, title: string, type: 'cancelled' | 'recess' = 'cancelled') {
     const cancelled = !!s.cancelledMeetings.find(c => c.branchId === branchId && c.date === date);
-    if (!cancelled && !confirm(`確定取消 ${date} 嘅「${title}」？成員嘅行事曆會即時唔再顯示。`)) return;
+    if (!cancelled) {
+      const ok = await confirm({ title: '確認取消該日集會', message: kv([['日期', date], ['集會', title], ['注意', '成員的行事曆會即時不再顯示']]), confirmLabel: '確認取消', danger: true });
+      if (!ok) return;
+    }
     setLoading(true); setErr('');
     try { await apiToggleMeetingCancel(branchId, date, '領袖標記', type); setMsg(cancelled ? `↺ 已恢復 ${date} 嘅「${title}」` : `✕ 已${type === 'recess' ? '休會' : '取消'} ${date} 嘅「${title}」`); await reload(); }
     catch (e: any) { setErr(e.message) } finally { setLoading(false) }
   }
 
   async function deleteMeeting(id: string, title: string) {
-    if (!confirm(`確定刪除會議「${title}」？`)) return;
+    const ok = await confirm({ title: '確認刪除會議', message: kv([['會議', title]]), confirmLabel: '確認刪除', danger: true });
+    if (!ok) return;
     setLoading(true); setErr('');
     try { await apiDeleteMeeting(id); setMsg(`🗑 已刪除「${title}」`); await reload(); }
     catch (e: any) { setErr(e.message) } finally { setLoading(false) }

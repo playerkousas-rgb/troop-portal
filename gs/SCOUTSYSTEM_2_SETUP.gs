@@ -33,7 +33,7 @@ var VISIBLE_SHEETS_FOR_BEGINNERS = [
 
 var ADVANCED_SHEETS = [
   'Roles', 'FieldSettings', 'Users', 'Applications',
-  'Events', 'EventReplies', 'LibraryBookmarks', 'Announcements',
+  'Events', 'EventReplies', 'LibraryBookmarks', 'Announcements', 'LatestNews',
   'RegularMeetings', 'CancelledMeetings', 'Notices', 'Plugins', 'UserPermissions', 'AttendanceRecords',
   'EquipmentLoans', 'AuditLogs'
 ];
@@ -197,6 +197,7 @@ function getInitialSheets_() {
       ['ADMIN_EMAIL', '', '必填：第一位管理員 Email。填好後到選單 → 重新建立管理員帳號。'],
 
       ['ANNOUNCEMENT_FOLDER_ID', '', '公告 PDF 的 Google Drive 資料夾 ID。取得方式：打開 Drive 資料夾，看網址 https://drive.google.com/drive/folders/XXXX，XXXX 就是 ID。資料夾需設為「知道連結的人都可檢視」。'],
+      ['MEETINGS_FOLDER_ID', '', '會議文件 PDF 的 Google Drive 資料夾 ID。可在「單位元件設定」或「會議管理」頁設定。'],
       ['REGISTRY_URL', 'https://troop-router.vercel.app/api/registry.json', '轉駁器 registry。'],
       
       ['STAFF_TOKEN', '', '（系統用）'],
@@ -262,10 +263,10 @@ function getInitialSheets_() {
       ['m_ex2', '2345678901', '2345678901', '李小美（範例）', '', 'b2', 'p1', 'member', '', '2015-07-20', '', '李太', '9876 5432', true, '範例：幼童軍支部成員，RED 隊。請修改或刪除。']
     ],
     Meetings: [
-      ['meetingId', 'title', 'type', 'date', 'startTime', 'endTime', 'location', 'targetRoles', 'branchId', 'url', 'status', 'createdBy', 'createdAt', 'note']
+      ['meetingId', 'title', 'type', 'date', 'startTime', 'endTime', 'location', 'targetRoles', 'branchId', 'url', 'status', 'calendarTag', 'createdBy', 'createdAt', 'note']
     ],
     Events: [
-      ['eventId', 'title', 'scope', 'branchId', 'date', 'location', 'kind', 'status', 'source', 'fee', 'paymentUrl', 'dutyPatrol', 'targetMemberIds', 'createdBy', 'createdAt', 'note']
+      ['eventId', 'title', 'scope', 'branchId', 'date', 'location', 'kind', 'status', 'source', 'category', 'calendarTag', 'fee', 'paymentUrl', 'dutyPatrol', 'targetMemberIds', 'createdBy', 'createdAt', 'note']
     ],
     EventReplies: [
       ['replyId', 'eventId', 'memberId', 'memberName', 'branchId', 'parentUserId', 'type', 'operatedBy', 'paid', 'cancelled', 'createdAt', 'updatedAt', 'notes']
@@ -275,6 +276,9 @@ function getInitialSheets_() {
     ],
     Announcements: [
       ['announcementId', 'fileId', 'fileName', 'fileUrl', 'fileSize', 'branchTags', 'audienceTags', 'status', 'updatedAt', 'note']
+    ],
+    LatestNews: [
+      ['newsId', 'text', 'authorUserId', 'authorName', 'createdAt']
     ],
     RegularMeetings: [
       ['meetingId', 'branchId', 'title', 'weekday', 'frequency', 'startTime', 'endTime', 'location', 'enabled', 'note'],
@@ -839,12 +843,20 @@ function mapEvents_() {
     if (targets.length === 0 && getField_(e, 'scope') === 'troop') {
       targets = members.map(function (m) { return getField_(m, 'memberId'); });
     }
+    var category = getField_(e, 'category') || '';
+    if (category !== 'district' && category !== 'self') {
+      // 舊資料推斷：圖書館／地域／區會 → district；否則 self
+      var src = String(getField_(e, 'source') || '');
+      category = (String(getField_(e, 'kind') || '') === 'notice_troop_participation' || /圖書館|地域|區會|區地域|總會/.test(src)) ? 'district' : 'self';
+    }
     return {
       id: getField_(e, 'eventId'), title: getField_(e, 'title'),
       scope: getField_(e, 'scope') || 'troop', branchId: getField_(e, 'branchId') || '',
       date: fmtDate_(getField_(e, 'date')), location: getField_(e, 'location') || '',
       kind: getField_(e, 'kind') || 'activity', status: getField_(e, 'status') || 'draft',
-      source: getField_(e, 'source') || '', fee: getField_(e, 'fee') || '',
+      source: getField_(e, 'source') || '', category: category,
+      calendarTag: getField_(e, 'calendarTag') || '',
+      fee: getField_(e, 'fee') || '',
       paymentUrl: getField_(e, 'paymentUrl') || '', dutyPatrol: getField_(e, 'dutyPatrol') || '',
       targetMemberIds: targets
     };
@@ -917,9 +929,20 @@ function mapMeetings_() {
       date: fmtDate_(getField_(m, 'date')), startTime: fmtTime_(getField_(m, 'startTime')),
       endTime: fmtTime_(getField_(m, 'endTime')), location: getField_(m, 'location'),
       targetRoles: parseArray_(getField_(m, 'targetRoles')), branchId: getField_(m, 'branchId'),
-      url: getField_(m, 'url'), status: getField_(m, 'status') || 'draft'
+      url: getField_(m, 'url'), status: getField_(m, 'status') || 'draft',
+      calendarTag: getField_(m, 'calendarTag') || ''
     };
   });
+}
+
+function mapLatestNews_() {
+  return readTable_('LatestNews').map(function (n) {
+    return {
+      id: getField_(n, 'newsId'), text: getField_(n, 'text') || '',
+      authorUserId: getField_(n, 'authorUserId') || '', authorName: getField_(n, 'authorName') || '',
+      createdAt: getField_(n, 'createdAt') ? fmtDate_(getField_(n, 'createdAt')) || getField_(n, 'createdAt') : ''
+    };
+  }).filter(function (n) { return n.text; }).slice(0, 3);
 }
 
 function mapCancelledMeetings_() {
@@ -1091,6 +1114,7 @@ function buildDashboardCore_(userId, loadPdfs) {
   var allEquipment = mapEquipment_();
   var allEquipmentLoans = mapEquipmentLoans_();
   var allAudits = mapAudits_();
+  var allLatestNews = mapLatestNews_();
   var config = mapConfig_();
 
   var state = {
@@ -1102,7 +1126,7 @@ function buildDashboardCore_(userId, loadPdfs) {
     plugins: [],
     pluginSettings: [],
     audits: [], config: publicConfig_(config),
-    equipment: [], equipmentLoans: [],
+    equipment: [], equipmentLoans: [], latestNews: [],
     userFeatures: []  // 當前用戶的功能權限
   };
   // Fill userFeatures for current user
@@ -1165,6 +1189,9 @@ function buildDashboardCore_(userId, loadPdfs) {
   if (!user) {
     return state;
   }
+
+  // 最新消息：登入後所有人都見到（最多 3 條）
+  state.latestNews = allLatestNews.slice(0, 3);
 
   // 當前使用者永遠包含
   state.users = [user];
@@ -1365,7 +1392,7 @@ function buildStateSlice_(userId, keys) {
     plugins: [],
     pluginSettings: [],
     audits: [],
-    equipment: [], equipmentLoans: [],
+    equipment: [], equipmentLoans: [], latestNews: [],
     config: full.config || {},
     userFeatures: full.userFeatures || []
   };
@@ -1680,6 +1707,8 @@ function doGet(e) {
       case 'getAnnouncements': return json(getAnnouncements(p));
       case 'updateAnnouncement': return wrap_(updateAnnouncement(p), p);
       case 'deleteAnnouncement': return wrap_(deleteAnnouncement(p), p);
+      case 'addLatestNews': return wrap_(addLatestNews(p), p);
+      case 'deleteLatestNews': return wrap_(deleteLatestNews(p), p);
       case 'addRow': return wrap_(genericAddRow(p), p);
       case 'createMeeting': return wrap_(handleCreateMeeting_(p), p);
       case 'updateMeeting': return wrap_(handleUpdateMeeting_(p), p);
@@ -2501,10 +2530,19 @@ function handleCreateEvent_(p) {
     if (scope === 'troop') targets = members.map(function (m) { return getField_(m, 'memberId'); }).join(',');
     else if (p.branchId) targets = members.filter(function (m) { return getField_(m, 'branchId') === p.branchId; }).map(function (m) { return getField_(m, 'memberId'); }).join(',');
   }
+  // 活動分類：自行舉辦（self）／區地域總會活動（district）
+  var category = p.category === 'district' ? 'district' : (p.category === 'self' ? 'self' : '');
+  if (!category) {
+    var src = String(p.source || '');
+    category = (p.kind === 'notice_troop_participation' || /圖書館|地域|區會|區地域|總會/.test(src)) ? 'district' : 'self';
+  }
+  var kind = p.kind || (category === 'district' ? 'notice_troop_participation' : 'activity');
+  var source = p.source || (category === 'district' ? '區地域總會活動' : '自行舉辦');
   appendRowByHeaders_('Events', {
     eventId: id, title: p.title || '', scope: scope, branchId: p.branchId || '',
-    date: p.date || '', location: p.location || '', kind: p.kind || 'activity',
-    status: p.status || 'draft', source: p.source || '手動新增', fee: p.fee || '',
+    date: p.date || '', location: p.location || '', kind: kind,
+    status: p.status || 'draft', source: source, category: category,
+    calendarTag: p.calendarTag || '', fee: p.fee || '',
     paymentUrl: p.paymentUrl || '', dutyPatrol: p.dutyPatrol || '',
     targetMemberIds: targets, createdBy: p.operatedBy || '', createdAt: now_(), note: p.note || ''
   });
@@ -2519,7 +2557,7 @@ function handlePublishEvent_(p) {
 }
 
 function handleUpdateEvent_(p) {
-  var fields = ['title', 'scope', 'branchId', 'date', 'location', 'kind', 'status', 'source', 'fee', 'paymentUrl', 'dutyPatrol', 'targetMemberIds', 'note'];
+  var fields = ['title', 'scope', 'branchId', 'date', 'location', 'kind', 'status', 'source', 'category', 'calendarTag', 'fee', 'paymentUrl', 'dutyPatrol', 'targetMemberIds', 'note'];
   var changed = [];
   fields.forEach(function (f) {
     if (p[f] !== undefined && p[f] !== null) {
@@ -2527,6 +2565,10 @@ function handleUpdateEvent_(p) {
       changed.push(f);
     }
   });
+  // 分類變更時同步 kind（自行舉辦=activity；區地域總會=notice_troop_participation）
+  if (p.category !== undefined && p.category !== null) {
+    updateCellByName_('Events', 'eventId', p.eventId, 'kind', p.category === 'district' ? 'notice_troop_participation' : 'activity');
+  }
   if (changed.length === 0) return { success: false, error: '沒有要更新的欄位' };
   updateCellByName_('Events', 'eventId', p.eventId, 'updatedAt', now_());
   writeAudit_(p.operatedBy || 'system', 'updateEvent', 'Events', p.eventId, changed.join(','));
@@ -3332,6 +3374,7 @@ function handleCreateMeeting_(p) {
     date: p.date || '', startTime: p.startTime || '', endTime: p.endTime || '',
     location: p.location || '', targetRoles: p.targetRoles || '',
     branchId: p.branchId || '', url: p.url || '', status: 'draft',
+    calendarTag: p.calendarTag || '',
     createdBy: p.operatedBy || '', createdAt: now_(), note: p.note || ''
   });
   writeAudit_(p.operatedBy || 'system', 'createMeeting', 'Meetings', id, p.title || '');
@@ -3339,7 +3382,7 @@ function handleCreateMeeting_(p) {
 }
 
 function handleUpdateMeeting_(p) {
-  var fields = ['title', 'type', 'date', 'startTime', 'endTime', 'location', 'targetRoles', 'branchId', 'url', 'status', 'note'];
+  var fields = ['title', 'type', 'date', 'startTime', 'endTime', 'location', 'targetRoles', 'branchId', 'url', 'status', 'calendarTag', 'note'];
   fields.forEach(function (f) {
     if (p[f] !== undefined && p[f] !== null) {
       updateCellByName_('Meetings', 'meetingId', p.meetingId, f, p[f]);
@@ -3587,6 +3630,34 @@ function updateAnnouncement(p) {
   return { success: true };
 }
 
+// ==================== 最新消息（登入後首頁頂部 BAR，領袖直接新增／刪除，最多 3 條） ====================
+
+function addLatestNews(p) {
+  var text = String(p.text || '').trim();
+  if (!text) return { success: false, error: '消息內容不可為空。' };
+  var news = readTable_('LatestNews');
+  if (news.length >= 3) return { success: false, error: '最新消息最多 3 條，請先刪除一條。' };
+  var users = mapUsers_();
+  var author = users.filter(function (u) { return u.id === (p.operatedBy || ''); })[0];
+  var id = uid_('n');
+  appendRowByHeaders_('LatestNews', {
+    newsId: id, text: text,
+    authorUserId: p.operatedBy || '', authorName: author ? author.name : '',
+    createdAt: now_()
+  });
+  writeAudit_(p.operatedBy || 'system', 'addLatestNews', 'LatestNews', id, text);
+  return { success: true, latestNews: mapLatestNews_() };
+}
+
+function deleteLatestNews(p) {
+  var newsId = p.newsId || p.id || '';
+  var idx = findRowIndexById_('LatestNews', 'newsId', newsId);
+  if (idx < 0) return { success: false, error: '找不到該消息。' };
+  getSheet_('LatestNews').deleteRow(idx + 1);
+  writeAudit_(p.operatedBy || 'system', 'deleteLatestNews', 'LatestNews', newsId, '');
+  return { success: true, latestNews: mapLatestNews_() };
+}
+
 
 
 // ==================== 維修工具（1.0 邏輯） ====================
@@ -3703,7 +3774,7 @@ function testConnectionMenu() {
   var results = [];
   
   // 檢查 Sheets
-  var requiredSheets = ['SystemConfig', 'Users', 'Members', 'Branches', 'Patrols', 'Events', 'EventReplies', 'LibraryBookmarks', 'Announcements', 'RegularMeetings', 'CancelledMeetings', 'Meetings', 'Notices', 'Plugins', 'PluginSettings', 'UserPermissions', 'AttendanceRecords', 'Equipment', 'EquipmentLoans', 'AuditLogs'];
+  var requiredSheets = ['SystemConfig', 'Users', 'Members', 'Branches', 'Patrols', 'Events', 'EventReplies', 'LibraryBookmarks', 'Announcements', 'LatestNews', 'RegularMeetings', 'CancelledMeetings', 'Meetings', 'Notices', 'Plugins', 'PluginSettings', 'UserPermissions', 'AttendanceRecords', 'Equipment', 'EquipmentLoans', 'AuditLogs'];
   var missing = [];
   requiredSheets.forEach(function(name) {
     if (!ss.getSheetByName(name)) missing.push(name);

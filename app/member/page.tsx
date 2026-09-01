@@ -10,10 +10,12 @@ import PluginIframeCard from '@/components/PluginCard';
 import { AppState, loadStateSlice, visibleEventsForMember, replyStatus } from '@/lib/store';
 import { apiSetReply } from '@/lib/api';
 import { getSession } from '@/lib/session';
+import { useConfirm, kv } from '@/components/ConfirmProvider';
 
 export default function Member(){
   const [s,setS]=useState<AppState|null>(null);const [err,setErr]=useState('');
   const [loadingId,setLoadingId]=useState('');
+  const { confirm } = useConfirm();
   // 按需載入：成員空間（visibleEventsForMember 用到 events/replies）
   useEffect(()=>{loadStateSlice(['patrols','members','plugins','pluginSettings','events','replies']).then(setS).catch(e=>setErr(e.message))},[]);
   const session=getSession();
@@ -30,6 +32,10 @@ export default function Member(){
   if(!member)return <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 text-sm text-slate-600">找不到成員資料。</div>;
   const adult=member.age>=18;
   async function act(eid:string,type:'interested'|'registered'|'declined'){
+    const ev=s?.events.find(e=>e.id===eid);
+    const label={interested:'❤️ 有興趣',registered:'✅ 確定參加',declined:'❌ 婉拒不參加'}[type]||type;
+    const ok=await confirm({title:'確認回覆活動',message:kv([['活動',ev?.title||eid],['回覆',label]]),confirmLabel:'確認回覆'});
+    if(!ok)return;
     setLoadingId(eid+type);setErr('');
     try{const f=await apiSetReply({eventId:eid,memberId:member.id,type});setS(f)}catch(e:any){setErr(e.message)}finally{setLoadingId('')}
   }

@@ -8,6 +8,7 @@ import {
 } from '@/lib/api';
 import { branches } from '@/lib/model';
 import Link from 'next/link';
+import { useConfirm, kv } from '@/components/ConfirmProvider';
 
 const CATEGORIES = ['露營', '煮食', '繩索', '先鋒工程', '安全', '活動', '制服', '其他'];
 
@@ -34,6 +35,7 @@ export default function AdminEquipment() {
   const [adjustQty, setAdjustQty] = useState('1');
 
   const [filter, setFilter] = useState<'pending' | 'approved' | 'all'>('pending');
+  const { confirm } = useConfirm();
 
   useEffect(() => { load(); }, []);
   async function load() {
@@ -68,9 +70,24 @@ export default function AdminEquipment() {
     } finally { setBusy(''); }
   }
 
+  /** 防呆：先經用戶確認，才執行一次寫入。 */
+  async function confirmRun(key: string, opts: Parameters<typeof confirm>[0], fn: () => Promise<AppState>, successMsg?: string) {
+    const ok = await confirm(opts);
+    if (!ok) return;
+    await run(key, fn, successMsg);
+  }
+
   async function add() {
     if (!name.trim()) { setErr('請填寫物資名稱。'); return; }
-    await run('add', () => apiCreateEquipment({
+    await confirmRun('add', {
+      title: '確認新增物資',
+      message: kv([
+        ['名稱', name.trim()], ['分類', category], ['單位', unit.trim() || '件'],
+        ['總數', `${Number(totalQty) || 0}`], ['存放位置', location.trim()],
+        ['備註', note.trim()],
+      ]),
+      confirmLabel: '確認新增',
+    }, () => apiCreateEquipment({
       name: name.trim(), category, unit: unit.trim() || '件',
       totalQty: Number(totalQty) || 0, location: location.trim(), note: note.trim(), enabled: true,
     }), `已新增物資「${name.trim()}」`);
@@ -79,7 +96,15 @@ export default function AdminEquipment() {
 
   async function saveEdit() {
     if (!editing) return;
-    await run('edit', () => apiUpdateEquipment({
+    await confirmRun('edit', {
+      title: '確認儲存物資修改',
+      message: kv([
+        ['名稱', editing.name], ['分類', editing.category], ['單位', editing.unit],
+        ['總數', `${editing.totalQty}`], ['存放位置', editing.location], ['備註', editing.note],
+        ['狀態', editing.enabled ? '🟢 可借用' : '🔴 已停用'],
+      ]),
+      confirmLabel: '確認儲存',
+    }, () => apiUpdateEquipment({
       equipmentId: editing.id, name: editing.name, category: editing.category,
       unit: editing.unit, totalQty: editing.totalQty, location: editing.location || '',
       note: editing.note || '', enabled: editing.enabled,
@@ -90,33 +115,76 @@ export default function AdminEquipment() {
   async function adjust(item: Equipment, delta: number) {
     const qty = Number(adjustQty);
     if (!qty || qty <= 0) { setErr('請填寫大於 0 的數量。'); return; }
-    await run('adj' + item.id, () => apiAdjustEquipmentQty(item.id, delta * qty),
+    await confirmRun('adj' + item.id, {
+      title: delta > 0 ? '確認入庫' : '確認報廢',
+      message: kv([
+        ['物資', item.name],
+        ['變動', `${delta > 0 ? '+' : ''}${delta * qty} ${item.unit}`],
+        ['變動後可借', `${(item.availableQty || 0) + delta * qty} ${item.unit}`],
+      ]),
+      confirmLabel: '確認調整',
+    }, () => apiAdjustEquipmentQty(item.id, delta * qty),
       `${item.name}：${delta > 0 ? '入庫 +' : '報廢 '}${qty} ${item.unit}`);
     setAdjusting(''); setAdjustQty('1');
   }
 
   async function remove(item: Equipment) {
-    if (!confirm(`確定刪除物資「${item.name}」？\n（已有借用紀錄的物資不能刪除，請改用「停用」）`)) return;
-    await run('del' + item.id, () => apiDeleteEquipment(item.id), `已刪除「${item.name}」`);
+    await confirmRun('del' + item.id, {
+      title: '確認刪除物資',
+      message: kv([
+        ['物資', item.name],
+        ['注意', '已有借用紀錄的物資不能刪除，請改用「停用」'],
+      ]),
+      confirmLabel: '確認刪除',
+      danger: true,
+    }, () => apiDeleteEquipment(item.id), `已刪除「${item.name}」`);
   }
 
   async function decide(loan: EquipmentLoan, decision: 'approved' | 'rejected') {
-    let note = '';
-    if (decision === 'rejected') {
-      const input = prompt('拒絕原因（可留空）：');
-      if (input === null) return;
-      note = input;
+    if (decision === 'approved') {
+      await confirmRun('dec' + loan.id, {
+        title: '確認批准借用',
+        message: kv([
+          ['申請人', loan.memberName || loan.memberId],
+          ['物資', `${loan.equipmentName} ×${loan.qty} ${loan.unit || ''}`],
+          ['注意', '批准後會即時扣除庫存'],
+        ]),
+        confirmLabel: '確認批准',
+      }, () => apiDecideEquipmentLoan(loan.id, decision, ''), '✅ 已批准並扣除庫存');
+    } else {
+      await confirmRun('dec' + loan.id, {
+        title: '確認拒絕借用申請',
+        message: kv([
+          ['申請人', loan.memberName || loan.memberId],
+          ['物資', `${loan.equipmentName} ×${loan.qty} ${loan.unit || ''}`],
+        ]),
+        confirmLabel: '確認拒絕',
+        danger: true,
+      }, () => apiDecideEquipmentLoan(loan.id, decision, ''), '已拒絕該申請');
     }
-    if (decision === 'approved' && !confirm(
-      `批准「${loan.memberName}」借用 ${loan.equipmentName} ×${loan.qty} ${loan.unit || ''}？\n批准後會即時扣除庫存。`
-    )) return;
-    await run('dec' + loan.id, () => apiDecideEquipmentLoan(loan.id, decision, note),
-      decision === 'approved' ? '✅ 已批准並扣除庫存' : '已拒絕該申請');
   }
 
   async function markReturned(loan: EquipmentLoan) {
-    if (!confirm(`確認「${loan.memberName}」已歸還 ${loan.equipmentName} ×${loan.qty} ${loan.unit || ''}？\n標記後庫存會即時回補。`)) return;
-    await run('ret' + loan.id, () => apiReturnEquipmentLoan(loan.id), '✅ 已標記歸還，庫存已回補');
+    await confirmRun('ret' + loan.id, {
+      title: '確認已歸還',
+      message: kv([
+        ['申請人', loan.memberName || loan.memberId],
+        ['物資', `${loan.equipmentName} ×${loan.qty} ${loan.unit || ''}`],
+        ['注意', '標記後庫存會即時回補'],
+      ]),
+      confirmLabel: '確認已歸還',
+    }, () => apiReturnEquipmentLoan(loan.id), '✅ 已標記歸還，庫存已回補');
+  }
+
+  async function toggleEnabled(e: Equipment) {
+    await confirmRun('tog' + e.id, {
+      title: e.enabled ? '確認停用物資' : '確認啟用物資',
+      message: kv([
+        ['物資', e.name],
+        ['變更後狀態', e.enabled ? '🔴 已停用（不可借用）' : '🟢 可借用'],
+      ]),
+      confirmLabel: '確認',
+    }, () => apiUpdateEquipment({ equipmentId: e.id, enabled: !e.enabled }));
   }
 
   if (!s) return <div className="card">{err ? <span className="badge red">{err}</span> : '載入中...'}</div>;
@@ -177,7 +245,7 @@ export default function AdminEquipment() {
                         <div className="row" style={{ gap: 6 }}>
                           <button className="btn" style={{ fontSize: 13 }} onClick={() => { setEditing(e); setErr(''); setOk(''); }}>✏️ 編輯</button>
                           <button className="btn" style={{ fontSize: 13 }} disabled={busy === 'tog' + e.id}
-                            onClick={() => run('tog' + e.id, () => apiUpdateEquipment({ equipmentId: e.id, enabled: !e.enabled }))}>
+                            onClick={() => toggleEnabled(e)}>
                             {e.enabled ? '停用' : '啟用'}
                           </button>
                           {adjusting === e.id ? (

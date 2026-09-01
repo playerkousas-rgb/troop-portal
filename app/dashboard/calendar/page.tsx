@@ -1,5 +1,6 @@
 'use client';
 import { useMemo, useState } from 'react';
+import { useConfirm, kv } from '@/components/ConfirmProvider';
 
 /* ═══════════════════════════════════════════════════
    MOCK 行事曆 —— 對齊用戶要求 #6：
@@ -53,6 +54,7 @@ export default function CalendarPage() {
   const [ruleForm, setRuleForm] = useState<Rule | null>(null);
   const [msg, setMsg] = useState('');
   const [formErr, setFormErr] = useState('');
+  const { confirm } = useConfirm();
 
   const isLeader = ['admin', 'group_leader', 'branch_leader', 'coach'].includes(role);
 
@@ -158,18 +160,32 @@ export default function CalendarPage() {
     setForm(null);
   }
 
-  function deleteEvent(id: string) {
+  async function deleteEvent(id: string) {
     const e = events.find(x => x.id === id);
     if (!e) return;
     // 防呆：刪除前確認
-    if (!window.confirm(`確定刪除「${e.title}」（${e.date}）？刪除後成員就唔會再見到呢個活動。`)) return;
+    const ok = await confirm({
+      title: '確認刪除活動',
+      message: kv([['活動', `${e.title}（${e.date}）`], ['提示', '刪除後成員就唔會再見到呢個活動']]),
+      confirmLabel: '確認刪除',
+      danger: true,
+    });
+    if (!ok) return;
     setEvents(prev => prev.filter(x => x.id !== id));
     setMsg(`🗑 已刪除「${e.title}」`);
   }
 
-  function toggleCancel(date: string, title: string) {
+  async function toggleCancel(date: string, title: string) {
     const isCancelled = cancelled.includes(date);
-    if (!isCancelled && !window.confirm(`確定取消 ${date} 嘅${title}？成員嘅行事曆會即時唔再顯示。`)) return;
+    if (!isCancelled) {
+      const ok = await confirm({
+        title: '確認取消',
+        message: kv([['日期', `${date} ${title}`], ['提示', '成員嘅行事曆會即時唔再顯示']]),
+        confirmLabel: '確認取消',
+        danger: true,
+      });
+      if (!ok) return;
+    }
     setCancelled(prev => (isCancelled ? prev.filter(d => d !== date) : [...prev, date]));
     setMsg(isCancelled ? `↺ 已恢復 ${date} 嘅${title}` : `✕ 已取消 ${date} 嘅${title}`);
   }
@@ -184,10 +200,16 @@ export default function CalendarPage() {
     setMsg(`✅ 已新增標籤「${t}」`);
   }
 
-  function removeTag(t: string) {
+  async function removeTag(t: string) {
     const used = events.filter(e => e.tag === t).length;
     // 防呆：有活動用緊要先講清楚
-    if (!window.confirm(`確定刪除標籤「${t}」？${used ? `有 ${used} 個活動用緊，佢哋會變成「未分類」。` : ''}`)) return;
+    const ok = await confirm({
+      title: '確認刪除標籤',
+      message: kv([['標籤', t], ...(used ? [['提示', `有 ${used} 個活動用緊，佢哋會變成「未分類」`] as [string, string]] : [])]),
+      confirmLabel: '確認刪除',
+      danger: true,
+    });
+    if (!ok) return;
     setTags(prev => prev.filter(x => x !== t));
     setEvents(prev => prev.map(e => (e.tag === t ? { ...e, tag: '' } : e)));
     if (tagFilter === t) setTagFilter('all');
@@ -207,10 +229,16 @@ export default function CalendarPage() {
     setRuleForm(null);
   }
 
-  function deleteRule(id: string) {
+  async function deleteRule(id: string) {
     const r = rules.find(x => x.id === id);
     if (!r) return;
-    if (!window.confirm(`確定刪除 ${r.branch}（${r.weekday} ${r.time}）嘅恆常集會？`)) return;
+    const ok = await confirm({
+      title: '確認刪除恆常集會',
+      message: kv([['恆常集會', `${r.branch}（${r.weekday} ${r.time}）`]]),
+      confirmLabel: '確認刪除',
+      danger: true,
+    });
+    if (!ok) return;
     setRules(prev => prev.filter(x => x.id !== id));
     setMsg(`🗑 已刪除 ${r.branch}集會規則`);
   }

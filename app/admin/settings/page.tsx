@@ -4,6 +4,7 @@ import { AppState, loadStateSlice } from '@/lib/store';
 import { apiSaveConfig, apiTogglePluginStatus } from '@/lib/api';
 import Link from 'next/link';
 import Auth from '@/components/Auth';
+import { useConfirm, kv } from '@/components/ConfirmProvider';
 
 const FRIENDLY_LABELS: Record<string, string> = {
   TROOP_CODE: '旅團號碼',
@@ -57,6 +58,8 @@ export default function Page() {
   const [ok, setOk] = useState('');
   const [busy, setBusy] = useState('');
   const [folderIds, setFolderIds] = useState<{ key: string; value: string }[]>([]);
+  const [cfgDrafts, setCfgDrafts] = useState<Record<string, string>>({});
+  const { confirm } = useConfirm();
 
   useEffect(() => {
     loadStateSlice(['config', 'plugins', 'pluginSettings'])
@@ -66,19 +69,56 @@ export default function Page() {
           { key: 'ANNOUNCEMENT_FOLDER_ID', value: st.config.ANNOUNCEMENT_FOLDER_ID || '' },
           { key: 'MEETINGS_FOLDER_ID', value: st.config.MEETINGS_FOLDER_ID || '' },
         ]);
+        setCfgDrafts({ ...(st.config || {}) });
       })
       .catch(e => setErr(e.message));
   }, []);
 
-  async function save(key: string, v: string) {
-    setErr(''); setOk(''); setBusy(key);
-    try { const f = await apiSaveConfig(key, v); setS(f); setOk('✅ 已儲存 ' + (FRIENDLY_LABELS[key] || key)); }
-    catch (e: any) { setErr(e.message); } finally { setBusy(''); }
+  async function saveFolders() {
+    if (!s) return;
+    const changed = folderIds.filter(f => f.value.trim() !== (s.config[f.key] || '').trim());
+    if (changed.length === 0) { setOk('✅ 沒有變更需要儲存'); return; }
+    const ok = await confirm({
+      title: '確認儲存 Drive 資料夾設定',
+      message: kv(changed.map(f => [FRIENDLY_LABELS[f.key] || f.key, f.value] as [string, string])),
+      confirmLabel: '確認儲存',
+    });
+    if (!ok) return;
+    setErr(''); setOk(''); setBusy('folders');
+    try {
+      let f = s;
+      for (const c of changed) f = await apiSaveConfig(c.key, c.value.trim());
+      setS(f); setOk('✅ 已儲存資料夾設定');
+    } catch (e: any) { setErr(e.message); } finally { setBusy(''); }
+  }
+
+  async function saveAdvanced() {
+    if (!s) return;
+    const changed = Object.entries(cfgDrafts).filter(([k, v]) => String(v ?? '').trim() !== (s.config[k] || '').trim());
+    if (changed.length === 0) { setOk('✅ 沒有變更需要儲存'); return; }
+    const ok = await confirm({
+      title: '確認儲存 SystemConfig',
+      message: kv(changed.map(([k, v]) => [FRIENDLY_LABELS[k] || k, v] as [string, string])),
+      confirmLabel: '確認儲存',
+    });
+    if (!ok) return;
+    setErr(''); setOk(''); setBusy('advanced');
+    try {
+      let f = s;
+      for (const [k, v] of changed) f = await apiSaveConfig(k, String(v ?? '').trim());
+      setS(f); setOk('✅ 已儲存設定');
+    } catch (e: any) { setErr(e.message); } finally { setBusy(''); }
   }
 
   async function togglePublicView() {
     if (!s) return;
     const on = ['false', '0', 'off', 'no'].includes(String(s.config.PUBLIC_VIEW || '').trim().toLowerCase());
+    const ok = await confirm({
+      title: '確認切換公開瀏覽',
+      message: kv([['變更後狀態', on ? '🟢 公開瀏覽：開放' : '🔴 公開瀏覽：已關閉']]),
+      confirmLabel: '確認切換',
+    });
+    if (!ok) return;
     setBusy('PUBLIC_VIEW');
     try { const f = await apiSaveConfig('PUBLIC_VIEW', on ? 'TRUE' : 'FALSE'); setS(f); }
     catch (e: any) { setErr(e.message); } finally { setBusy(''); }
@@ -86,13 +126,27 @@ export default function Page() {
 
   async function toggleLock() {
     if (!s) return;
-    setBusy('system_locked');
     const next = String(s.config.system_locked || '').toLowerCase() === 'true' ? 'false' : 'true';
+    const ok = await confirm({
+      title: '確認切換系統鎖定',
+      message: kv([['變更後狀態', next === 'true' ? '🔴 系統已鎖定（暫停服務）' : '🟢 系統開放中']]),
+      confirmLabel: '確認切換',
+      danger: next === 'true',
+    });
+    if (!ok) return;
+    setBusy('system_locked');
     try { const f = await apiSaveConfig('system_locked', next); setS(f); }
     catch (e: any) { setErr(e.message); } finally { setBusy(''); }
   }
 
   async function togglePlugin(id: string) {
+    const p = s?.plugins?.find(x => x.id === id);
+    const ok = await confirm({
+      title: p?.enabled ? '確認停用元件' : '確認啟用元件',
+      message: kv([['元件', p?.title || id], ['變更後狀態', p?.enabled ? '🔴 已停用' : '🟢 開啟中']]),
+      confirmLabel: '確認',
+    });
+    if (!ok) return;
     setErr(''); setBusy('plugin-' + id);
     try { const f = await apiTogglePluginStatus(id); setS(f); }
     catch (e: any) { setErr(e.message); } finally { setBusy(''); }
@@ -183,35 +237,41 @@ export default function Page() {
       {/* Drive 資料夾設定（也可在本身頁面設定，如會議管理） */}
       <div style={{ borderTop: '1px solid var(--line)', paddingTop: 14 }}>
         <h3 className="m-0">🗂 Drive 資料夾設定</h3>
-        <p className="muted m-0">亦可在本身頁面設定（例如會議管理、公告頁）。資料夾需設為「知道連結的人都可檢視」。</p>
+        <p className="muted m-0">亦可在本身頁面設定（例如會議管理、公告頁）。資料夾需設為「知道連結的人都可檢視」。修改後按「儲存」才寫入。</p>
         <div className="grid">
           {folderIds.map(f => (
             <label key={f.key}>
               <span><b>{FRIENDLY_LABELS[f.key] || f.key}</b> <span className="muted">{f.key}</span></span>
               <input
-                defaultValue={f.value}
-                disabled={busy === f.key}
+                value={f.value}
+                disabled={busy === 'folders'}
                 placeholder="貼上資料夾 ID 或完整 URL"
-                onBlur={e => { if (e.target.value !== f.value) save(f.key, e.target.value); }}
+                onChange={e => setFolderIds(prev => prev.map(x => x.key === f.key ? { ...x, value: e.target.value } : x))}
               />
             </label>
           ))}
         </div>
+        <button className="btn primary" disabled={busy === 'folders'} onClick={saveFolders}>💾 儲存資料夾設定</button>
       </div>
     </section>
 
     {/* SystemConfig 前端編輯（保留，收合區） */}
     <details className="card">
       <summary style={{ cursor: 'pointer', fontWeight: 800 }}>🔧 SystemConfig 前端編輯（進階）</summary>
-      <p className="muted">修改欄位後離開輸入框會自動儲存。敏感欄位如非必要請勿更改。</p>
+      <p className="muted">修改欄位後按「儲存設定」才會寫入（先暫存在瀏覽器）。敏感欄位如非必要請勿更改。</p>
       <div className="grid">
-        {Object.entries(s.config).map(([k, v]) => (
+        {Object.entries(cfgDrafts).map(([k, v]) => (
           <label key={k}>
             <span><b>{FRIENDLY_LABELS[k] || k}</b> <span className="muted">{k}</span></span>
-            <input key={k + v} defaultValue={v} disabled={busy === k} onBlur={e => { if (e.target.value !== v) save(k, e.target.value); }} />
+            <input
+              value={v}
+              disabled={busy === 'advanced'}
+              onChange={e => setCfgDrafts(prev => ({ ...prev, [k]: e.target.value }))}
+            />
           </label>
         ))}
       </div>
+      <button className="btn primary" disabled={busy === 'advanced'} onClick={saveAdvanced} style={{ marginTop: 12 }}>💾 儲存設定</button>
     </details>
   </div></Auth>;
 }

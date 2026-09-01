@@ -4,6 +4,7 @@ import { usePathname } from 'next/navigation';
 import { AppState, loadStateSlice, LatestNews } from '@/lib/store';
 import { apiAddLatestNews, apiDeleteLatestNews } from '@/lib/api';
 import { getSession } from '@/lib/session';
+import { useConfirm, kv } from '@/components/ConfirmProvider';
 
 const LEADER_ROLES = ['super_admin', 'troop_super', 'admin', 'group_leader', 'branch_leader', 'coach'];
 // 這些頁面不顯示最新消息（未登入／平台資訊頁／MOCK 展示樹）
@@ -21,6 +22,7 @@ export default function LatestNewsBar() {
   const [draft, setDraft] = useState('');
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
+  const { confirm } = useConfirm();
 
   useEffect(() => {
     const s = getSession();
@@ -38,6 +40,12 @@ export default function LatestNewsBar() {
   async function add() {
     const text = draft.trim();
     if (!text) { setErr('請填寫最新消息內容。'); return; }
+    const ok = await confirm({
+      title: '確認加入最新消息',
+      message: kv([['消息內容', text], ['加入後總數', `${news.length + 1} 條（最多 3 條）`]]),
+      confirmLabel: '確認加入',
+    });
+    if (!ok) return;
     setBusy(true); setErr('');
     try {
       const fresh = await apiAddLatestNews({ text }) as AppState;
@@ -47,8 +55,14 @@ export default function LatestNewsBar() {
     } catch (e: any) { setErr(e.message || String(e)); } finally { setBusy(false); }
   }
 
-  async function remove(id: string) {
-    if (!confirm('確定刪除這條最新消息？')) return;
+  async function remove(id: string, text: string) {
+    const ok = await confirm({
+      title: '確認刪除最新消息',
+      message: kv([['將刪除', text]]),
+      confirmLabel: '確認刪除',
+      danger: true,
+    });
+    if (!ok) return;
     setBusy(true); setErr('');
     try {
       const fresh = await apiDeleteLatestNews(id) as AppState;
@@ -79,7 +93,7 @@ export default function LatestNewsBar() {
                   {isLeader && (
                     <button
                       type="button"
-                      onClick={e => { e.stopPropagation(); remove(n.id); }}
+                      onClick={e => { e.stopPropagation(); remove(n.id, n.text); }}
                       className="text-amber-600 hover:text-rose-600 bg-transparent border-0 cursor-pointer px-0.5"
                       title="刪除"
                       aria-label="刪除"

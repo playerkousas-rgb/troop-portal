@@ -7,6 +7,7 @@ import { apiSaveConfig, apiUpdateBookmark, apiDeleteBookmark, apiUpdatePdfTags,
 import { getSession } from '@/lib/session';
 import { branches, publicViewEnabled } from '@/lib/model';
 import PublicLocked from '@/components/ui/PublicLocked';
+import { useConfirm, kv } from '@/components/ConfirmProvider';
 
 /* ═══════════════════════════════════════════════════
    公告 / 通告 —— MOCK 乾淨版式 + 真實後台
@@ -42,6 +43,7 @@ export default function Notices() {
   const [editingPdfId, setEditingPdfId] = useState<string | null>(null);
   const [pdfBranches, setPdfBranches] = useState<string[]>([]);
   const [pdfAudience, setPdfAudience] = useState<string[]>([]);
+  const { confirm } = useConfirm();
 
   const session = getSession();
   const isLeader = session && ['super_admin', 'troop_super', 'admin', 'group_leader', 'branch_leader', 'coach'].includes(session.role);
@@ -65,6 +67,16 @@ export default function Notices() {
     if (!form) return;
     if (!form.title.trim()) { setFormErr('請填寫公告標題。'); return; }
     if (!form.message.trim()) { setFormErr('請填寫公告內容。'); return; }
+    const ok = await confirm({
+      title: form.id ? '確認更新公告' : '確認發佈公告',
+      message: kv([
+        ['標題', form.title.trim()],
+        ['內容', form.message.trim()],
+        ['對象', form.scope === 'troop' ? '全旅' : BRANCH_NAME[form.branchId] || form.branchId || '指定支部'],
+      ]),
+      confirmLabel: form.id ? '確認更新' : '確認發佈',
+    });
+    if (!ok) return;
     setLoading(true); setErr('');
     try {
       const p = { title: form.title.trim(), message: form.message.trim(), scope: form.scope, branchId: form.scope === 'troop' ? '' : form.branchId };
@@ -81,7 +93,8 @@ export default function Notices() {
   }
 
   async function delAnn(id: string, title: string) {
-    if (!confirm(`確定刪除公告「${title}」？刪除後成員就唔會再見到。`)) return;
+    const ok = await confirm({ title: '確認刪除公告', message: kv([['公告', title]]), confirmLabel: '確認刪除', danger: true });
+    if (!ok) return;
     setLoading(true); setErr('');
     try { await apiDeleteAnnouncement(id); setOk(`🗑 已刪除公告「${title}」`); await reload(); }
     catch (e: any) { setErr(e.message) } finally { setLoading(false) }
@@ -98,7 +111,19 @@ export default function Notices() {
     setBm({ id: b.id, title: b.title || '', activityType: b.activityType || '', branches: b.branchTags || [], audience: b.audienceTags || [], mode: b.mode, internalDeadline: b.internalDeadline || '' });
   }
   async function saveEdit() {
-    if (!editingId) return; setLoading(true); setErr('');
+    if (!editingId) return;
+    const ok = await confirm({
+      title: '確認更新通告',
+      message: kv([
+        ['標題', bm.title],
+        ['類型', bm.activityType],
+        ['模式', bm.mode === 'troop_participation' ? '旅團參與' : '資訊性'],
+        ['內部截止', bm.internalDeadline],
+      ]),
+      confirmLabel: '確認更新',
+    });
+    if (!ok) return;
+    setLoading(true); setErr('');
     try {
       await apiUpdateBookmark({ bookmarkId: editingId, title: bm.title, activityType: bm.activityType,
         branchTags: bm.branches.join(',') || '全旅', audienceTags: bm.audience.join(','),
@@ -108,16 +133,30 @@ export default function Notices() {
     } catch (e: any) { setErr(e.message) } finally { setLoading(false) }
   }
   async function del(id: string, title: string) {
-    if (!confirm(`確定隱藏「${title}」？可從 Sheet 復原。`)) return;
+    const ok = await confirm({ title: '確認隱藏通告', message: kv([['通告', title], ['注意', '可從 Sheet 復原']]), confirmLabel: '確認隱藏', danger: true });
+    if (!ok) return;
     setLoading(true); setErr('');
     try { await apiDeleteBookmark(id); const { loadState } = await import('@/lib/store'); setS(await loadState()); setOk('✅ 已隱藏'); }
     catch (e: any) { setErr(e.message) } finally { setLoading(false) }
   }
 
   /* ── PDF ── */
-  async function saveFolder() { setErr(''); setOk(''); try { const f = await apiSaveConfig('ANNOUNCEMENT_FOLDER_ID', folderId); setS(f); setOk('✅ 已儲存') } catch (e: any) { setErr(e.message) } }
+  async function saveFolder() {
+    const ok = await confirm({ title: '確認儲存公告 Drive 資料夾', message: kv([['ANNOUNCEMENT_FOLDER_ID', folderId]]), confirmLabel: '確認儲存' });
+    if (!ok) return;
+    setErr(''); setOk(''); try { const f = await apiSaveConfig('ANNOUNCEMENT_FOLDER_ID', folderId); setS(f); setOk('✅ 已儲存') } catch (e: any) { setErr(e.message) }
+  }
   function startEditPdf(pdf: any) { setEditingPdfId(pdf.id); setPdfBranches(pdf.branchTags || ['全旅']); setPdfAudience(pdf.audienceTags || []); }
   async function savePdfTags(fileId: string) {
+    const ok = await confirm({
+      title: '確認更新 PDF 標籤',
+      message: kv([
+        ['支部', pdfBranches.length > 0 ? pdfBranches.join('、') : '全旅'],
+        ['對象', pdfAudience.join('、')],
+      ]),
+      confirmLabel: '確認更新',
+    });
+    if (!ok) return;
     setLoading(true); setErr('');
     try {
       await apiUpdatePdfTags({ fileId, branchTags: pdfBranches.length > 0 ? pdfBranches.join(',') : '全旅', audienceTags: pdfAudience.join(',') });
@@ -126,11 +165,14 @@ export default function Notices() {
     } catch (e: any) { setErr(e.message) } finally { setLoading(false) }
   }
   async function hidePdf(fileId: string, name: string) {
-    if (!confirm(`隱藏「${name}」？`)) return;
+    const ok = await confirm({ title: '確認隱藏 PDF', message: kv([['PDF', name]]), confirmLabel: '確認隱藏', danger: true });
+    if (!ok) return;
     setLoading(true); setErr('');
     try { await apiUpdatePdfTags({ fileId, status: 'hidden' }); const { loadState } = await import('@/lib/store'); setS(await loadState()); setOk('✅ 已隱藏') } catch (e: any) { setErr(e.message) } finally { setLoading(false) }
   }
   async function showPdf(fileId: string) {
+    const ok = await confirm({ title: '確認顯示 PDF', message: kv([['變更後狀態', '🟢 可見']]), confirmLabel: '確認顯示' });
+    if (!ok) return;
     setLoading(true); setErr('');
     try { await apiUpdatePdfTags({ fileId, status: 'visible' }); const { loadState } = await import('@/lib/store'); setS(await loadState()); setOk('✅ 已顯示') } catch (e: any) { setErr(e.message) } finally { setLoading(false) }
   }

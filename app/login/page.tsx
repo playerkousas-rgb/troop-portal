@@ -5,6 +5,7 @@ import { setSession, dashboardFor } from '@/lib/session';
 import { apiLogin, apiDiagnose } from '@/lib/api';
 import { isMockMode, setMockMode, MOCK_TROOP, DEMO_ACCOUNTS } from '@/lib/mock';
 import Link from 'next/link';
+import { useConfirm, kv } from '@/components/ConfirmProvider';
 
 type Tab = 'account' | 'member' | 'staffToken';
 
@@ -40,6 +41,7 @@ export default function Login() {
   const [diag, setDiag] = useState<any>(null);
   const [diagRunning, setDiagRunning] = useState(false);
   const [showAdv, setShowAdv] = useState(false);
+  const { confirm } = useConfirm();
 
   useEffect(() => {
     try { setTroop(JSON.parse(localStorage.getItem('scoutsystem2_selected_troop') || 'null')) } catch {}
@@ -127,7 +129,12 @@ export default function Login() {
 
   async function forgotPw() {
     if (!identifier.trim()) { setMsg('請先輸入 Email 或 YMIS 編號，再點擊忘記密碼。'); return; }
-    if (!confirm(`將重設密碼並發送到與 ${identifier} 關聯的 Email，確定嗎？`)) return;
+    const ok = await confirm({
+      title: '確認重設密碼',
+      message: kv([['將重設並發送到', identifier.trim()]]),
+      confirmLabel: '確認發送',
+    });
+    if (!ok) return;
     setLoading(true);
     try {
       const { apiForgotPassword } = await import('@/lib/api');

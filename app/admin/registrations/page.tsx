@@ -3,6 +3,7 @@ import { Suspense, useEffect, useState } from 'react';
 import { AppState, loadState, loadStateSlice, replyStatus, eventCategory } from '@/lib/store';
 import { apiTogglePaid } from '@/lib/api';
 import { useSearchParams } from 'next/navigation';
+import { useConfirm, kv } from '@/components/ConfirmProvider';
 
 const GROUP_DEFS = [
   { id: 'b1', name: '🎒 小童軍', full: '小童軍支部', color: '#ff9800', text: '#b06000', border: '#ffe0b2' },
@@ -26,9 +27,16 @@ function RegistrationsInner(){
   const [expandedGroup, setExpandedGroup] = useState<string | null>(null);
   const [expandedBranchStatus, setExpandedBranchStatus] = useState<{ branchId: string; status: string } | null>(null);
   const [activeListTab, setActiveListTab] = useState<string>('all');
+  const { confirm } = useConfirm();
 
   useEffect(()=>{loadStateSlice(['patrols','users','members','events','replies']).then(st=>{setS(st);const q=search?.get('eventId');setEventId(q||st.events[0]?.id||'')}).catch(e=>setErr(e.message))},[]);
-  async function togglePaid(mid:string){setErr('');try{const f=await apiTogglePaid(eventId,mid);setS(f)}catch(e:any){setErr(e.message)}}
+  async function togglePaid(mid:string){
+    const m=s?.members.find(x=>x.id===mid);
+    const cur=!!replyStatus(s,eventId,mid)?.paid;
+    const ok=await confirm({title:'確認切換付款狀態',message:kv([['成員',m?.name||mid],['變更後狀態',cur?'❌ 未付款':'💰 已付款']]),confirmLabel:'確認'});
+    if(!ok)return;
+    setErr('');try{const f=await apiTogglePaid(eventId,mid);setS(f)}catch(e:any){setErr(e.message)}
+  }
 
   function getIsPaid(mid: string) {
     if (!s) return false;
@@ -46,6 +54,15 @@ function RegistrationsInner(){
     if (!s) return;
     const keys = Object.keys(paidOverrides);
     if (keys.length === 0) return;
+    const ok = await confirm({
+      title: '確認批次寫入付款狀態',
+      message: kv([
+        ['筆數', `${keys.length} 筆`],
+        ['變更', keys.map(mid => `${s.members.find(m => m.id === mid)?.name || mid} → ${paidOverrides[mid] ? '💰 已付款' : '❌ 未付款'}`).join('、')],
+      ]),
+      confirmLabel: '確認一次寫入',
+    });
+    if (!ok) return;
     setLoadingBatch(true);
     try {
       for (const mid of keys) {

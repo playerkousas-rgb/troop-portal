@@ -13,6 +13,7 @@ import { AppState, loadStateSlice, computeStats, replyStatus } from '@/lib/store
 import { apiSetReply } from '@/lib/api';
 import { getSession } from '@/lib/session';
 import { ROLE_LABEL } from '@/lib/model';
+import { useConfirm, kv } from '@/components/ConfirmProvider';
 
 // 領袖常用功能：全部歸入一張大卡（可收合）
 const LEADER_TOOLS: ConsoleTool[] = [
@@ -28,6 +29,7 @@ const LEADER_TOOLS: ConsoleTool[] = [
 export default function Leader(){
   const [s,setS]=useState<AppState|null>(null);const [err,setErr]=useState('');
   const [loadingId,setLoadingId]=useState('');
+  const { confirm } = useConfirm();
   // 按需載入：領袖摘要（computeStats 用到 users/applications/events/bookmarks）+ 活動回覆
   useEffect(()=>{loadStateSlice(['events','plugins','pluginSettings','users','applications','bookmarks','replies']).then(setS).catch(e=>setErr(e.message))},[]);
   const stats=s?computeStats(s):{users:0,pending:0,activities:0,notices:0};
@@ -35,7 +37,12 @@ export default function Leader(){
   const myId = session?.userId || '';
 
   async function act(eid:string,type:'registered'|'declined'|'interested'){
-    if(!myId)return;setErr('');setLoadingId(eid+type);
+    if(!myId)return;
+    const ev=s?.events.find(e=>e.id===eid);
+    const label={registered:'✅ 確定參加',declined:'❌ 婉拒不參加',interested:'❤️ 有興趣'}[type]||type;
+    const ok=await confirm({title:'確認回覆活動',message:kv([['活動',ev?.title||eid],['回覆',label]]),confirmLabel:'確認回覆'});
+    if(!ok)return;
+    setErr('');setLoadingId(eid+type);
     try{const f=await apiSetReply({eventId:eid,memberId:myId,type});setS(f)}catch(e:any){setErr(e.message)}finally{setLoadingId('')}
   }
 

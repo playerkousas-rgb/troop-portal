@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { AppState, loadStateSlice } from '@/lib/store';
 import { apiCreateMeeting, apiPublishMeeting, apiDeleteMeeting, apiUpdateMeeting, apiSaveConfig } from '@/lib/api';
 import { branches } from '@/lib/model';
+import { useConfirm, kv } from '@/components/ConfirmProvider';
 
 export default function MeetingsAdmin() {
   const [s, setS] = useState<AppState | null>(null);
@@ -22,6 +23,7 @@ export default function MeetingsAdmin() {
   const [url, setUrl] = useState('');
   const [calendarTag, setCalendarTag] = useState('');
   const [folderId, setFolderId] = useState('');
+  const { confirm } = useConfirm();
 
   useEffect(() => {
     loadStateSlice(['meetings', 'config']).then(st => { setS(st); setFolderId(st.config.MEETINGS_FOLDER_ID || ''); }).catch(e => setErr(e.message));
@@ -30,6 +32,21 @@ export default function MeetingsAdmin() {
   async function add() {
     if (!title.trim() || !date) { setErr('請填寫標題和日期'); return; }
     if (date && !calendarTag.trim()) { setErr('此會議有日期，請加入「行事曆標籤」以便加入行事曆。'); return; }
+    const ok = await confirm({
+      title: '確認新增會議（草稿）',
+      message: kv([
+        ['會議標題', title],
+        ['類型', type === 'agenda' ? '會議議程' : '會議紀錄'],
+        ['日期', date],
+        ['時間', `${startTime || '—'} 至 ${endTime || '—'}`],
+        ['行事曆標籤', calendarTag],
+        ['地點', location],
+        ['對象', targetRoles],
+        ['支部', branchId || '全旅'],
+      ]),
+      confirmLabel: '確認新增',
+    });
+    if (!ok) return;
     try {
       const fresh = await apiCreateMeeting({ title, type, date, startTime, endTime, location, targetRoles, branchId, url, calendarTag });
       setS(fresh); setShowAdd(false); resetForm();
@@ -42,6 +59,12 @@ export default function MeetingsAdmin() {
 
   async function saveFolder() {
     setErr('');
+    const ok = await confirm({
+      title: '確認儲存會議文件 Drive 資料夾',
+      message: kv([['MEETINGS_FOLDER_ID', folderId]]),
+      confirmLabel: '確認儲存',
+    });
+    if (!ok) return;
     try { const f = await apiSaveConfig('MEETINGS_FOLDER_ID', folderId); setS(f); }
     catch (e: any) { setErr(e.message); }
   }
@@ -118,8 +141,14 @@ export default function MeetingsAdmin() {
               {m.url && <a href={m.url} target="_blank" rel="noopener noreferrer" className="btn gold" style={{display:'inline-block', marginTop: 8, fontSize: '0.85rem'}}>📄 查看會議文件</a>}
             </div>
             <div className="row">
-              {m.status === 'draft' && <button className="btn primary" onClick={async () => setS(await apiPublishMeeting(m.id))}>發布</button>}
-              <button className="btn red" onClick={async () => { if (confirm('確定刪除？')) setS(await apiDeleteMeeting(m.id)) }}>🗑️</button>
+              {m.status === 'draft' && <button className="btn primary" onClick={async () => {
+                const ok = await confirm({ title: '確認發布會議', message: kv([['會議', m.title]]), confirmLabel: '確認發布' });
+                if (ok) setS(await apiPublishMeeting(m.id));
+              }}>發布</button>}
+              <button className="btn red" onClick={async () => {
+                const ok = await confirm({ title: '確認刪除會議', message: kv([['會議', m.title]]), confirmLabel: '確認刪除', danger: true });
+                if (ok) setS(await apiDeleteMeeting(m.id));
+              }}>🗑️</button>
             </div>
           </div>
         ))}

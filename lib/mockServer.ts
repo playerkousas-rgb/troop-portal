@@ -69,6 +69,7 @@ const seed: AppState = {
     ADMIN_EMAIL: 'admin@demo.scout',
     REGISTRY_URL: 'https://troop-router.vercel.app/api/registry.json',
     ANNOUNCEMENT_FOLDER_ID: '',
+    MEETINGS_FOLDER_ID: '',
   },
   patrols: [
     { id: 'p01', branchId: 'b1', name: 'BEE', short: 'B', memberIds: [], enabled: true, order: 1 },

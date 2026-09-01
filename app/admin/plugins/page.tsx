@@ -5,6 +5,7 @@ import { apiSavePluginSetting, apiTogglePluginStatus, apiSaveConfig } from '@/li
 import Auth from '@/components/Auth';
 import Link from 'next/link';
 import { isCoreNotPlugin } from '@/lib/attendance';
+import { useConfirm, kv } from '@/components/ConfirmProvider';
 
 const FOLDER_FIELDS = [
   { key: 'ANNOUNCEMENT_FOLDER_ID', label: '公告 PDF 資料夾 ID' },
@@ -19,13 +20,43 @@ export default function PluginManagementPage() {
   const [err, setErr] = useState('');
   const [ok, setOk] = useState('');
   const [loadingId, setLoadingId] = useState<string | null>(null);
+  const [settingDrafts, setSettingDrafts] = useState<Record<string, Partial<PluginSetting>>>({});
+  const [folderDrafts, setFolderDrafts] = useState<Record<string, string>>({});
+  const { confirm } = useConfirm();
 
-  useEffect(() => { loadStateSlice(['plugins', 'pluginSettings', 'config']).then(setS).catch(e => setErr(e.message)) }, []);
+  useEffect(() => {
+    loadStateSlice(['plugins', 'pluginSettings', 'config']).then(st => {
+      setS(st);
+      const drafts: Record<string, Partial<PluginSetting>> = {};
+      (st.plugins || []).forEach(p => {
+        const setting = st.pluginSettings?.find(ps => ps.pluginId === p.id);
+        drafts[p.id] = {
+          frontendUrl: setting?.frontendUrl || p.url || '',
+          backendUrl: setting?.backendUrl || '',
+          apiKey: setting?.apiKey || '',
+        };
+      });
+      setSettingDrafts(drafts);
+      setFolderDrafts({
+        ANNOUNCEMENT_FOLDER_ID: st.config.ANNOUNCEMENT_FOLDER_ID || '',
+        MEETINGS_FOLDER_ID: st.config.MEETINGS_FOLDER_ID || '',
+      });
+    }).catch(e => setErr(e.message));
+  }, []);
 
   async function saveSettings(pluginId: string, fields: Partial<PluginSetting>) {
+    const plugin = s?.plugins.find(p => p.id === pluginId);
+    const ok = await confirm({
+      title: '確認儲存元件設定',
+      message: kv([
+        ['元件', plugin?.title || pluginId],
+        ...Object.entries(fields).filter(([, v]) => v !== undefined).map(([k, v]) => [({ frontendUrl: '前端 URL', backendUrl: '後端 Apps Script URL', apiKey: 'API Key', note: '備註' } as Record<string, string>)[k] || k, String(v)] as [string, string]),
+      ]),
+      confirmLabel: '確認儲存',
+    });
+    if (!ok) return;
     setErr(''); setOk(''); setLoadingId(pluginId + '-save');
     try {
-      const plugin = s?.plugins.find(p => p.id === pluginId);
       const setting = s?.pluginSettings?.find(ps => ps.pluginId === pluginId) || { pluginId };
       const fresh = await apiSavePluginSetting({
         pluginId,
@@ -45,6 +76,13 @@ export default function PluginManagementPage() {
   }
 
   async function toggleStatus(pluginId: string) {
+    const p = s?.plugins.find(x => x.id === pluginId);
+    const ok = await confirm({
+      title: p?.enabled ? '確認停用元件' : '確認啟用元件',
+      message: kv([['元件', p?.title || pluginId], ['變更後狀態', p?.enabled ? '🔴 已停用' : '🟢 開啟中']]),
+      confirmLabel: '確認',
+    });
+    if (!ok) return;
     setErr(''); setLoadingId(pluginId + '-toggle');
     try {
       const fresh = await apiTogglePluginStatus(pluginId);
@@ -56,10 +94,22 @@ export default function PluginManagementPage() {
     }
   }
 
-  async function saveFolder(key: string, value: string) {
+  async function saveFolders() {
+    if (!s) return;
+    const changed = Object.entries(folderDrafts).filter(([k, v]) => String(v ?? '').trim() !== (s.config[k] || '').trim());
+    if (changed.length === 0) { setOk('✅ 沒有變更需要儲存'); return; }
+    const ok = await confirm({
+      title: '確認儲存 Drive 資料夾設定',
+      message: kv(changed.map(([k, v]) => [{ ANNOUNCEMENT_FOLDER_ID: '公告 PDF 資料夾 ID', MEETINGS_FOLDER_ID: '會議文件資料夾 ID' }[k] || k, v] as [string, string])),
+      confirmLabel: '確認儲存',
+    });
+    if (!ok) return;
     setErr(''); setOk('');
-    try { const f = await apiSaveConfig(key, value); setS(f); setOk('✅ 已儲存資料夾設定'); }
-    catch (e: any) { setErr(e.message); }
+    try {
+      let f = s;
+      for (const [k, v] of changed) f = await apiSaveConfig(k, String(v ?? '').trim());
+      setS(f); setOk('✅ 已儲存資料夾設定');
+    } catch (e: any) { setErr(e.message); }
   }
 
   if (!s) return <div className="card">載入中...</div>;
@@ -85,7 +135,6 @@ export default function PluginManagementPage() {
             <div className="card"><p className="muted">尚未安裝任何擴充元件。請先到「元件市場」查看。簽到／點名已內建，無需在此安裝。</p></div>
           ) : (
             s.plugins.filter(p => !isCoreNotPlugin(p.id)).map(p => {
-              const setting = s.pluginSettings?.find(ps => ps.pluginId === p.id);
               return (
                 <div key={p.id} className="card stack" style={{ borderLeft: p.enabled ? '5px solid #34a853' : '5px solid #ea4335' }}>
                   <div className="row" style={{ justifyContent: 'space-between' }}>
@@ -115,29 +164,34 @@ export default function PluginManagementPage() {
 
                   {p.tier === 3 && (
                     <div className="stack" style={{ background: '#f8f9fa', padding: '1rem', borderRadius: '8px', marginTop: '0.5rem' }}>
-                      <p style={{ fontWeight: 'bold', margin: 0 }}>⚙️ 後端連結設定</p>
+                      <p style={{ fontWeight: 'bold', margin: 0 }}>⚙️ 後端連結設定（修改後按「儲存」才寫入）</p>
                       <label>前端 URL
                         <input
-                          defaultValue={setting?.frontendUrl || p.url}
+                          value={settingDrafts[p.id]?.frontendUrl ?? ''}
                           placeholder="例如：https://vs-tracker.vercel.app"
-                          onBlur={e => saveSettings(p.id, { frontendUrl: e.target.value })}
+                          onChange={e => setSettingDrafts(prev => ({ ...prev, [p.id]: { ...prev[p.id], frontendUrl: e.target.value } }))}
                         />
                       </label>
                       <label>後端 Apps Script URL
                         <input
-                          defaultValue={setting?.backendUrl}
+                          value={settingDrafts[p.id]?.backendUrl ?? ''}
                           placeholder="https://script.google.com/macros/s/.../exec"
-                          onBlur={e => saveSettings(p.id, { backendUrl: e.target.value })}
+                          onChange={e => setSettingDrafts(prev => ({ ...prev, [p.id]: { ...prev[p.id], backendUrl: e.target.value } }))}
                         />
                       </label>
                       <label>元件 API Key
                         <input
                           type="password"
-                          defaultValue={setting?.apiKey}
+                          value={settingDrafts[p.id]?.apiKey ?? ''}
                           placeholder="填入元件專用的安全金鑰"
-                          onBlur={e => saveSettings(p.id, { apiKey: e.target.value })}
+                          onChange={e => setSettingDrafts(prev => ({ ...prev, [p.id]: { ...prev[p.id], apiKey: e.target.value } }))}
                         />
                       </label>
+                      <button
+                        className="btn primary"
+                        disabled={loadingId === p.id + '-save'}
+                        onClick={() => saveSettings(p.id, settingDrafts[p.id] || {})}
+                      >💾 儲存元件設定</button>
                     </div>
                   )}
 
@@ -160,13 +214,14 @@ export default function PluginManagementPage() {
               <label key={f.key}>
                 <span><b>{f.label}</b> <span className="muted">{f.key}</span></span>
                 <input
-                  defaultValue={s.config[f.key] || ''}
+                  value={folderDrafts[f.key] ?? ''}
                   placeholder="貼上資料夾 ID 或完整 URL"
-                  onBlur={e => saveFolder(f.key, e.target.value)}
+                  onChange={e => setFolderDrafts(prev => ({ ...prev, [f.key]: e.target.value }))}
                 />
               </label>
             ))}
           </div>
+          <button className="btn primary" onClick={saveFolders}>💾 儲存資料夾設定</button>
         </section>
       </div>
     </Auth>

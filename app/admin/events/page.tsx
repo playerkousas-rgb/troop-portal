@@ -4,6 +4,7 @@ import { AppState, loadStateSlice, eventCategory, eventCategoryLabel } from '@/l
 import { apiCreateEvent, apiPublishEvent, apiUpdateEvent, apiDeleteEvent } from '@/lib/api';
 import { branches } from '@/lib/model';
 import Link from 'next/link';
+import { useConfirm, kv } from '@/components/ConfirmProvider';
 
 const CATEGORY_OPTIONS = [
   { id: 'self', label: '🏠 自行舉辦（原旅團自辦）' },
@@ -27,12 +28,28 @@ export default function Page() {
   const [editCategory, setEditCategory] = useState<'self' | 'district'>('self');
   const [editCalendarTag, setEditCalendarTag] = useState('');
 
+  const { confirm } = useConfirm();
+
   useEffect(() => { loadStateSlice(['events']).then(setS).catch(e => setErr(e.message)) }, []);
 
   async function add() {
     if (!title.trim()) { setErr('請填活動標題'); return; }
     if (date && !calendarTag.trim()) { setErr('此活動有日期，請加入「行事曆標籤」以便加入行事曆。'); return; }
     setErr('');
+    const ok = await confirm({
+      title: '確認新增活動（草稿）',
+      message: kv([
+        ['活動標題', title],
+        ['分類', category === 'district' ? '區地域總會活動' : '自行舉辦'],
+        ['日期', date],
+        ['行事曆標籤', calendarTag],
+        ['地點', location],
+        ['範圍', scope === 'troop' ? '全旅' : `支部 ${branchId || '（未選）'}`],
+        ['費用', fee],
+      ]),
+      confirmLabel: '確認新增',
+    });
+    if (!ok) return;
     try {
       const fresh = await apiCreateEvent({
         title, scope, branchId: scope === 'branch' ? branchId : '', date: date || undefined, location: location || undefined,
@@ -56,6 +73,20 @@ export default function Page() {
     if (!editing) return;
     if (editDate && !editCalendarTag.trim()) { setErr('此活動有日期，請加入「行事曆標籤」。'); return; }
     setErr('');
+    const ok = await confirm({
+      title: '確認儲存活動修改',
+      message: kv([
+        ['活動標題', editTitle],
+        ['分類', editCategory === 'district' ? '區地域總會活動' : '自行舉辦'],
+        ['日期', editDate],
+        ['行事曆標籤', editCalendarTag],
+        ['地點', editLocation],
+        ['範圍', editScope === 'troop' ? '全旅' : `支部 ${editBranchId || '（未選）'}`],
+        ['費用', editFee],
+      ]),
+      confirmLabel: '確認儲存',
+    });
+    if (!ok) return;
     try {
       const fresh = await apiUpdateEvent({
         eventId: editing, title: editTitle, date: editDate, location: editLocation, fee: editFee,
@@ -66,8 +97,28 @@ export default function Page() {
     } catch (e: any) { setErr(e.message) }
   }
 
-  async function publish(id: string) { setErr(''); try { const f = await apiPublishEvent(id); setS(f) } catch (e: any) { setErr(e.message) } }
-  async function del(id: string) { if (!confirm('確定刪除此活動？')) return; setErr(''); try { const f = await apiDeleteEvent(id); setS(f); if (editing === id) setEditing(null) } catch (e: any) { setErr(e.message) } }
+  async function publish(id: string) {
+    setErr('');
+    const e = s?.events.find(x => x.id === id);
+    const ok = await confirm({
+      title: '確認發布活動',
+      message: kv([['活動', e?.title || id]]),
+      confirmLabel: '確認發布',
+    });
+    if (!ok) return;
+    try { const f = await apiPublishEvent(id); setS(f) } catch (e: any) { setErr(e.message) }
+  }
+  async function del(id: string) {
+    const e = s?.events.find(x => x.id === id);
+    const ok = await confirm({
+      title: '確認刪除活動',
+      message: kv([['活動', e?.title || id], ['注意', '刪除後相關報名紀錄亦會一併移除']]),
+      confirmLabel: '確認刪除',
+      danger: true,
+    });
+    if (!ok) return;
+    setErr(''); try { const f = await apiDeleteEvent(id); setS(f); if (editing === id) setEditing(null) } catch (e: any) { setErr(e.message) }
+  }
 
   if (!s) return <div className="card">{err || '載入中...'}</div>;
 

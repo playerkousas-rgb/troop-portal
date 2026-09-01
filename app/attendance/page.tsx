@@ -13,6 +13,7 @@ import {
   apiGetMemberAttendance,
   apiSaveAttendance,
 } from '@/lib/api';
+import { useConfirm, kv } from '@/components/ConfirmProvider';
 import {
   ATTENDANCE_STATUSES,
   AttendanceMatrix,
@@ -82,6 +83,7 @@ export default function AttendancePage() {
   const [err, setErr] = useState('');
   const [ok, setOk] = useState('');
   const [loading, setLoading] = useState(false);
+  const { confirm } = useConfirm();
 
   // 支部 / 類型
   const [branchId, setBranchId] = useState('');
@@ -217,15 +219,28 @@ export default function AttendancePage() {
   }, [state, session]);
 
   // ── 防呆：切換前有未儲存修改就確認 ──
-  function guardDiscard(): boolean {
-    if (dirty) return window.confirm('⚠️ 目前點名表有未儲存嘅修改，切換後會遺失。確定要繼續？');
-    return true;
+  async function guardDiscard(): Promise<boolean> {
+    if (!dirty) return true;
+    return confirm({
+      title: '未儲存嘅修改',
+      message: kv([['提示', '目前點名表有未儲存嘅修改，切換後會遺失']]),
+      confirmLabel: '繼續（放棄修改）',
+      cancelLabel: '返回點名表',
+      danger: true,
+    });
   }
 
-  function openSession(ed: Omit<Editor, 'key'>) {
+  async function openSession(ed: Omit<Editor, 'key'>) {
     const key = `${branchId}|${ed.mode}|${ed.date}|${ed.eventId}`;
     if (dirty && editor && editor.key !== key) {
-      if (!window.confirm('⚠️ 目前點名表有未儲存嘅修改，切換後會遺失。確定要繼續？')) return;
+      const ok = await confirm({
+        title: '未儲存嘅修改',
+        message: kv([['提示', '目前點名表有未儲存嘅修改，切換後會遺失']]),
+        confirmLabel: '繼續（放棄修改）',
+        cancelLabel: '返回點名表',
+        danger: true,
+      });
+      if (!ok) return;
     }
     // 快取命中 → 唔使再 LOAD
     if (cacheRef.current[key]) {
@@ -277,8 +292,8 @@ export default function AttendancePage() {
     });
   }
 
-  function changeBranch(id: string) {
-    if (!guardDiscard()) return;
+  async function changeBranch(id: string) {
+    if (!(await guardDiscard())) return;
     setBranchId(id);
     setEditor(null);
     setRoster([]);
@@ -325,14 +340,20 @@ export default function AttendancePage() {
     const records = roster.filter(r => r.status);
     if (!records.length) { setErr('請至少為一位成員選擇出席狀態（點 P／A／L／E／S）'); return; }
     // 防呆：先填好全部，按確認先一次過儲存到後台（唔會逐個成員逐次儲存）
-    const s = summarizeRoster(records);
-    const confirmed = window.confirm(
-      `確定要一次過儲存以下點名結果？\n\n` +
-      `場次：${editor.label}（${editor.date}）\n` +
-      `出席 P：${s.P}　缺席 A：${s.A}　遲到 L：${s.L}\n` +
-      `請假 E：${s.E}　病假 S：${s.S}\n\n` +
-      `共 ${records.length} 筆，按「確定」後一次過存入後台。`
-    );
+    const summary = summarizeRoster(records);
+    const confirmed = await confirm({
+      title: '確認一次過儲存點名結果',
+      message: kv([
+        ['場次', `${editor.label}（${editor.date}）`],
+        ['出席 P', `${summary.P}`],
+        ['缺席 A', `${summary.A}`],
+        ['遲到 L', `${summary.L}`],
+        ['請假 E', `${summary.E}`],
+        ['病假 S', `${summary.S}`],
+        ['共', `${records.length} 筆`],
+      ]),
+      confirmLabel: '確認儲存',
+    });
     if (!confirmed) return;
     setLoading(true);
     setErr('');
@@ -479,13 +500,13 @@ export default function AttendancePage() {
               <h2 className="text-xl m-0">② 恆常集會 或 活動</h2>
               <div className="flex flex-wrap gap-2">
                 <button
-                  onClick={() => { if (guardDiscard()) { setMode('meeting'); setEditor(null); setLoaded(false); setDirty(false); } }}
+                  onClick={async () => { if (await guardDiscard()) { setMode('meeting'); setEditor(null); setLoaded(false); setDirty(false); } }}
                   className={`${btnCls} text-base ${mode === 'meeting' ? 'bg-brand-700 text-white border-brand-700' : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'}`}
                 >
                   🏕️ 恆常集會
                 </button>
                 <button
-                  onClick={() => { if (guardDiscard()) { setMode('activity'); setEditor(null); setLoaded(false); setDirty(false); } }}
+                  onClick={async () => { if (await guardDiscard()) { setMode('activity'); setEditor(null); setLoaded(false); setDirty(false); } }}
                   className={`${btnCls} text-base ${mode === 'activity' ? 'bg-brand-700 text-white border-brand-700' : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'}`}
                 >
                   🎪 旅團自辦活動
@@ -498,7 +519,7 @@ export default function AttendancePage() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <label style={{ fontSize: 15 }}>集會日期（恆常集會按當天日期出現）
                     <input type="date" className={inputCls} value={meetingDate}
-                      onChange={e => { const v = e.target.value; if (guardDiscard()) { setMeetingDate(v); openMeeting(v); } }} />
+                      onChange={async e => { const v = e.target.value; if (await guardDiscard()) { setMeetingDate(v); openMeeting(v); } }} />
                   </label>
                   <label style={{ fontSize: 15 }}>小隊過濾
                     <select className={inputCls} value={patrolFilter} onChange={e => setPatrolFilter(e.target.value)}>
@@ -520,7 +541,7 @@ export default function AttendancePage() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <label style={{ fontSize: 15 }}>選擇活動（今日／即將；過期請到「③ 出席管理」補改）
                     <select className={inputCls} value={eventId}
-                      onChange={e => { const v = e.target.value; if (guardDiscard()) { setEventId(v); if (v) openActivity(v); } }}>
+                      onChange={async e => { const v = e.target.value; if (await guardDiscard()) { setEventId(v); if (v) openActivity(v); } }}>
                       <option value="">請選擇活動</option>
                       {(sessions?.activities || []).filter(a => a.date >= todayLabel).map(a => (
                         <option key={a.id} value={a.id}>
@@ -562,13 +583,13 @@ export default function AttendancePage() {
               </p>
               <div className="flex flex-wrap gap-2">
                 <button
-                  onClick={() => { if (guardDiscard()) { setBackfillType('meeting'); setBackfillEventId(''); setEditor(null); setLoaded(false); setDirty(false); } }}
+                  onClick={async () => { if (await guardDiscard()) { setBackfillType('meeting'); setBackfillEventId(''); setEditor(null); setLoaded(false); setDirty(false); } }}
                   className={`${btnCls} ${backfillType === 'meeting' ? 'bg-slate-800 text-white border-slate-800' : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'}`}
                 >
                   🏕️ 過期／過去集會
                 </button>
                 <button
-                  onClick={() => { if (guardDiscard()) { setBackfillType('activity'); setBackfillMeetingDate(''); setEditor(null); setLoaded(false); setDirty(false); } }}
+                  onClick={async () => { if (await guardDiscard()) { setBackfillType('activity'); setBackfillMeetingDate(''); setEditor(null); setLoaded(false); setDirty(false); } }}
                   className={`${btnCls} ${backfillType === 'activity' ? 'bg-slate-800 text-white border-slate-800' : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'}`}
                 >
                   🎪 過期／過去活動
@@ -579,7 +600,7 @@ export default function AttendancePage() {
               {sessions && backfillType === 'meeting' && (
                 <label style={{ fontSize: 15 }}>揀集會日（由新至舊；標「已點名」＝已有紀錄，可修改）
                   <select className={inputCls} value={backfillMeetingDate}
-                    onChange={e => { const v = e.target.value; if (guardDiscard()) { setBackfillMeetingDate(v); if (v) openMeeting(v); } }}>
+                    onChange={async e => { const v = e.target.value; if (await guardDiscard()) { setBackfillMeetingDate(v); if (v) openMeeting(v); } }}>
                     <option value="">請選擇集會日期</option>
                     {sessions.meetings.map(m => (
                       <option key={m.id} value={m.date}>
@@ -592,7 +613,7 @@ export default function AttendancePage() {
               {sessions && backfillType === 'activity' && (
                 <label style={{ fontSize: 15 }}>揀活動（由新至舊）
                   <select className={inputCls} value={backfillEventId}
-                    onChange={e => { const v = e.target.value; if (guardDiscard()) { setBackfillEventId(v); if (v) openActivity(v); } }}>
+                    onChange={async e => { const v = e.target.value; if (await guardDiscard()) { setBackfillEventId(v); if (v) openActivity(v); } }}>
                     <option value="">請選擇活動</option>
                     {sessions.activities.map(a => (
                       <option key={a.id} value={a.id}>{a.label}（{a.date}）{a.hasRecords ? ' · 已點名' : ''}</option>

@@ -6,6 +6,7 @@ import { AppState, loadState, loadStateSlice, Bookmark } from '@/lib/store';
 import { apiImportBookmark, apiUpdateBookmark, apiDeleteBookmark } from '@/lib/api';
 import { branches } from '@/lib/model';
 import { getSession } from '@/lib/session';
+import { useConfirm, kv } from '@/components/ConfirmProvider';
 
 const AUDIENCE_OPTIONS = ['全旅', '領袖', '成年成員', '小童軍', '幼童軍', '童軍', '深資童軍', '樂行童軍', '家長'];
 const ACTIVITY_TYPES = ['訓練班', '比賽', '服務', '工作坊', '活動', '其他'];
@@ -34,6 +35,7 @@ function ImportInner(){
   const [selectedAudience,setSelectedAudience]=useState<string[]>([]);
   const [mode,setMode]=useState<'informational'|'troop_participation'>('informational');
   const [fromLibrary,setFromLibrary]=useState(false);
+  const { confirm } = useConfirm();
 
   // Edit form
   const [eTitle,setETitle]=useState('');
@@ -68,10 +70,23 @@ function ImportInner(){
   async function save(){
     setErr('');setMsg('');
     if(!title.trim()){setErr('請填通告標題');return;}
+    const branchTags=selectedBranches.length>0?selectedBranches.map(id=>branches.find(b=>b.id===id)?.short||id).join(','):'全旅';
+    const audienceTags=selectedAudience.join(',');
+    const ok = await confirm({
+      title: '確認引入通告',
+      message: kv([
+        ['標題', title],
+        ['模式', mode === 'troop_participation' ? '旅團參與（加入行事曆）' : '資訊性'],
+        ['來源', source],
+        ['費用', fee],
+        ['本旅截止', internalDeadline],
+        ['類型', activityType],
+      ]),
+      confirmLabel: '確認引入',
+    });
+    if (!ok) return;
     setLoading(true);
     try{
-      const branchTags=selectedBranches.length>0?selectedBranches.map(id=>branches.find(b=>b.id===id)?.short||id).join(','):'全旅';
-      const audienceTags=selectedAudience.join(',');
       await apiImportBookmark({title,mode,source,officialDeadline,internalDeadline,fee,eligibility,activityType,branchTags,audienceTags});
       const {loadState}=await import('@/lib/store');
       setS(await loadState());
@@ -97,6 +112,19 @@ function ImportInner(){
 
   async function saveEdit(){
     if(!editingId)return;
+    const ok = await confirm({
+      title: '確認儲存通告修改',
+      message: kv([
+        ['標題', eTitle],
+        ['模式', eMode === 'troop_participation' ? '旅團參與' : '資訊性'],
+        ['來源', eSource],
+        ['費用', eFee],
+        ['本旅截止', eInternalDeadline],
+        ['類型', eActivityType],
+      ]),
+      confirmLabel: '確認儲存',
+    });
+    if (!ok) return;
     setLoading(true);setErr('');
     try{
       await apiUpdateBookmark({
@@ -114,7 +142,8 @@ function ImportInner(){
   }
 
   async function del(id:string,title:string){
-    if(!confirm(`確定刪除「${title}」？`))return;
+    const ok=await confirm({title:'確認刪除通告',message:kv([['通告',title]]),confirmLabel:'確認刪除',danger:true});
+    if(!ok)return;
     setLoading(true);setErr('');
     try{await apiDeleteBookmark(id);const {loadState}=await import('@/lib/store');setS(await loadState());setMsg('✅ 已刪除')}catch(e:any){setErr(e.message)}finally{setLoading(false)}
   }

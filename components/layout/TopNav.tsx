@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react';
 import { isMockMode } from '@/lib/mock';
 import { isAdmin, ROLE_LABEL, Role } from '@/lib/model';
 import { clearSession, getSession } from '@/lib/session';
+import { useConfirm, kv } from '@/components/ConfirmProvider';
 
 /**
  * 頂部導覽列 —— 參考 reference APP 的右上角：
@@ -17,6 +18,7 @@ export default function TopNav() {
   const [user, setUser] = useState<{ name: string; role: string } | null>(null);
   const [showMenu, setShowMenu] = useState(false);
   const [mockOn, setMockOn] = useState(false);
+  const { confirm } = useConfirm();
 
   useEffect(() => {
     try {
@@ -44,8 +46,13 @@ export default function TopNav() {
     pathname === '/setup' ||
     pathname === '/onboard';
 
-  function logout() {
-    if (!window.confirm('確定登出？登出後要重新選擇旅團及登入。')) return;
+  async function logout() {
+    const ok = await confirm({
+      title: '確認登出',
+      message: kv([['注意', '登出後要重新選擇旅團及登入']]),
+      confirmLabel: '確認登出',
+    });
+    if (!ok) return;
     clearSession();
     window.location.href = '/';
   }

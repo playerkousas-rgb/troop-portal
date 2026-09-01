@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useConfirm, kv } from '@/components/ConfirmProvider';
 
 /** MOCK 會議管理：有管理權的角色可在會議頁直接新增、修改及刪除。 */
 type Meeting = {
@@ -35,6 +36,7 @@ export default function MeetingsPage() {
   const [form, setForm] = useState<MeetingForm | null>(null);
   const [msg, setMsg] = useState('');
   const [formErr, setFormErr] = useState('');
+  const { confirm } = useConfirm();
 
   const isLeader = ['admin', 'group_leader', 'branch_leader'].includes(role);
   const meeting = items.find(m => m.id === selected);
@@ -65,8 +67,14 @@ export default function MeetingsPage() {
     setForm(null);
   }
 
-  function remove(m: Meeting) {
-    if (!window.confirm(`確定刪除「${m.title}」？`)) return;
+  async function remove(m: Meeting) {
+    const ok = await confirm({
+      title: '確認刪除會議',
+      message: kv([['會議', m.title], ['日期', `${m.date} ${m.time}`]]),
+      confirmLabel: '確認刪除',
+      danger: true,
+    });
+    if (!ok) return;
     setItems(prev => prev.filter(x => x.id !== m.id));
     setSelected(null);
     setMsg(`🗑 已刪除「${m.title}」`);

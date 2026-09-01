@@ -9,10 +9,12 @@ import EventReplyRow from '@/components/ui/EventReplyRow';
 import { AppState, loadStateSlice, replyStatus } from '@/lib/store';
 import { apiSetReply, apiTogglePaid } from '@/lib/api';
 import { getSession } from '@/lib/session';
+import { useConfirm, kv } from '@/components/ConfirmProvider';
 
 export default function Parent(){
   const [s,setS]=useState<AppState|null>(null);const [err,setErr]=useState('');
   const [loadingId,setLoadingId]=useState('');
+  const { confirm } = useConfirm();
   // 按需載入：家長空間（replyStatus 用到 replies）
   useEffect(()=>{loadStateSlice(['users','members','events','replies']).then(setS).catch(e=>setErr(e.message))},[]);
   const session=getSession();
@@ -30,11 +32,19 @@ export default function Parent(){
   const children=s.members.filter(m=>(parent.childMemberIds||[]).includes(m.id)||m.parentUserId===parent.id);
   // 家長報名＝簽署：用家長帳戶登入回覆，無需再簽通告回條
   async function respond(eid:string,mid:string,type:'interested'|'registered'|'declined'){
+    const ev=s?.events.find(e=>e.id===eid);
+    const label={interested:'❤️ 有興趣',registered:'✅ 確定參加',declined:'❌ 婉拒不參加'}[type]||type;
+    const ok=await confirm({title:'確認代子女回覆活動',message:kv([['活動',ev?.title||eid],['回覆',label]]),confirmLabel:'確認回覆'});
+    if(!ok)return;
     setLoadingId(eid+mid);setErr('');
     try{const f=await apiSetReply({eventId:eid,memberId:mid,type,parentUserId:parent.id});setS(f)}catch(e:any){setErr(e.message)}finally{setLoadingId('')}
   }
   // 已付款 tick：只喺「已參加」時先會出現（不參加不用 tick）
   async function togglePaid(eid:string,mid:string){
+    const ev=s?.events.find(e=>e.id===eid);
+    const cur=!!replyStatus(s,eid,mid)?.paid;
+    const ok=await confirm({title:'確認切換付款狀態',message:kv([['活動',ev?.title||eid],['變更後狀態',cur?'❌ 未付款':'💰 已付款']]),confirmLabel:'確認'});
+    if(!ok)return;
     setLoadingId(eid+mid+'paid');setErr('');
     try{const f=await apiTogglePaid(eid,mid);setS(f)}catch(e:any){setErr(e.message)}finally{setLoadingId('')}
   }

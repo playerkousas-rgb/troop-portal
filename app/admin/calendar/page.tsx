@@ -4,6 +4,7 @@ import { AppState, loadState, loadStateSlice } from '@/lib/store';
 import { apiToggleRegularMeeting, apiCreateRegularMeeting, apiCreateEvent, apiDeleteRegularMeeting, apiUpdateRegularMeeting } from '@/lib/api';
 import { branches } from '@/lib/model';
 import { getSession } from '@/lib/session';
+import { useConfirm, kv } from '@/components/ConfirmProvider';
 const weekdays=['日','一','二','三','四','五','六'];
 
 export default function Page(){
@@ -39,13 +40,24 @@ export default function Page(){
   const [spStartTime,setSpStartTime]=useState('');
   const [spEndTime,setSpEndTime]=useState('');
   const [spTag,setSpTag]=useState('');
+  const { confirm } = useConfirm();
 
   useEffect(()=>{loadStateSlice(['events','regularMeetings']).then(setS).catch(e=>setErr(e.message))},[]);
 
   function toggleBranch(id:string,setFn:(fn:(prev:string[])=>string[])=>void){setFn(prev=>prev.includes(id)?prev.filter(x=>x!==id):[...prev,id])}
 
-  async function toggle(id:string){setErr('');try{const f=await apiToggleRegularMeeting(id);setS(f)}catch(e:any){setErr(e.message)}}
-  async function delRegular(id:string){if(!confirm('確定刪除此集會規則？'))return;setErr('');try{const f=await apiDeleteRegularMeeting(id);setS(f)}catch(e:any){setErr(e.message)}}
+  async function toggle(id:string){
+    const r=s?.regularMeetings?.find(x=>x.id===id);
+    const ok=await confirm({title:r?.enabled?'確認停用集會規則':'確認啟用集會規則',message:kv([['集會',r?.title||id],['變更後狀態',r?.enabled?'🔴 停用':'🟢 啟用']]),confirmLabel:'確認'});
+    if(!ok)return;
+    setErr('');try{const f=await apiToggleRegularMeeting(id);setS(f)}catch(e:any){setErr(e.message)}
+  }
+  async function delRegular(id:string){
+    const r=s?.regularMeetings?.find(x=>x.id===id);
+    const ok=await confirm({title:'確認刪除集會規則',message:kv([['集會',r?.title||id]]),confirmLabel:'確認刪除',danger:true});
+    if(!ok)return;
+    setErr('');try{const f=await apiDeleteRegularMeeting(id);setS(f)}catch(e:any){setErr(e.message)}
+  }
 
   function startEdit(r: any) {
     setEditingId(r.id);
@@ -60,6 +72,18 @@ export default function Page(){
 
   async function saveEdit() {
     if (!editingId) return;
+    const ok = await confirm({
+      title: '確認儲存集會規則修改',
+      message: kv([
+        ['標題', eTitle],
+        ['支部', branches.find(b => b.id === eBranchId)?.name || eBranchId],
+        ['星期', `星期${weekdays[Number(eWeekday)]}`],
+        ['時間', `${eStartTime}-${eEndTime}`],
+        ['地點', eLocation],
+      ]),
+      confirmLabel: '確認儲存',
+    });
+    if (!ok) return;
     setErr('');
     try {
       const fresh = await apiUpdateRegularMeeting({
@@ -80,6 +104,18 @@ export default function Page(){
   async function addRegular(){
     if(!title.trim()){setErr('請填標題');return;}
     if(selBranches.length===0){setErr('請至少選一個支部');return;}
+    const ok = await confirm({
+      title: '確認新增恆常集會',
+      message: kv([
+        ['標題', title],
+        ['適用支部', selBranches.map(id => branches.find(b => b.id === id)?.name || id).join('、')],
+        ['星期', `星期${weekdays[Number(weekday)]}`],
+        ['時間', `${startTime}-${endTime}`],
+        ['地點', location],
+      ]),
+      confirmLabel: '確認新增',
+    });
+    if (!ok) return;
     setErr('');
     try{
       for(const bid of selBranches){
@@ -95,13 +131,26 @@ export default function Page(){
     if(!spTitle.trim()){setErr('請填活動標題');return;}
     if(!spDate){setErr('請選日期');return;}
     if(!spTag.trim()){setErr('請加入「行事曆標籤」以便加入行事曆。');return;}
+    // 0 selected = 全旅; 1 = 支部; 2+ = 跨支部
+    let scope = 'troop';
+    let branchId = '';
+    if(spBranches.length===1){scope='branch';branchId=spBranches[0];}
+    else if(spBranches.length>=2){scope='troop';} // 跨支部設為全旅活動
+    const ok = await confirm({
+      title: '確認加入特別集會到行事曆',
+      message: kv([
+        ['標題', spTitle],
+        ['日期', spDate],
+        ['時間', `${spStartTime || '—'} 至 ${spEndTime || '—'}`],
+        ['行事曆標籤', spTag],
+        ['地點', spLocation],
+        ['範圍', scope === 'troop' ? '全旅' : `支部 ${branches.find(b => b.id === branchId)?.name || branchId}`],
+      ]),
+      confirmLabel: '確認加入',
+    });
+    if (!ok) return;
     setErr('');
     try{
-      // 0 selected = 全旅; 1 = 支部; 2+ = 跨支部
-      let scope = 'troop';
-      let branchId = '';
-      if(spBranches.length===1){scope='branch';branchId=spBranches[0];}
-      else if(spBranches.length>=2){scope='troop';} // 跨支部設為全旅活動
       await apiCreateEvent({
         title:spTitle,
         scope:scope as any,

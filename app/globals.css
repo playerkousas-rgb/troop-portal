@@ -306,3 +306,61 @@
     .attendance-hero, .topbar, .footer { display: none !important; }
   }
 }
+
+/* ==================== 防呆確認對話框（ConfirmProvider） ==================== */
+.confirm-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  background: rgba(15, 23, 42, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  backdrop-filter: blur(2px);
+}
+.confirm-card {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  box-shadow: 0 20px 60px rgba(0, 35, 80, 0.25);
+  max-width: 480px;
+  width: 100%;
+  padding: 24px;
+  max-height: 84vh;
+  overflow: auto;
+}
+.confirm-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.confirm-icon { font-size: 24px; }
+.confirm-head h3 { margin: 0; color: var(--blue); font-size: 20px; }
+.confirm-body {
+  margin: 14px 0;
+  border: 1px dashed var(--line);
+  border-radius: 12px;
+  padding: 12px 14px;
+  background: #f8fafc;
+  font-size: 15.5px;
+  line-height: 1.65;
+  color: #22344a;
+}
+.confirm-body ul { margin: 0; padding-left: 18px; }
+.confirm-body li { margin: 3px 0; }
+.confirm-body .k { color: var(--muted); }
+.confirm-actions {
+  margin-top: 16px;
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
+.btn-danger {
+  background: var(--red);
+  color: #fff;
+}
+@media (max-width: 480px) {
+  .confirm-actions { flex-direction: column-reverse; }
+  .confirm-actions .btn { width: 100%; }
+}

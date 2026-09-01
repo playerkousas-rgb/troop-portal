@@ -1,11 +1,12 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { AppState, loadStateSlice } from '@/lib/store';
-import { apiToggleUser, apiCreateUser, apiUpdateUserRole, apiDeleteUser, apiGrantFeature, apiRevokeFeature, apiGetUserFeatures, apiUpdateUserPermissions, apiBatchCreateUsers, apiBatchCreateMembers, apiDecideApplication, apiUpdateMember, apiLinkParent, apiDeleteMember } from '@/lib/api';
+import { apiToggleUser, apiCreateUser, apiUpdateUserRole, apiDeleteUser, apiGetUserFeatures, apiUpdateUserPermissions, apiBatchCreateUsers, apiBatchCreateMembers, apiDecideApplication, apiUpdateMember, apiLinkParent, apiDeleteMember } from '@/lib/api';
 import { ROLE_LABEL, branches, LEADER_ROLES } from '@/lib/model';
 import { checkEditPermission, assignableRoles } from '@/lib/permissions';
 import { getSession } from '@/lib/session';
 import type { Role } from '@/lib/model';
+import { useConfirm, kv } from '@/components/ConfirmProvider';
 
 const FEATURE_LABELS: Record<string,string> = {
   branches: '支部管理', members: '成員資料庫', applications: '審核 / 申請管理',
@@ -148,6 +149,7 @@ export default function Page(){
   const [tab,setTab]=useState<'accounts'|'members'|'applications'>('accounts');
   const [appProcessing,setAppProcessing]=useState('');
   const session=getSession();
+  const { confirm } = useConfirm();
 
   useEffect(()=>{loadStateSlice(['patrols','users','members','applications']).then(setS).catch(e=>setErr(e.message))},[]);
   useEffect(()=>{
@@ -162,16 +164,36 @@ export default function Page(){
     }
   },[s]);
 
-  async function toggle(id:string){setErr('');try{const f=await apiToggleUser(id);setS(f)}catch(e:any){setErr(e.message)}}
-  async function changeRole(userId:string,newRole:Role){setErr('');try{const f=await apiUpdateUserRole(userId,newRole);setS(f)}catch(e:any){setErr(e.message)}}
-  async function del(id:string,userName:string){if(!confirm(`確定刪除 ${userName}？`))return;setErr('');try{const f=await apiDeleteUser(id);setS(f)}catch(e:any){setErr(e.message)}}
+  async function toggle(id:string){
+    const u=s?.users.find(x=>x.id===id);
+    const ok=await confirm({title:u?.approved?'確認停用帳號':'確認啟用帳號',message:kv([['帳號',u?.name||id],['變更後狀態',u?.approved?'🔴 停用':'🟢 啟用']]),confirmLabel:'確認'});
+    if(!ok)return;
+    setErr('');try{const f=await apiToggleUser(id);setS(f)}catch(e:any){setErr(e.message)}
+  }
+  async function changeRole(userId:string,newRole:Role){
+    const u=s?.users.find(x=>x.id===userId);
+    const ok=await confirm({title:'確認更改角色',message:kv([['帳號',u?.name||userId],['新角色',ROLE_LABEL[newRole]||newRole]]),confirmLabel:'確認更改'});
+    if(!ok)return;
+    setErr('');try{const f=await apiUpdateUserRole(userId,newRole);setS(f)}catch(e:any){setErr(e.message)}
+  }
+  async function del(id:string,userName:string){
+    const ok=await confirm({title:'確認刪除帳號',message:kv([['帳號',userName]]),confirmLabel:'確認刪除',danger:true});
+    if(!ok)return;
+    setErr('');try{const f=await apiDeleteUser(id);setS(f)}catch(e:any){setErr(e.message)}
+  }
   async function add(){
     if(!name||!email){setErr('請填姓名及 Email');return;}
+    const children = role === 'parent'
+      ? childRows.filter(c => c.ym.trim() || c.name.trim()).map(c => ({ ymNumber: c.ym.trim() || undefined, name: c.name.trim() || undefined, branchId: newChildBranch || 'b1' }))
+      : undefined;
+    const ok=await confirm({title:'確認建立使用者',message:kv([
+      ['姓名',name],['Email',email],['角色',ROLE_LABEL[role]||role],
+      ['支部',LEADER_ROLES.includes(role)?(branches.find(b=>b.id===branchId)?.name||branchId||'（未選）'):'—'],
+      ...(children?.length?[['子女', children.map(c=>c.name||c.ymNumber).join('、')] as [string,string]]:[]),
+    ]),confirmLabel:'確認建立'});
+    if(!ok)return;
     setErr('');setLoading(true);
     try{
-      const children = role === 'parent'
-        ? childRows.filter(c => c.ym.trim() || c.name.trim()).map(c => ({ ymNumber: c.ym.trim() || undefined, name: c.name.trim() || undefined, branchId: newChildBranch || 'b1' }))
-        : undefined;
       const res = await apiCreateUser({name,email,password:pw,role,branchId:LEADER_ROLES.includes(role)?branchId:'',children});
       setS(res.state);setShowAdd(false);setName('');setEmail('');setChildRows([{ym:'',name:''}]);
       setOk(children?.length ? `✅ 已建立 ${name} 的帳號 — 連結已有成員 ${res.linked.length} 名、新建成員紀錄(無登入帳號) ${res.created.length} 名。` : '✅ 帳號已建立。');
@@ -322,7 +344,16 @@ export default function Page(){
         emergencyContactName: r.emergencyContactName, emergencyContactPhone: r.emergencyContactPhone, note: r.note,
       };
     });
-    if (!confirm(`確定批量開戶？\n帳號：${userRows.length} 個\n成員：${memberRows.length} 名${bulkWarnings.length ? `\n(另有 ${bulkWarnings.length} 項選填提示)` : ''}`)) return;
+    const ok = await confirm({
+      title: '確認批量開戶',
+      message: kv([
+        ['帳號', `${userRows.length} 個`],
+        ['成員', `${memberRows.length} 名`],
+        ...(bulkWarnings.length ? [['選填提示', `${bulkWarnings.length} 項（不影響開戶）`] as [string, string]] : []),
+      ]),
+      confirmLabel: '確認一次寫入',
+    });
+    if (!ok) return;
     setLoading(true); setErr(''); setOk('');
     try {
       let fresh: AppState | null = null;
@@ -357,9 +388,19 @@ export default function Page(){
 
   async function savePermsBatch() {
     if (!permsUserId) return;
+    const enabledFeatures = perms.filter(p => p.enabled).map(p => p.feature);
+    const targetName = isMemberPerms ? s?.members.find(m => m.id === permsUserId)?.name : s?.users.find(u => u.id === permsUserId)?.name;
+    const ok = await confirm({
+      title: '確認寫入功能授權',
+      message: kv([
+        ['對象', targetName || permsUserId],
+        ['啟用功能', enabledFeatures.map(f => FEATURE_LABELS[f] || f).join('、') || '（無）'],
+      ]),
+      confirmLabel: '確認批次寫入',
+    });
+    if (!ok) return;
     setLoading(true); setErr(''); setOk('');
     try {
-      const enabledFeatures = perms.filter(p => p.enabled).map(p => p.feature);
       const freshState = await apiUpdateUserPermissions(permsUserId, enabledFeatures);
       setOk('✅ 授權設定已完整批次寫入！');
       setS(freshState);
@@ -367,32 +408,41 @@ export default function Page(){
     } catch (e: any) { setErr(e.message); } finally { setLoading(false); }
   }
 
-  async function toggleFeature(userId:string,feature:string,enabled:boolean){
-    setLoading(true);setErr('');
-    try{
-      if(enabled){
-        await apiGrantFeature(userId,feature,true);
-      }else{
-        await apiRevokeFeature(userId,feature);
-      }
-      // Reload perms
-      const result=await apiGetUserFeatures(userId);
-      if(result.success) setPerms(result.features||[]);
-      setOk('✅ 已更新權限');
-    }catch(e:any){setErr(e.message)}finally{setLoading(false)}
-  }
-
   async function decideApp(id:string,status:'approved'|'rejected'){
+    const a=s?.applications.find(x=>x.id===id);
+    const ok=await confirm({
+      title:status==='approved'?'確認批核申請':'確認拒絕申請',
+      message:kv([
+        ['申請人',a?.name||id],
+        ['身份',ROLE_LABEL[a?.role as Role]||a?.role||'—'],
+        ['支部',branches.find(b=>b.id===a?.branchId)?.name||'—'],
+        ...(status==='approved'?[['注意','批核後即建立使用者帳號'] as [string,string]]:[]),
+      ]),
+      confirmLabel:status==='approved'?'確認批核':'確認拒絕',
+      danger:status==='rejected',
+    });
+    if(!ok)return;
     setErr('');setAppProcessing(id);
     try{const f=await apiDecideApplication(id,status);setS(f);setOk(status==='approved'?'✅ 已批核申請':'✅ 已拒絕申請')}
     catch(e:any){setErr(e.message)}finally{setAppProcessing('')}
   }
   async function linkMemberParent(mid:string,pid:string){
+    const m=s?.members.find(x=>x.id===mid);
+    const ok=await confirm({
+      title:'確認連結家長',
+      message:kv([
+        ['成員',m?.name||mid],
+        ['家長', pid ? s?.users.find(u=>u.id===pid)?.name||pid : '未連結'],
+      ]),
+      confirmLabel:'確認連結',
+    });
+    if(!ok)return;
     setErr('');
     try{const f=await apiLinkParent(mid,pid);setS(f)}catch(e:any){setErr(e.message)}
   }
   async function delMember(id:string,name:string){
-    if(!confirm(`確定刪除成員 ${name}？`))return;
+    const ok=await confirm({title:'確認刪除成員',message:kv([['成員',name]]),confirmLabel:'確認刪除',danger:true});
+    if(!ok)return;
     setErr('');
     try{const f=await apiDeleteMember(id);setS(f)}catch(e:any){setErr(e.message)}
   }
