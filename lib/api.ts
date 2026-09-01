@@ -287,17 +287,25 @@ export function apiUpdateMember(p: Record<string, string>) {
 
 // ==================== 活動 / 報名 ====================
 
-export function apiCreateEvent(p: { title: string; scope?: string; branchId?: string; date?: string; location?: string; kind?: string; status?: string; source?: string; fee?: string; paymentUrl?: string; dutyPatrol?: string; targetMemberIds?: string; category?: string; calendarTag?: string }) {
+export function apiCreateEvent(p: { title: string; scope?: string; branchId?: string; date?: string; location?: string; kind?: string; status?: string; source?: string; fee?: string; paymentUrl?: string; dutyPatrol?: string; targetMemberIds?: string; category?: string; calendarTag?: string; noticeUrl?: string; noticeFileName?: string; inputMode?: string }) {
   return apiMutate('createEvent', p as any);
 }
 export function apiPublishEvent(eventId: string) {
   return apiMutate('publishEvent', { eventId });
 }
-export function apiUpdateEvent(p: { eventId: string; title?: string; date?: string; location?: string; scope?: string; branchId?: string; fee?: string; paymentUrl?: string; dutyPatrol?: string; status?: string; category?: string; calendarTag?: string }) {
+export function apiUpdateEvent(p: { eventId: string; title?: string; date?: string; location?: string; scope?: string; branchId?: string; fee?: string; paymentUrl?: string; dutyPatrol?: string; status?: string; category?: string; calendarTag?: string; noticeUrl?: string; noticeFileName?: string; inputMode?: string }) {
   return apiMutate('updateEvent', p as any);
 }
 export function apiDeleteEvent(eventId: string) {
   return apiMutate('deleteEvent', { eventId });
+}
+/** 過期通告：自行舉辦 → 放入「過期通告」封存（可查回）；區地域總會（外部）→ 直接刪除 */
+export function apiArchiveEvent(eventId: string) {
+  return apiMutate('archiveEvent', { eventId });
+}
+/** 由封存還原成已發布 */
+export function apiRestoreEvent(eventId: string) {
+  return apiMutate('restoreEvent', { eventId });
 }
 export function apiSetReply(p: { eventId: string; memberId: string; type: string; parentUserId?: string }) {
   const user = currentUser();
@@ -306,6 +314,10 @@ export function apiSetReply(p: { eventId: string; memberId: string; type: string
 }
 export function apiTogglePaid(eventId: string, memberId: string) {
   return apiMutate('togglePaid', { eventId, memberId });
+}
+/** 領袖核實收款：家長 tick「已付款」後，領袖在自己一邊確認收到錢 */
+export function apiConfirmPayment(eventId: string, memberId: string, confirmed: boolean) {
+  return apiMutate('confirmPayment', { eventId, memberId, confirmed: confirmed ? 'true' : 'false' });
 }
 export function apiCancelReply(eventId: string, memberId: string) {
   return apiMutate('cancelReply', { eventId, memberId });

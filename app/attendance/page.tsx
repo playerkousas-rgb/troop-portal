@@ -413,6 +413,13 @@ export default function AttendancePage() {
     }
   }
 
+  // 家長由「子女出席紀錄」入嚟：/attendance?memberId=xxx → 自動揀返嗰個子女
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const q = new URLSearchParams(window.location.search).get('memberId');
+    if (q) setChildId(q);
+  }, []);
+
   useEffect(() => {
     if (!session || !state) return;
     if (isMember) loadHistory({ memberId: session.memberId || session.userId });

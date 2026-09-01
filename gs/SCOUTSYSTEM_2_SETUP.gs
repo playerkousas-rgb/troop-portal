@@ -266,10 +266,10 @@ function getInitialSheets_() {
       ['meetingId', 'title', 'type', 'date', 'startTime', 'endTime', 'location', 'targetRoles', 'branchId', 'url', 'status', 'calendarTag', 'createdBy', 'createdAt', 'note']
     ],
     Events: [
-      ['eventId', 'title', 'scope', 'branchId', 'date', 'location', 'kind', 'status', 'source', 'category', 'calendarTag', 'fee', 'paymentUrl', 'dutyPatrol', 'targetMemberIds', 'createdBy', 'createdAt', 'note']
+      ['eventId', 'title', 'scope', 'branchId', 'date', 'location', 'kind', 'status', 'source', 'category', 'calendarTag', 'fee', 'paymentUrl', 'dutyPatrol', 'noticeUrl', 'noticeFileName', 'inputMode', 'targetMemberIds', 'createdBy', 'createdAt', 'note']
     ],
     EventReplies: [
-      ['replyId', 'eventId', 'memberId', 'memberName', 'branchId', 'parentUserId', 'type', 'operatedBy', 'paid', 'cancelled', 'createdAt', 'updatedAt', 'notes']
+      ['replyId', 'eventId', 'memberId', 'memberName', 'branchId', 'parentUserId', 'type', 'operatedBy', 'paid', 'paymentConfirmed', 'paymentConfirmedBy', 'paymentConfirmedAt', 'cancelled', 'createdAt', 'updatedAt', 'notes']
     ],
     LibraryBookmarks: [
       ['bookmarkId', 'circularKey', 'title', 'source', 'region', 'circularDate', 'sourceUrl', 'attachmentUrl', 'paymentUrl', 'officialDeadline', 'internalDeadline', 'mode', 'activityType', 'targetText', 'eligibility', 'fee', 'branchTags', 'audienceTags', 'status', 'convertedEventId', 'ownerUserId', 'createdBy', 'createdAt', 'note']
@@ -858,6 +858,8 @@ function mapEvents_() {
       calendarTag: getField_(e, 'calendarTag') || '',
       fee: getField_(e, 'fee') || '',
       paymentUrl: getField_(e, 'paymentUrl') || '', dutyPatrol: getField_(e, 'dutyPatrol') || '',
+      noticeUrl: getField_(e, 'noticeUrl') || '', noticeFileName: getField_(e, 'noticeFileName') || '',
+      inputMode: getField_(e, 'inputMode') || 'form',
       targetMemberIds: targets
     };
   });
@@ -874,6 +876,9 @@ function mapReplies_() {
       parentUserId: getField_(r, 'parentUserId') || '',
       type: getField_(r, 'type') || 'interested', operatedBy: getField_(r, 'operatedBy') || 'member',
       paid: parseBool_(getField_(r, 'paid')),
+      paymentConfirmed: parseBool_(getField_(r, 'paymentConfirmed')),
+      paymentConfirmedBy: getField_(r, 'paymentConfirmedBy') || '',
+      paymentConfirmedAt: getField_(r, 'paymentConfirmedAt') ? (fmtDate_(getField_(r, 'paymentConfirmedAt')) || getField_(r, 'paymentConfirmedAt')) : '',
       cancelled: parseBool_(getField_(r, 'cancelled')),
       updatedAt: getField_(r, 'updatedAt') ? fmtDate_(getField_(r, 'updatedAt')) || getField_(r, 'updatedAt') : ''
     };
@@ -1675,6 +1680,9 @@ function doGet(e) {
       case 'deleteEvent': return wrap_(handleDeleteEvent_(p), p);
       case 'setReply': return wrap_(handleSetReply_(p), p);
       case 'togglePaid': return wrap_(handleTogglePaid_(p), p);
+      case 'confirmPayment': return wrap_(handleConfirmPayment_(p), p);
+      case 'archiveEvent': return wrap_(handleArchiveEvent_(p), p);
+      case 'restoreEvent': return wrap_(handleRestoreEvent_(p), p);
       case 'decideApplication': return wrap_(handleDecideApplication_(p), p);
       case 'toggleUser': return wrap_(handleToggleUser_(p), p);
       case 'updateUserRole': return wrap_(handleUpdateUserRole_(p), p);
@@ -2544,6 +2552,7 @@ function handleCreateEvent_(p) {
     status: p.status || 'draft', source: source, category: category,
     calendarTag: p.calendarTag || '', fee: p.fee || '',
     paymentUrl: p.paymentUrl || '', dutyPatrol: p.dutyPatrol || '',
+    noticeUrl: p.noticeUrl || '', noticeFileName: p.noticeFileName || '', inputMode: p.inputMode || 'form',
     targetMemberIds: targets, createdBy: p.operatedBy || '', createdAt: now_(), note: p.note || ''
   });
   writeAudit_(p.operatedBy || 'system', 'createEvent', 'Events', id, p.title || '');
@@ -2557,7 +2566,7 @@ function handlePublishEvent_(p) {
 }
 
 function handleUpdateEvent_(p) {
-  var fields = ['title', 'scope', 'branchId', 'date', 'location', 'kind', 'status', 'source', 'category', 'calendarTag', 'fee', 'paymentUrl', 'dutyPatrol', 'targetMemberIds', 'note'];
+  var fields = ['title', 'scope', 'branchId', 'date', 'location', 'kind', 'status', 'source', 'category', 'calendarTag', 'fee', 'paymentUrl', 'dutyPatrol', 'noticeUrl', 'noticeFileName', 'inputMode', 'targetMemberIds', 'note'];
   var changed = [];
   fields.forEach(function (f) {
     if (p[f] !== undefined && p[f] !== null) {
@@ -2580,6 +2589,39 @@ function handleDeleteEvent_(p) {
   if (idx < 0) return { success: false, error: '找不到活動' };
   getSheet_('Events').deleteRow(idx + 1);
   writeAudit_(p.operatedBy || 'system', 'deleteEvent', 'Events', p.eventId, '');
+  return { success: true };
+}
+
+/**
+ * 過期通告處理：
+ *   自行舉辦（self）→ status = archived（放入「過期通告」，日後可查回／還原）
+ *   區地域總會（district，外部通告）→ 直接刪除
+ */
+function handleArchiveEvent_(p) {
+  var idx = findRowIndexById_('Events', 'eventId', p.eventId);
+  if (idx < 0) return { success: false, error: '找不到活動' };
+  var events = readTable_('Events');
+  var ev = events.filter(function (e) { return getField_(e, 'eventId') === p.eventId; })[0];
+  var category = String(getField_(ev, 'category') || '');
+  if (!category) {
+    var src = String(getField_(ev, 'source') || '');
+    category = (String(getField_(ev, 'kind') || '') === 'notice_troop_participation' || /圖書館|地域|區會|區地域|總會/.test(src)) ? 'district' : 'self';
+  }
+  if (category === 'district') {
+    getSheet_('Events').deleteRow(idx + 1);
+    writeAudit_(p.operatedBy || 'system', 'deleteExpiredEvent', 'Events', p.eventId, '外部通告過期直接刪除');
+  } else {
+    updateCellByName_('Events', 'eventId', p.eventId, 'status', 'archived');
+    writeAudit_(p.operatedBy || 'system', 'archiveEvent', 'Events', p.eventId, '放入過期通告');
+  }
+  return { success: true };
+}
+
+function handleRestoreEvent_(p) {
+  var idx = findRowIndexById_('Events', 'eventId', p.eventId);
+  if (idx < 0) return { success: false, error: '找不到活動' };
+  updateCellByName_('Events', 'eventId', p.eventId, 'status', 'published');
+  writeAudit_(p.operatedBy || 'system', 'restoreEvent', 'Events', p.eventId, '由過期通告還原');
   return { success: true };
 }
 
@@ -2665,6 +2707,31 @@ function handleTogglePaid_(p) {
     });
     writeAudit_(p.operatedBy || 'system', 'togglePaid', 'EventReplies', p.eventId, p.memberId + ' new paid=true');
   }
+  return { success: true };
+}
+
+/** 領袖核實收款：家長 tick「已付款」後，領袖喺自己嗰邊確認收到錢（家長端會顯示） */
+function handleConfirmPayment_(p) {
+  var replyId = p.eventId + '_' + p.memberId;
+  var on = String(p.confirmed) !== 'false';
+  var idx = findRowIndexById_('EventReplies', 'replyId', replyId);
+  if (idx < 0) {
+    appendRowByHeaders_('EventReplies', {
+      replyId: replyId, eventId: p.eventId, memberId: p.memberId,
+      parentUserId: '', type: 'registered', operatedBy: 'leader',
+      paid: on, paymentConfirmed: on,
+      paymentConfirmedBy: on ? (p.operatedBy || 'system') : '',
+      paymentConfirmedAt: on ? now_() : '',
+      cancelled: false, createdAt: now_(), updatedAt: now_(), notes: ''
+    });
+  } else {
+    updateCellByName_('EventReplies', 'replyId', replyId, 'paymentConfirmed', String(on));
+    updateCellByName_('EventReplies', 'replyId', replyId, 'paymentConfirmedBy', on ? (p.operatedBy || 'system') : '');
+    updateCellByName_('EventReplies', 'replyId', replyId, 'paymentConfirmedAt', on ? now_() : '');
+    if (on) updateCellByName_('EventReplies', 'replyId', replyId, 'paid', 'true');
+    updateCellByName_('EventReplies', 'replyId', replyId, 'updatedAt', now_());
+  }
+  writeAudit_(p.operatedBy || 'system', 'confirmPayment', 'EventReplies', p.eventId, p.memberId + ' confirmed=' + on);
   return { success: true };
 }
 

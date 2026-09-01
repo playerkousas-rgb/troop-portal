@@ -1,7 +1,7 @@
 'use client';
 import { Suspense, useEffect, useState } from 'react';
 import { AppState, loadState, loadStateSlice, replyStatus, eventCategory } from '@/lib/store';
-import { apiTogglePaid } from '@/lib/api';
+import { apiTogglePaid, apiConfirmPayment } from '@/lib/api';
 import { useSearchParams } from 'next/navigation';
 import { useConfirm, kv } from '@/components/ConfirmProvider';
 
@@ -14,6 +14,28 @@ const GROUP_DEFS = [
   { id: 'leader', name: '👔 領袖', full: '旅團領袖與統籌', color: '#9c27b0', text: '#6a1b9a', border: '#e1bee7' },
   { id: 'parent', name: '👨‍👩‍👧 家長', full: '家長團隊', color: '#00897b', text: '#00695c', border: '#b2dfdb' }
 ];
+
+/** 展開式分層區塊（活動統計資料太多 → 每層預設收起） */
+function Layer({ title, subtitle, count, defaultOpen = false, children }: { title: string; subtitle?: string; count?: string; defaultOpen?: boolean; children: React.ReactNode }) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <section className="card stack" style={{ padding: 0, overflow: 'hidden' }}>
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        aria-expanded={open}
+        style={{ display: 'flex', width: '100%', alignItems: 'center', justifyContent: 'space-between', gap: 8, padding: '12px 14px', background: open ? '#f8fafc' : '#fff', border: 'none', borderBottom: open ? '1px solid #e8eaed' : 'none', cursor: 'pointer', textAlign: 'left' }}
+      >
+        <span>
+          <strong style={{ fontSize: '1rem' }}>{title}</strong>
+          {subtitle && <span className="muted" style={{ display: 'block', fontSize: '0.82rem' }}>{subtitle}</span>}
+        </span>
+        <span className="muted" style={{ fontWeight: 'bold', whiteSpace: 'nowrap' }}>{count ? count + ' ' : ''}{open ? '🔼 收起' : '🔽 展開'}</span>
+      </button>
+      {open && <div className="stack" style={{ padding: 14 }}>{children}</div>}
+    </section>
+  );
+}
 
 function RegistrationsInner(){
   const [s,setS]=useState<AppState|null>(null);const [err,setErr]=useState('');
@@ -29,13 +51,26 @@ function RegistrationsInner(){
   const [activeListTab, setActiveListTab] = useState<string>('all');
   const { confirm } = useConfirm();
 
-  useEffect(()=>{loadStateSlice(['patrols','users','members','events','replies']).then(st=>{setS(st);const q=search?.get('eventId');setEventId(q||st.events[0]?.id||'')}).catch(e=>setErr(e.message))},[]);
+  useEffect(()=>{loadStateSlice(['patrols','users','members','events','replies']).then(st=>{setS(st);const q=search?.get('eventId');setEventId(q||st.events.filter(e=>eventCategory(e)==='self'&&e.status!=='archived')[0]?.id||'')}).catch(e=>setErr(e.message))},[]);
   async function togglePaid(mid:string){
     const m=s?.members.find(x=>x.id===mid);
     const cur=!!replyStatus(s,eventId,mid)?.paid;
     const ok=await confirm({title:'確認切換付款狀態',message:kv([['成員',m?.name||mid],['變更後狀態',cur?'❌ 未付款':'💰 已付款']]),confirmLabel:'確認'});
     if(!ok)return;
     setErr('');try{const f=await apiTogglePaid(eventId,mid);setS(f)}catch(e:any){setErr(e.message)}
+  }
+
+  async function toggleConfirm(mid:string){
+    const m=s?.members.find(x=>x.id===mid)||s?.users.find(x=>x.id===mid);
+    const cur=!!replyStatus(s!,eventId,mid)?.paymentConfirmed;
+    const ok=await confirm({title:cur?'取消收款核實':'確認已收到款項',message:kv([['對象',m?.name||mid],['變更後',cur?'⏳ 未核實':'🧾 領袖已確認收款（家長端會顯示）']]),confirmLabel:'確認'});
+    if(!ok)return;
+    setErr('');try{const f=await apiConfirmPayment(eventId,mid,!cur);setS(f)}catch(e:any){setErr(e.message)}
+  }
+
+  function isConfirmed(mid: string) {
+    if (!s) return false;
+    return !!replyStatus(s, eventId, mid)?.paymentConfirmed;
   }
 
   function getIsPaid(mid: string) {
@@ -81,8 +116,7 @@ function RegistrationsInner(){
   if(!s)return <div className="card">{err||'載入中...'}</div>;
   const event=s.events.find(e=>e.id===eventId);
   
-  const internalEvents = s.events.filter(e => eventCategory(e) === 'self');
-  const externalEvents = s.events.filter(e => eventCategory(e) === 'district');
+  const internalEvents = s.events.filter(e => eventCategory(e) === 'self' && e.status !== 'archived');
 
   const memberTargets = event ? s.members.filter(m => event.targetMemberIds.includes(m.id)) : [];
   const userTargets = event ? s.users.filter(u => event.targetMemberIds.includes(u.id) && !memberTargets.some(m => m.id === u.id)) : [];
@@ -131,35 +165,23 @@ function RegistrationsInner(){
   return <div className="stack">
     <section className="hero">
       <span className="badge gold">活動統計</span>
-      <h1>📊 活動統計（自行舉辦 ＝ 區地域總會 ＝ 通告統計）</h1>
-      <p>活動統計統一在此：雙下拉選單分流「自行舉辦」與「區地域總會活動（原圖書館引入）」，7大直式格完整呈現各支部與領袖出席，點選狀態即可展開具體名單。</p>
+      <h1>📊 活動統計（只計自行舉辦活動）</h1>
+      <p>資料分層展示，預設收起：點各層標題即可展開。區地域總會活動不做統計。</p>
     </section>
     {err&&<p className="badge red">{err}</p>}
 
-    {/* 1. 雙下拉選單選擇活動 */}
-    <section className="grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 16 }}>
-      <div className="card stack" style={{ borderTop: '4px solid #1a73e8', background: '#f8fafc' }}>
-        <strong style={{ fontSize: '1.05rem', color: '#1a73e8' }}>🏠 自行舉辦（原旅團自辦）：</strong>
-        <select value={eventId} onChange={e=>{setEventId(e.target.value);setPaidOverrides({});setExpandedGroup(null);setExpandedOverallStatus(null);setExpandedBranchStatus(null);}}>
-          {internalEvents.length===0&&<option value="">無自行舉辦活動</option>}
-          {internalEvents.map(e=><option key={e.id} value={e.id}>{e.title} ({e.date})</option>)}
-        </select>
-      </div>
-      <div className="card stack" style={{ borderTop: '4px solid #f9ab00', background: '#fffef0' }}>
-        <strong style={{ fontSize: '1.05rem', color: '#b06000' }}>🗺️ 區地域總會活動（原圖書館引入）：</strong>
-        <select value={eventId} onChange={e=>{setEventId(e.target.value);setPaidOverrides({});setExpandedGroup(null);setExpandedOverallStatus(null);setExpandedBranchStatus(null);}}>
-          {externalEvents.length===0&&<option value="">無區地域總會活動</option>}
-          {externalEvents.map(e=><option key={e.id} value={e.id}>{e.title} ({e.date})</option>)}
-        </select>
-      </div>
+    {/* 1. 選擇活動（只計自行舉辦；區地域總會活動不做統計） */}
+    <section className="card stack" style={{ borderTop: '4px solid #1a73e8', background: '#f8fafc' }}>
+      <strong style={{ fontSize: '1.05rem', color: '#1a73e8' }}>🏠 自行舉辦活動：</strong>
+      <select value={eventId} onChange={e=>{setEventId(e.target.value);setPaidOverrides({});setExpandedGroup(null);setExpandedOverallStatus(null);setExpandedBranchStatus(null);}}>
+        {internalEvents.length===0&&<option value="">無自行舉辦活動</option>}
+        {internalEvents.map(e=><option key={e.id} value={e.id}>{e.title} ({e.date})</option>)}
+      </select>
+      <p className="muted" style={{ margin: 0 }}>ℹ️ 區地域總會活動（原圖書館引入）只係精選通告畀成員睇，佢想報就自己報，所以不做統計。</p>
     </section>
 
     {event&&<>
-    <section className="card stack" style={{ background: '#f8fafc', borderLeft: '6px solid #1a73e8' }}>
-      <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
-        <h2 style={{ margin: 0 }}>📊 總體報名與付款概況 — {event.title}</h2>
-        <span className="badge blue" style={{ fontSize: '0.95rem' }}>點選狀態卡片即可下展該分類全員名單</span>
-      </div>
+    <Layer title={`📊 總體報名與付款概況 — ${event.title}`} subtitle="點選狀態卡片即可下展該分類全員名單。" defaultOpen>
       <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 12, marginTop: 8 }}>
         <div className={`card ${expandedOverallStatus==='registered'?'notice-mode active':''}`} style={{ background: '#e6f4ea', borderColor: '#ceead6', padding: 12, cursor: 'pointer' }} onClick={() => setExpandedOverallStatus(expandedOverallStatus==='registered'?null:'registered')}>
           <div className="muted" style={{ fontWeight: 'bold' }}>✅ 確定參加 {expandedOverallStatus==='registered'?'🔽':''}</div>
@@ -207,12 +229,10 @@ function RegistrationsInner(){
           </div>
         </div>
       )}
-    </section>
+    </Layer>
 
-    {/* 2. 第一層：7格直式支部、領袖與家長統計 */}
-    <section className="card stack">
-      <h3>🏢 第一層：各支部、領袖與家長出席報名統計 (共7格直式呈現)</h3>
-      <p className="muted">點選卡片內具體欄位（如「✅ 確定」或「💰 付款」）即可立即在下方展開該支部的對應人員名字。</p>
+    {/* 2. 第一層：7格直式支部、領袖與家長統計（預設收起） */}
+    <Layer title="🏢 第一層：各支部、領袖與家長統計" subtitle="點選卡片內欄位可展開該支部對應人員名字。" count={`${unifiedTargets.length} 人`}>
       <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12 }}>
         {GROUP_DEFS.map(g => {
           const grpMembers = unifiedTargets.filter(m => m.branchId === g.id);
@@ -301,10 +321,11 @@ function RegistrationsInner(){
           </div>
         </div>
       )}
-    </section>
+    </Layer>
 
     {/* 3. 第二層：專屬兩大格童軍與幼童軍小隊報名統計 (名字+標示✅❌❤️⚠️💰，❤️可並存) */}
-    <section className="grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))', gap: 16 }}>
+    <Layer title="🐺⚜️ 第二層：幼童軍／童軍小隊報名統計" subtitle="逐隊展示成員意願與付款標記。">
+      <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(350px, 1fr))', gap: 16 }}>
       {/* 幼童軍大格 */}
       <div className="card stack" style={{ borderTop: '5px solid #fbc02d', background: '#fff' }}>
         <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
@@ -388,12 +409,12 @@ function RegistrationsInner(){
           })}
         </div>
       </div>
-    </section>
+      </div>
+    </Layer>
 
     {/* 4. 最底名單：分成各支部、領袖、家長和總合共8個分頁方便匯出 */}
-    <section className="card stack">
+    <Layer title="📋 出席與付款核對名單表" subtitle="8 個分頁快速對賬與 CSV 匯出。" count={`${unifiedTargets.length} 人`}>
       <div className="row" style={{ justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
-        <h3 style={{ margin: 0 }}>📋 出席與付款核對名單表 (共 8 個分頁快速對賬與 CSV 匯出)</h3>
         {modifiedCount > 0 && (
           <button className="btn primary" disabled={loadingBatch} style={{ background: '#2e7d32', borderColor: '#1b5e20' }} onClick={saveBatchPaid}>
             {loadingBatch ? '⏳ 批次同步寫入中...' : `💾 一鍵同步儲存 ${modifiedCount} 筆暫存付款`}
@@ -409,7 +430,7 @@ function RegistrationsInner(){
         })}
       </div>
 
-      <table className="table"><thead><tr><th>姓名</th><th>所屬單位</th><th>小隊/職務</th><th>回覆出席狀態</th><th>緊急聯絡電話</th><th>付款核對</th><th>操作</th></tr></thead>
+      <table className="table"><thead><tr><th>姓名</th><th>所屬單位</th><th>小隊/職務</th><th>回覆出席狀態</th><th>緊急聯絡電話</th><th>家長付款</th><th>領袖收款核實</th><th>操作</th></tr></thead>
       <tbody>{displayTargets.map(m=>{
         const r=replyStatus(s,eventId,m.id);
         const p=s.patrols.find(x=>x.id===m.patrolId);
@@ -431,6 +452,13 @@ function RegistrationsInner(){
           <td>{m.emergencyContactPhone||'—'}</td>
           <td>{isPaidCur?<span className="badge green" style={{fontWeight:'bold'}}>💰 已付款</span>:<span className="badge red" style={{fontWeight:'bold'}}>❌ 未付款</span>}</td>
           <td>
+            {isConfirmed(m.id)
+              ? <span className="badge green" style={{fontWeight:'bold'}}>🧾 已確認收款</span>
+              : <span className="badge" style={{background:'#f1f3f4',color:'#555'}}>⏳ 未核實</span>}
+            {' '}
+            <button className="btn" style={{fontSize:'0.8em'}} onClick={()=>toggleConfirm(m.id)}>{isConfirmed(m.id)?'取消核實':'✔️ 核實收款'}</button>
+          </td>
+          <td>
             <button className={`btn ${isChanged ? 'gold' : ''}`} onClick={()=>toggleLocalPaid(m.id)}>{isPaidCur ? '❌ 取消已付款' : '💰 已付款'}</button>{' '}
             <button className="btn" style={{fontSize:'0.82em'}} onClick={()=>togglePaid(m.id)}>單筆同步</button>
           </td>
@@ -444,7 +472,7 @@ function RegistrationsInner(){
           </button>
         )}
       </div>
-    </section></>}
+    </Layer></>}
   </div>;
 }
 

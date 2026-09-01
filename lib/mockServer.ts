@@ -874,6 +874,8 @@ function handleMutate(action: string, p: Record<string, any>) {
         category, status: p.status || 'draft', source,
         targetMemberIds: [], fee: String(p.fee || ''), paymentUrl: String(p.paymentUrl || ''),
         dutyPatrol: String(p.dutyPatrol || ''), calendarTag: String(p.calendarTag || ''),
+        noticeUrl: String(p.noticeUrl || ''), noticeFileName: String(p.noticeFileName || ''),
+        inputMode: (p.inputMode || 'form') as any,
       });
       logAudit(ob, 'createEvent', '活動', id, String(p.title || ''));
       return S(ob);
@@ -890,6 +892,28 @@ function handleMutate(action: string, p: Record<string, any>) {
     }
     case 'publishEvent': { const i = findIdx(store.events, 'id', String(p.eventId || '')); if (i >= 0) { store.events[i].status = 'published'; logAudit(ob, 'publishEvent', '活動', String(p.eventId || ''), store.events[i].title || ''); } return S(ob); }
     case 'deleteEvent': store.events = store.events.filter(e => e.id !== p.eventId); store.replies = store.replies.filter(r => r.eventId !== p.eventId); logAudit(ob, 'deleteEvent', '活動', String(p.eventId || ''), String(p.title || '')); return S(ob);
+    /** 過期處理：自行舉辦 → 封存成「過期通告」；區地域總會（外部）→ 直接刪除 */
+    case 'archiveEvent': {
+      const i = findIdx(store.events, 'id', String(p.eventId || ''));
+      if (i >= 0) {
+        const ev = store.events[i];
+        const isDistrict = ev.category === 'district' || ev.kind === 'notice_troop_participation';
+        if (isDistrict) {
+          store.events = store.events.filter(e => e.id !== ev.id);
+          store.replies = store.replies.filter(r => r.eventId !== ev.id);
+          logAudit(ob, 'deleteExpiredEvent', '活動', ev.id, `${ev.title}（外部通告，過期直接刪除）`);
+        } else {
+          ev.status = 'archived' as any;
+          logAudit(ob, 'archiveEvent', '活動', ev.id, `${ev.title}（放入過期通告）`);
+        }
+      }
+      return S(ob);
+    }
+    case 'restoreEvent': {
+      const i = findIdx(store.events, 'id', String(p.eventId || ''));
+      if (i >= 0) { store.events[i].status = 'published'; logAudit(ob, 'restoreEvent', '活動', store.events[i].id, store.events[i].title || ''); }
+      return S(ob);
+    }
     // 報名
     case 'setReply': {
       const replyId = `${p.eventId}_${p.memberId}`;
@@ -900,7 +924,28 @@ function handleMutate(action: string, p: Record<string, any>) {
       return S(ob);
     }
     case 'cancelReply': { const i = findIdx(store.replies, 'id', `${p.eventId}_${p.memberId}`); if (i >= 0) store.replies[i].cancelled = !store.replies[i].cancelled; return S(ob); }
-    case 'togglePaid': { const i = findIdx(store.replies, 'id', `${p.eventId}_${p.memberId}`); if (i >= 0) store.replies[i].paid = !store.replies[i].paid; return S(ob); }
+    case 'togglePaid': {
+      const i = findIdx(store.replies, 'id', `${p.eventId}_${p.memberId}`);
+      if (i >= 0) {
+        store.replies[i].paid = !store.replies[i].paid;
+        // 家長取消「已付款」→ 領袖核實同時失效
+        if (!store.replies[i].paid) { store.replies[i].paymentConfirmed = false; store.replies[i].paymentConfirmedBy = ''; store.replies[i].paymentConfirmedAt = ''; }
+      }
+      return S(ob);
+    }
+    /** 領袖核實收款（家長端會睇到「領袖已確認收款」） */
+    case 'confirmPayment': {
+      const i = findIdx(store.replies, 'id', `${p.eventId}_${p.memberId}`);
+      if (i >= 0) {
+        const on = String(p.confirmed) !== 'false';
+        store.replies[i].paymentConfirmed = on;
+        store.replies[i].paymentConfirmedBy = on ? ob : '';
+        store.replies[i].paymentConfirmedAt = on ? new Date().toISOString().slice(0, 10) : '';
+        if (on) store.replies[i].paid = true;
+        logAudit(ob, 'confirmPayment', '報名', String(p.eventId || ''), `${p.memberId} confirmed=${on}`);
+      }
+      return S(ob);
+    }
     // 申請
     case 'decideApplication': {
       const i = findIdx(store.applications, 'id', String(p.applicationId || ''));
