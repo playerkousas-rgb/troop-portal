@@ -842,7 +842,7 @@ function handleMutate(action: string, p: Record<string, any>) {
       const defaults = FEATURES[role] || [];
       const overrides: Record<string, boolean> = {};
       (USER_FEATURE_OVERRIDES[tu?.id || ''] || []).forEach(f => { overrides[f] = true; });
-      const allFeatures = ['branches', 'members', 'applications', 'events', 'registrations', 'attendance', 'attendance_all', 'library_import', 'notices', 'users', 'settings', 'audit', 'calendar'];
+      const allFeatures = ['branches', 'members', 'applications', 'events', 'registrations', 'attendance', 'attendance_all', 'library_import', 'notices', 'users', 'settings', 'meetings', 'equipment', 'plugins', 'audit', 'calendar'];
       return {
         success: true,
         role,

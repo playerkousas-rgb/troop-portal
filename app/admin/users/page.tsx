@@ -9,9 +9,10 @@ import type { Role } from '@/lib/model';
 
 const FEATURE_LABELS: Record<string,string> = {
   branches: '支部管理', members: '成員資料庫', applications: '審核 / 申請管理',
-  events: '活動管理', registrations: '報名管理', attendance: '簽到／點名', attendance_all: '全旅點名（跨支部）', library_import: '圖書館引入',
-  notices: '通告管理', users: '使用者管理', settings: '系統設定',
-  audit: '審核紀錄', calendar: '行事曆管理',
+  events: '活動管理', registrations: '報名管理', attendance: '簽到／點名', attendance_all: '全旅點名（跨支部）', library_import: '區地域總會活動引入',
+  notices: '通告管理', users: '使用者管理', settings: '系統設定', meetings: '會議管理',
+  equipment: '物資管理', plugins: '單位元件設定',
+  audit: '操作紀錄', calendar: '行事曆管理',
 };
 
 type BulkRow = {

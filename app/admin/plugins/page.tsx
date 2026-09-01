@@ -116,6 +116,13 @@ export default function PluginManagementPage() {
                   {p.tier === 3 && (
                     <div className="stack" style={{ background: '#f8f9fa', padding: '1rem', borderRadius: '8px', marginTop: '0.5rem' }}>
                       <p style={{ fontWeight: 'bold', margin: 0 }}>⚙️ 後端連結設定</p>
+                      <label>前端 URL
+                        <input
+                          defaultValue={setting?.frontendUrl || p.url}
+                          placeholder="例如：https://vs-tracker.vercel.app"
+                          onBlur={e => saveSettings(p.id, { frontendUrl: e.target.value })}
+                        />
+                      </label>
                       <label>後端 Apps Script URL
                         <input
                           defaultValue={setting?.backendUrl}
