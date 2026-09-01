@@ -73,7 +73,7 @@ export default function Admin(){
   // 已登入、但後台什麼資料都沒給 → 幾乎一定是 GS 版本太舊（未重新部署）或 API Key 不符
   const emptyData = !!s && !err && (s.users || []).length === 0;
 
-  return <Auth roles={['super_admin','troop_super','admin','group_leader','branch_leader','coach']}><div className="space-y-3">
+  return <Auth roles={['super_admin','troop_super','admin','group_leader','branch_leader','coach']}><div className="max-w-5xl mx-auto space-y-4">
     <ConsoleHeader
       icon="🛡️"
       name={s?.users[0]?.name || '管理員'}
@@ -81,7 +81,7 @@ export default function Admin(){
       tone="amber"
       tagline="功能卡按你的權限動態顯示，同類功能已歸類在同一張大卡內，可按標題收合。"
       action={
-        <Link href="/profile" className="no-underline text-[11px] font-bold bg-white/95 text-slate-800 px-3 py-2 rounded-xl hover:bg-white transition whitespace-nowrap">
+        <Link href="/profile" className="no-underline text-sm font-bold bg-white/95 text-slate-800 px-3 py-2 rounded-xl hover:bg-white transition whitespace-nowrap">
           👤 個人設定
         </Link>
       }
@@ -89,18 +89,18 @@ export default function Admin(){
 
     {err && (
       <section className="bg-rose-50 border border-rose-200 rounded-2xl p-4">
-        <p className="text-xs text-rose-700 font-bold m-0 whitespace-pre-wrap leading-relaxed">{err}</p>
+        <p className="text-sm text-rose-700 font-bold m-0 whitespace-pre-wrap leading-relaxed">{err}</p>
       </section>
     )}
 
     {emptyData && (
       <section className="bg-rose-50 border border-rose-200 rounded-2xl p-4">
         <h3 className="text-sm font-black text-rose-800 mt-0 mb-1.5">⚠️ 已登入，但後台沒有回傳任何資料</h3>
-        <p className="text-[11px] text-rose-700 leading-relaxed m-0">
+        <p className="text-sm text-rose-700 leading-relaxed m-0">
           登入帳號是「{session?.userId || '—'}」，後台卻回傳空的 user 清單。這通常代表
           Google Sheet 的 Apps Script 還沒更新到 <b>3.0-live</b>（舊版不認得超管／STAFF_TOKEN 的身份，會把它當訪客）。
         </p>
-        <ol className="text-[11px] text-rose-700 leading-relaxed mt-2 mb-0 pl-5 list-decimal">
+        <ol className="text-sm text-rose-700 leading-relaxed mt-2 mb-0 pl-5 list-decimal">
           <li>把 <code className="bg-white/70 border border-rose-200 rounded px-1 py-0.5 font-mono">gs/SCOUTSYSTEM_2_SETUP.gs</code> 整份貼回 Script Editor</li>
           <li>Deploy → Manage deployments → 新增版本（Who has access = <b>Anyone</b>）</li>
           <li>回登入頁按「🩺 連線檢查」，確認「後台版本」是 3.0-live</li>

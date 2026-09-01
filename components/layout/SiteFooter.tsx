@@ -9,7 +9,7 @@ export default function SiteFooter() {
 
   return (
     <footer className="site-footer pt-2 pb-16 text-center">
-      <p className="text-[11px] text-slate-500">© 2026 Scout System · 旅團管理系統</p>
+      <p className="text-[13px] text-slate-500">© 2026 Scout System · 旅團管理系統</p>
     </footer>
   );
 }

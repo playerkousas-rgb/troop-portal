@@ -12,6 +12,30 @@
 - 收合界面：控制台同類功能歸類到可收合的大卡（`components/ui/Panel` + `ToolGroup`）；管理員控制台由約 21 個獨立卡減到 7 個區塊
 - 插件統一使用 `u` 參數：區=字母碼，旅團=純數字碼
 
+## 本輪：GS Setup 修復 + MOCK 實作進 MAIN（真前後端連線實測）
+
+### 1. GS 檔（`gs/SCOUTSYSTEM_2_SETUP.gs`）Setup 錯誤修復
+
+請把整份 GS 重新貼回 Script Editor，再執行一次 `setupScoutSystem()`（重複執行是安全的，不會覆蓋現有資料）。修復內容：
+
+- **Setup 逐步執行**：每步獨立 try/catch，最後彈窗清楚列出是哪一步失敗（例如「❌ 隱藏進階分頁及保護：…」），不再做到一半靜靜死掉。
+- **保護工作表不再炸 Setup**：`protectSensitiveSheets_` 對個人 Gmail（消費版）帳號 `Session.getActiveUser()` 回傳 null 的情況加了防護（此為最常見的「SETUP 時 ERROR」原因）；拿不到身份就只保留 owner。
+- **系統鎖修好**：`lockSystemMenu` / `unlockSystemMenu` 之前寫錯欄位（完全無效），現改用 `setConfigValue_('system_locked')` 並寫 Audit；SystemConfig 補回 `system_locked` 預設列。
+- **`fixAllMissingColumns` 修好**：之前對 object 用 `forEach`（必爆 TypeError），現改 `Object.keys(...)`。
+- **移除 `?.` 語法**（`showSystemVersion`，舊版 Runtime 不支援）及重複的 `case 'updateUserField'`。
+- **選單檢查清單更新**：`testConnectionMenu` / `simpleModeMenu` 改用本版實際存在的工作表。
+
+### 2. MOCK 實作進 MAIN：演示旅團行真前後端連線
+
+之前演示模式在瀏覽器內直接模擬回應（`lib/mock.ts` 短路），**沒有真正行網路**。現在：
+
+- 新增 **`lib/mockServer.ts`（內置 MOCK 後台）**：實作與 GS 後台完全相同的 API 合約（`getDashboard` / `getState` 切片 / 登入 / 點名 / 報名統計 / 全部寫入 action），資料會同步到 `.mockdata/mock-state.json`（已 gitignore），dev server 重啟/HMR 不消失；重設資料：`action=resetMock` 或刪除該檔案。
+- **`app/api/proxy/route.ts`**：`troopKey=troop_demo`（演示旅團 0088）的請求改由 proxy 轉到內置 MOCK 後台，不需環境變數；真實旅團路徑完全不變。
+- **`lib/api.ts`**：移除瀏覽器內 mock 短路 —— 所有請求（包括演示旅團）都經真實 fetch → `/api/proxy` → 後台。這正是「前後端連接實測」：連線、角色過濾、錯誤處理、寫入回整包 state，全部與真實 GS 流程一致。
+- **入口更新**：首頁「演示體驗」→ 真實登入頁 `/login` → 進階面板一鍵演示帳號（7 種角色）→ 進入真實頁面（`/admin` `/member` `/parent` `/leader`），TopNav 顯示 🎭 DEMO 標籤。`/dashboard` 舊版靜態預覽樹保留作設計參考，並加了「實測 MAIN」捷徑。
+- 連線檢查（登入頁「🩺 連線檢查」）會顯示「內置 MOCK 後台」狀態，與真實旅團的診斷互不混淆。
+
+
 ## 簽到／點名與報名管理分流
 
 - **簽到／點名**：日常／恆常集會及旅團自辦活動，以內建 `/attendance` 頁記錄 P／A／L／E／S 實際出席（不是插件，也不 iframe 外部網站）。

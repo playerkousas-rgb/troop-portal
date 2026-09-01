@@ -47,65 +47,92 @@ function setupScoutSystem() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   if (!ss) throw new Error('請先在 Google Sheet 中開啟 Apps Script，再執行 setupScoutSystem()');
 
-  var sheets = getInitialSheets_();
-  Object.keys(sheets).forEach(function (name) {
-    var sh = ss.getSheetByName(name) || ss.insertSheet(name);
-    sh.showSheet();
-    
-    var data = sh.getDataRange().getValues();
-    var existingHeaders = data[0].map(function(h) { return String(h).trim().toLowerCase(); });
-    var targetHeaders = sheets[name][0];
-    
-    if (data.length <= 1 && data[0][0] === "") {
-      // 完全空的表：直接寫入初始資料（含標題和範例）
-      sh.getRange(1, 1, sheets[name].length, sheets[name][0].length).setValues(sheets[name]);
-    } else {
-      // 已有資料：只檢查並補齊缺失的欄位標題
-      targetHeaders.forEach(function(h, idx) {
-        if (existingHeaders.indexOf(h.toLowerCase()) < 0) {
-          var lastCol = sh.getLastColumn();
-          sh.getRange(1, lastCol + 1).setValue(h);
-          existingHeaders.push(h.toLowerCase());
-        }
-      });
-      
-      // 特殊處理 SystemConfig：補齊缺失的 Key，但不覆蓋現有 Value
-      if (name === 'SystemConfig') {
-        var existingKeys = data.map(function(r) { return String(r[0]); });
-        sheets[name].slice(1).forEach(function(row) {
-          if (existingKeys.indexOf(row[0]) < 0) {
-            sh.appendRow(row);
+  // ★ 逐步執行並收集錯誤：任何一步失敗都會在最後的訊息清楚列出是哪一步，
+  //   不會再「做到一半靜靜死掉」讓你看不到原因。
+  var apiKeyPlain = '';
+  var steps = [
+    { label: '建立 / 補齊工作表', run: function () {
+        var sheets = getInitialSheets_();
+        Object.keys(sheets).forEach(function (name) {
+          var sh = ss.getSheetByName(name) || ss.insertSheet(name);
+          sh.showSheet();
+          
+          var data = sh.getDataRange().getValues();
+          var existingHeaders = data[0].map(function(h) { return String(h).trim().toLowerCase(); });
+          var targetHeaders = sheets[name][0];
+          
+          if (data.length <= 1 && data[0][0] === "") {
+            // 完全空的表：直接寫入初始資料（含標題和範例）
+            sh.getRange(1, 1, sheets[name].length, sheets[name][0].length).setValues(sheets[name]);
+          } else {
+            // 已有資料：只檢查並補齊缺失的欄位標題
+            targetHeaders.forEach(function(h, idx) {
+              if (existingHeaders.indexOf(h.toLowerCase()) < 0) {
+                var lastCol = sh.getLastColumn();
+                sh.getRange(1, lastCol + 1).setValue(h);
+                existingHeaders.push(h.toLowerCase());
+              }
+            });
+            
+            // 特殊處理 SystemConfig：補齊缺失的 Key，但不覆蓋現有 Value
+            if (name === 'SystemConfig') {
+              var existingKeys = data.map(function(r) { return String(r[0]); });
+              sheets[name].slice(1).forEach(function(row) {
+                if (existingKeys.indexOf(row[0]) < 0) {
+                  sh.appendRow(row);
+                }
+              });
+            }
           }
+          sh.setFrozenRows(1);
         });
-      }
+      } },
+    { label: 'README 新手指南', run: function () { setupReadmeSheet_(ss); } },
+    { label: '格式化及上色', run: function () { formatScoutSystemSheets_(ss); } },
+    { label: '欄位提示', run: function () { addHelpfulNotes_(ss); } },
+    // seedInitialAdmin_ 註解掉，避免重複建立導致密碼被重設
+    { label: 'API Key / 管理員帳號', run: function () { apiKeyPlain = generateStaffToken_(ss); } },
+    { label: '隱藏進階分頁及保護', run: function () { hideAdvancedSheets(); } }
+  ];
+  var errors = [];
+  steps.forEach(function (s) {
+    try {
+      s.run();
+    } catch (e) {
+      var msg = String((e && e.message) ? e.message : e);
+      errors.push('❌ ' + s.label + '：' + msg);
+      console.log('[Setup] ' + s.label + ' 失敗：' + msg);
     }
-    sh.setFrozenRows(1);
   });
-
-  setupReadmeSheet_(ss);
-  formatScoutSystemSheets_(ss);
-  addHelpfulNotes_(ss);
-  // seedInitialAdmin_(ss); // 註解掉，避免重複建立導致密碼被重設
-  var apiKeyPlain = generateStaffToken_(ss);
-  hideAdvancedSheets();
 
   var readme = ss.getSheetByName('README_新手必看');
   if (readme) ss.setActiveSheet(readme);
 
   try {
-    SpreadsheetApp.getUi().alert(
-      '2026 Scout System 安全更新完成',
-      '已檢查並補齊新功能所需的欄位，原有資料已完整保留。\n\n'
-      + '本次更新摘要：\n'
-      + '1. 新增了「會議管理 (Meetings)」工作表\n'
-      + '2. 新增了「元件設定 (PluginSettings)」工作表\n'
-      + '3. 補齊了成員 Email 及特別身份等欄位\n\n'
-      + '🔑 你的 API Key（如果之前沒設定過）：\n'
-      + (apiKeyPlain || '（已保留現有設定）'),
-      SpreadsheetApp.getUi().ButtonSet.OK
-    );
+    if (errors.length) {
+      SpreadsheetApp.getUi().alert(
+        '2026 Scout System Setup — 部分步驟失敗',
+        '以下步驟出錯，請把整段錯誤訊息截圖或複製給開發者：\n\n'
+        + errors.join('\n') + '\n\n'
+        + '已完成的其他步驟不受影響，可以直接修好問題後再執行一次 Setup（重複執行是安全的）。',
+        SpreadsheetApp.getUi().ButtonSet.OK
+      );
+    } else {
+      SpreadsheetApp.getUi().alert(
+        '2026 Scout System 安全更新完成',
+        '已檢查並補齊新功能所需的欄位，原有資料已完整保留。\n\n'
+        + '本次更新摘要：\n'
+        + '1. 新增了「會議管理 (Meetings)」工作表\n'
+        + '2. 新增了「元件設定 (PluginSettings)」工作表\n'
+        + '3. 補齊了成員 Email 及特別身份等欄位\n\n'
+        + '🔑 你的 API Key（如果之前沒設定過）：\n'
+        + (apiKeyPlain || '（已保留現有設定）'),
+        SpreadsheetApp.getUi().ButtonSet.OK
+      );
+    }
   } catch (e) {
     console.log('UI alert not available in this context');
+    if (errors.length) console.log(errors.join('\n'));
   }
 }
 
@@ -177,7 +204,8 @@ function getInitialSheets_() {
       ['SUPER_ADMIN_USER', '', '（系統用）'],
       ['SUPER_ADMIN_HASH', '', '（系統用）'],
       ['INITIAL_ADMIN_USER', '', '初始管理員帳號，旅團首次登入用。'],
-      ['INITIAL_ADMIN_PW', '', '初始管理員密碼，登入後請立即更改。']
+      ['INITIAL_ADMIN_PW', '', '初始管理員密碼，登入後請立即更改。'],
+      ['system_locked', 'false', '系統鎖：TRUE = 暫停服務（只有技術測試帳號可登入）。由選單「鎖定 / 解鎖系統」控制。']
     ],
     Roles: [
       ['role', 'label', 'level', 'defaultLanding', 'note'],
@@ -402,7 +430,9 @@ function addHelpfulNotes_(ss) {
     noteCell_(config, 'B2', '旅團號，純數字。');
     noteCell_(config, 'B3', '顯示於前端的旅團名稱。');
     noteCell_(config, 'B4', '第一位管理員 Email。');
-    noteCell_(config, 'B5', '初始管理員預設密碼。');
+    noteCell_(config, 'B5', '公告 PDF 的 Google Drive 資料夾 ID（可留空）。');
+    noteCell_(config, 'B11', '初始管理員登入帳號（系統隨機生成）。');
+    noteCell_(config, 'B12', '初始管理員登入密碼，首次登入後請立即更改。');
   }
   var users = ss.getSheetByName('Users');
   if (users) { noteCell_(users, 'D1', '登入密碼。'); }
@@ -417,15 +447,41 @@ function noteCell_(sheet, a1, note) { sheet.getRange(a1).setNote(note); }
 
 /** 保護含有敏感資料的工作表，只允許 owner 編輯 */
 function protectSensitiveSheets_(ss) {
-  var me = Session.getActiveUser().getEmail();
+  // ★ 個人 Gmail（消費版）帳號在某些環境下 Session.getActiveUser() 會回傳 null，
+  //   直接 .getEmail() 會爆「Cannot read property 'getEmail' of null」，
+  //   令 Setup 在最後一步失敗。全部包 try/catch，拿不到身份就只保留 owner。
+  var me = '';
+  try {
+    var activeUser = Session.getActiveUser();
+    me = activeUser ? String(activeUser.getEmail() || '') : '';
+  } catch (e) {
+    me = '';
+  }
   ['SystemConfig', 'Users'].forEach(function (name) {
-    var sh = ss.getSheetByName(name);
-    if (!sh) return;
-    var prot = sh.protect().setDescription('ScoutSystem：保護敏感設定（API_KEY_HASH / STAFF_TOKEN / 密碼）');
-    var meFound = false;
-    prot.getEditors().forEach(function (e) { if (e.getEmail() === me) meFound = true; });
-    if (!meFound && me) prot.addEditor(me);
-    prot.removeEditors(prot.getEditors().filter(function (e) { return e.getEmail() !== me; }));
+    try {
+      var sh = ss.getSheetByName(name);
+      if (!sh) return;
+      var prot = sh.protect().setDescription('ScoutSystem：保護敏感設定（API_KEY_HASH / STAFF_TOKEN / 密碼）');
+      if (me) {
+        var editors = prot.getEditors();
+        var meFound = false;
+        editors.forEach(function (e) {
+          try { if (String(e.getEmail()) === me) meFound = true; } catch (e2) {}
+        });
+        if (!meFound) {
+          try { prot.addEditor(me); } catch (e3) {}
+        }
+        var toRemove = editors.filter(function (e) {
+          try { return String(e.getEmail()) !== me; } catch (e4) { return false; }
+        });
+        if (toRemove.length) {
+          try { prot.removeEditors(toRemove); } catch (e5) {}
+        }
+      }
+    } catch (e6) {
+      // 保護失敗（例如教育版限制）不應令 Setup 失敗
+      console.log('[Setup] 保護工作表 ' + name + ' 跳過：' + String(e6 && e6.message ? e6.message : e6));
+    }
   });
 }
 function hideAdvancedSheets() {
@@ -1622,6 +1678,7 @@ function doGet(e) {
       case 'togglePluginStatus': return wrap_(handleTogglePluginStatus_(p), p);
       case 'addAnnouncement': return wrap_(addAnnouncement(p), p);
       case 'getAnnouncements': return json(getAnnouncements(p));
+      case 'updateAnnouncement': return wrap_(updateAnnouncement(p), p);
       case 'deleteAnnouncement': return wrap_(deleteAnnouncement(p), p);
       case 'addRow': return wrap_(genericAddRow(p), p);
       case 'createMeeting': return wrap_(handleCreateMeeting_(p), p);
@@ -1629,7 +1686,6 @@ function doGet(e) {
       case 'deleteMeeting': return wrap_(handleDeleteMeeting_(p), p);
       case 'publishMeeting': return wrap_(handlePublishMeeting_(p), p);
       case 'updateUserPermissions': return wrap_(handleUpdateUserPermissions_(p), p);
-      case 'updateUserField': return wrap_(handleUpdateUserField_(p), p);
       case 'getAttendance': return json(handleGetAttendance_(p));
       case 'saveAttendance': return json(handleSaveAttendance_(p));
       case 'getAttendanceMatrix': return json(handleGetAttendanceMatrix_(p));
@@ -3516,6 +3572,21 @@ function deleteAnnouncement(p) {
   return { success: true };
 }
 
+function updateAnnouncement(p) {
+  var fields = ['title', 'message', 'scope', 'branchId'];
+  var changed = [];
+  fields.forEach(function (f) {
+    if (p[f] !== undefined && p[f] !== null) {
+      updateCellByName_('Announcements', 'announcementId', p.announcementId, f, p[f]);
+      changed.push(f);
+    }
+  });
+  if (changed.length === 0) return { success: false, error: '沒有要更新的欄位' };
+  updateCellByName_('Announcements', 'announcementId', p.announcementId, 'updatedAt', now_());
+  writeAudit_(p.operatedBy || 'system', 'updateAnnouncement', 'Announcements', p.announcementId, changed.join(','));
+  return { success: true };
+}
+
 
 
 // ==================== 維修工具（1.0 邏輯） ====================
@@ -3601,10 +3672,9 @@ function runFullSetupMenu() {
 function showSystemVersion() {
   SpreadsheetApp.getUi().alert(
     '🏕️ 2026 Scout System',
-    '版本：2.0.0\n'
+    '版本：' + SCOUTSYSTEM_VERSION + '\n'
     + '更新日期：' + new Date().toLocaleDateString('zh-TW') + '\n'
-    + '檔案：SCOUTSYSTEM_2_SETUP.gs\n'
-    + '總行數：' + SpreadsheetApp.getActiveSpreadsheet().getSheetByName('SCOUTSYSTEM_2_SETUP')?.getDataRange().getNumRows() || 'N/A',
+    + '檔案：SCOUTSYSTEM_2_SETUP.gs',
     SpreadsheetApp.getUi().ButtonSet.OK
   );
 }
@@ -3614,13 +3684,15 @@ function lockSystemMenu() {
   var ui = SpreadsheetApp.getUi();
   var response = ui.alert('鎖定系統', '鎖定後，所有用戶（除技術測試帳號外）將無法登入。\n\n確定要鎖定嗎？', ui.ButtonSet.YES_NO);
   if (response !== ui.Button.YES) return;
-  updateCellByName_('SystemConfig', 'setting', 'system_locked', 'value', 'true');
+  setConfigValue_('system_locked', 'true');
+  writeAudit_('system', 'lockSystem', 'SystemConfig', 'system_locked', 'locked');
   ui.alert('系統已鎖定。只有技術測試帳號可以登入。');
 }
 
 /** 解鎖系統 */
 function unlockSystemMenu() {
-  updateCellByName_('SystemConfig', 'setting', 'system_locked', 'value', 'false');
+  setConfigValue_('system_locked', 'false');
+  writeAudit_('system', 'unlockSystem', 'SystemConfig', 'system_locked', 'unlocked');
   SpreadsheetApp.getUi().alert('系統已解鎖。所有用戶可以正常登入。');
 }
 
@@ -3631,7 +3703,7 @@ function testConnectionMenu() {
   var results = [];
   
   // 檢查 Sheets
-  var requiredSheets = ['SystemConfig', 'Users', 'Members', 'Branches', 'Patrols', 'Events', 'Applications', 'Announcements', 'EventReplies', 'Badges', 'Payments', 'MeetingDates'];
+  var requiredSheets = ['SystemConfig', 'Users', 'Members', 'Branches', 'Patrols', 'Events', 'EventReplies', 'LibraryBookmarks', 'Announcements', 'RegularMeetings', 'CancelledMeetings', 'Meetings', 'Notices', 'Plugins', 'PluginSettings', 'UserPermissions', 'AttendanceRecords', 'Equipment', 'EquipmentLoans', 'AuditLogs'];
   var missing = [];
   requiredSheets.forEach(function(name) {
     if (!ss.getSheetByName(name)) missing.push(name);
@@ -3691,7 +3763,7 @@ function testConnectionMenu() {
 /** 小白模式：只顯示基本分頁 */
 function simpleModeMenu() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var basicSheets = ['SystemConfig', 'Users', 'Members', 'Branches', 'Patrols', 'Events', 'Applications', 'Announcements', 'EventReplies', 'Badges', 'Payments', 'MeetingDates'];
+  var basicSheets = VISIBLE_SHEETS_FOR_BEGINNERS;
   var allSheets = ss.getSheets();
   var hidden = 0;
   allSheets.forEach(function(sheet) {
@@ -3818,8 +3890,9 @@ function fixAllMissingColumns() {
   var sheets = getInitialSheets_();
   var fixed = 0;
   
-  sheets.forEach(function(sheetDef) {
-    var sheet = ss.getSheetByName(sheetDef.name);
+  Object.keys(sheets).forEach(function(sheetName) {
+    var sheetDef = sheets[sheetName];
+    var sheet = ss.getSheetByName(sheetName);
     if (!sheet) return;
     
     var data = sheet.getDataRange().getValues();
@@ -3828,7 +3901,7 @@ function fixAllMissingColumns() {
     var currentHeaders = data[0].map(function(h) { return String(h).trim(); });
     var missingCols = [];
     
-    sheetDef.headers.forEach(function(h) {
+    sheetDef[0].forEach(function(h) {
       if (currentHeaders.indexOf(h) < 0) {
         missingCols.push(h);
       }
@@ -4120,6 +4193,45 @@ function handleSaveAttendance_(p) {
   if (records.length > 500) return { success: false, error: '一次最多儲存 500 筆' };
 
   var allowed = { P: 1, A: 1, L: 1, E: 1, S: 1 };
+
+  // ★ 效能：只讀一次整張表 → 喺記憶體改 → 最後一次過寫返。
+  //   之前逐筆「findRow + updateCell」會令成個旅團點名讀寫上千次成張表 → 超時卡死。
+  var sh = getSheet_('AttendanceRecords');
+  var data = sh.getDataRange().getValues();
+  var headers = data[0].map(function (h) { return String(h || '').trim(); });
+  var colIdx = {};
+  headers.forEach(function (h, i) { colIdx[h.toLowerCase()] = i; });
+
+  var neededCols = ['recordId', 'memberId', 'ymNumber', 'name', 'branchId', 'patrolId', 'date', 'status', 'note', 'sessionType', 'eventId', 'markedBy', 'markedAt'];
+  var headerChanged = false;
+  neededCols.forEach(function (c) {
+    if (colIdx[c.toLowerCase()] === undefined) {
+      colIdx[c.toLowerCase()] = headers.length;
+      headers.push(c);
+      headerChanged = true;
+    }
+  });
+  if (headerChanged) {
+    sh.getRange(1, 1, 1, headers.length).setValues([headers]);
+    data[0] = headers;
+    for (var ri = 1; ri < data.length; ri++) {
+      while (data[ri].length < headers.length) data[ri].push('');
+    }
+  }
+
+  var ridIdx = colIdx['recordid'];
+  var rowIndexById = {};
+  for (var i = 1; i < data.length; i++) {
+    rowIndexById[String(data[i][ridIdx])] = i;
+  }
+
+  function setCell_(rowIdx, colName, value) {
+    var c = colIdx[String(colName).toLowerCase()];
+    if (c === undefined) return;
+    while (data[rowIdx].length <= c) data[rowIdx].push('');
+    data[rowIdx][c] = value;
+  }
+
   var saved = 0;
   records.forEach(function (raw) {
     var memberId = String(raw.memberId || '').trim();
@@ -4141,16 +4253,25 @@ function handleSaveAttendance_(p) {
       markedBy: caller.userId,
       markedAt: now_()
     };
-    var idx = findRowIndexById_('AttendanceRecords', 'recordId', recordId);
-    if (idx >= 0) {
-      Object.keys(fields).forEach(function (k) {
-        updateCellByName_('AttendanceRecords', 'recordId', recordId, k, fields[k]);
-      });
+    var existing = rowIndexById[recordId];
+    if (existing !== undefined) {
+      Object.keys(fields).forEach(function (k) { setCell_(existing, k, fields[k]); });
     } else {
-      appendRowByHeaders_('AttendanceRecords', fields);
+      var newRow = [];
+      for (var x = 0; x < headers.length; x++) newRow.push('');
+      Object.keys(fields).forEach(function (k) {
+        var c = colIdx[String(k).toLowerCase()];
+        if (c !== undefined) newRow[c] = fields[k];
+      });
+      data.push(newRow);
+      rowIndexById[recordId] = data.length - 1;
     }
     saved++;
   });
+
+  if (saved > 0) {
+    sh.getRange(1, 1, data.length, headers.length).setValues(data);
+  }
   writeAudit_(caller.userId, 'saveAttendance', 'AttendanceRecords', branchId + ' ' + date, 'saved=' + saved + ' type=' + sessionType);
   return { success: true, saved: saved, date: date, branchId: branchId, sessionType: sessionType, eventId: eventId };
 }
@@ -4248,6 +4369,9 @@ function handleGetAttendanceSessions_(p) {
     return new Date(parts[0], parts[1] - 1, parts[2]).getDay();
   }
 
+  // ★ 效能：AttendanceRecords 只讀一次，唔好喺 loop 入面重複讀（會卡）
+  var attRows = readTable_('AttendanceRecords');
+
   var meetings = [];
   var seen = {};
   var now = new Date();
@@ -4267,24 +4391,30 @@ function handleGetAttendanceSessions_(p) {
       meetings.push({ id: key, date: iso, label: rule.title, time: (rule.startTime || '') + '-' + (rule.endTime || ''), location: rule.location || '', weekday: Number(rule.weekday) });
     }
   });
-  // 併入已點名但非規律的日期（例如補辦的集會）
-  readTable_('AttendanceRecords').forEach(function (r) {
+
+  // 一次過收集：會議 hasRecords 及 活動 hasRecords
+  var meetingRecDates = {};
+  var activityRecEventIds = {};
+  attRows.forEach(function (r) {
     if (String(getField_(r, 'branchId')) !== branchId) return;
-    if (String(getField_(r, 'sessionType') || 'meeting') !== 'meeting') return;
+    var type = String(getField_(r, 'sessionType') || 'meeting');
     var d = fmtDate_(getField_(r, 'date'));
-    var key = 'meeting|' + branchId + '|' + d;
-    if (seen[key]) return;
-    seen[key] = true;
-    meetings.push({ id: key, date: d, label: '已點名集會', time: '', location: '', weekday: weekdayOf_(d) });
-  });
-  meetings.sort(function (a, b) { return a.date < b.date ? 1 : -1; });
-  var recDates = {};
-  readTable_('AttendanceRecords').forEach(function (r) {
-    if (String(getField_(r, 'branchId')) === branchId && String(getField_(r, 'sessionType') || 'meeting') === 'meeting') {
-      recDates[fmtDate_(getField_(r, 'date'))] = true;
+    if (type === 'meeting') {
+      meetingRecDates[d] = true;
+      // 併入已點名但非規律的日期（例如補辦的集會）
+      var key = 'meeting|' + branchId + '|' + d;
+      if (!seen[key]) {
+        seen[key] = true;
+        meetings.push({ id: key, date: d, label: '已點名集會', time: '', location: '', weekday: weekdayOf_(d) });
+      }
+    } else if (type === 'activity') {
+      var evId = String(getField_(r, 'eventId') || '');
+      if (evId) activityRecEventIds[evId] = true;
     }
   });
-  meetings.forEach(function (m) { m.hasRecords = !!recDates[m.date]; });
+
+  meetings.sort(function (a, b) { return a.date < b.date ? 1 : -1; });
+  meetings.forEach(function (m) { m.hasRecords = !!meetingRecDates[m.date]; });
 
   var activities = mapEvents_().filter(function (e) {
     if (e.kind !== 'activity') return false;
@@ -4292,11 +4422,7 @@ function handleGetAttendanceSessions_(p) {
     if (e.scope === 'troop') return true;
     return e.branchId === branchId;
   }).map(function (e) {
-    var has = false;
-    readTable_('AttendanceRecords').forEach(function (r) {
-      if (String(getField_(r, 'sessionType') || 'meeting') === 'activity' && String(getField_(r, 'eventId') || '') === e.id) has = true;
-    });
-    return { id: e.id, date: e.date, label: e.title, location: e.location || '', branchId: e.branchId, scope: e.scope, hasRecords: has };
+    return { id: e.id, date: e.date, label: e.title, location: e.location || '', branchId: e.branchId, scope: e.scope, hasRecords: !!activityRecEventIds[e.id] };
   }).sort(function (a, b) { return a.date < b.date ? 1 : -1; });
 
   return { success: true, branchId: branchId, today: today, meetings: meetings, activities: activities };
@@ -4362,3 +4488,4 @@ function handleGetMemberAttendance_(p) {
     }
   };
 }
+

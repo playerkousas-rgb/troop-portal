@@ -23,7 +23,7 @@ export default function Parent(){
     { id: 'notices', icon: '📄', label: '通告', desc: '旅團通告及外間活動通告。', href: '/notices' },
   ];
 
-  if(err)return <div className="bg-rose-50 border border-rose-200 rounded-2xl p-4"><p className="text-xs text-rose-700 font-bold m-0 whitespace-pre-wrap leading-relaxed">{err}</p></div>;
+  if(err)return <div className="bg-rose-50 border border-rose-200 rounded-2xl p-4"><p className="text-sm text-rose-700 font-bold m-0 whitespace-pre-wrap leading-relaxed">{err}</p></div>;
   if(!s)return <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 text-sm text-slate-600">載入中...</div>;
   const parent=s.users.find(u=>u.id===(session?.userId))||s.users.find(u=>u.role==='parent');
   if(!parent)return <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 text-sm text-slate-600">找不到家長帳號。</div>;
@@ -40,7 +40,7 @@ export default function Parent(){
   }
 
   return (
-    <div className="space-y-3">
+    <div className="max-w-5xl mx-auto space-y-4">
       <ConsoleHeader
         icon="👨‍👩‍👧"
         name={parent.name}
@@ -48,7 +48,7 @@ export default function Parent(){
         tone="violet"
         tagline="管理子女活動報名與資訊。用家長帳戶登入報名＝已簽署，無需再簽通告回條。"
         action={
-          <Link href="/profile" className="no-underline text-[11px] font-bold bg-white/95 text-slate-800 px-3 py-2 rounded-xl hover:bg-white transition whitespace-nowrap">
+          <Link href="/profile" className="no-underline text-sm font-bold bg-white/95 text-slate-800 px-3 py-2 rounded-xl hover:bg-white transition whitespace-nowrap">
             👤 個人設定
           </Link>
         }
@@ -56,7 +56,7 @@ export default function Parent(){
 
       {err && (
         <section className="bg-rose-50 border border-rose-200 rounded-2xl p-4">
-          <p className="text-xs text-rose-700 font-bold m-0 whitespace-pre-wrap leading-relaxed">{err}</p>
+          <p className="text-sm text-rose-700 font-bold m-0 whitespace-pre-wrap leading-relaxed">{err}</p>
         </section>
       )}
 
@@ -100,12 +100,12 @@ export default function Parent(){
                         footer={
                           r?.type === 'registered' ? (
                             <div className="flex items-center justify-between gap-2 flex-wrap">
-                              <span className="text-[11px] text-slate-500 font-semibold">💰 付款（參加先需 tick）</span>
+                              <span className="text-sm text-slate-500 font-semibold">💰 付款（參加先需 tick）</span>
                               <button
                                 type="button"
                                 disabled={loadingId === e.id + c.id + 'paid'}
                                 onClick={() => togglePaid(e.id, c.id)}
-                                className={`text-[11px] font-bold px-3 py-2 rounded-lg border transition cursor-pointer disabled:opacity-60 ${
+                                className={`text-sm font-bold px-3.5 py-2.5 rounded-lg border transition cursor-pointer disabled:opacity-60 ${
                                   r?.paid ? 'bg-emerald-700 text-white border-emerald-800 shadow-sm' : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300 hover:bg-slate-50'
                                 }`}
                               >
@@ -113,7 +113,7 @@ export default function Parent(){
                               </button>
                             </div>
                           ) : (
-                            <p className="text-[11px] text-slate-400 m-0 leading-relaxed">ℹ️ 選「不參加」或「有興趣」不用 tick 付款。</p>
+                            <p className="text-sm text-slate-500 m-0 leading-relaxed">ℹ️ 選「不參加」或「有興趣」不用 tick 付款。</p>
                           )
                         }
                       />
@@ -131,16 +131,16 @@ export default function Parent(){
       <Panel icon="🆘" title="家庭聯絡資料" subtitle="家長及子女資料" tone="rose" defaultOpen={false}>
         <div className="grid sm:grid-cols-2 gap-2">
           <div className="rounded-xl bg-slate-50 border border-slate-200 px-3 py-2">
-            <div className="text-[11px] text-slate-500 font-bold">家長</div>
+            <div className="text-sm text-slate-500 font-bold">家長</div>
             <div className="text-sm font-bold text-slate-800">{parent.name}</div>
           </div>
           <div className="rounded-xl bg-slate-50 border border-slate-200 px-3 py-2">
-            <div className="text-[11px] text-slate-500 font-bold">Email</div>
+            <div className="text-sm text-slate-500 font-bold">Email</div>
             <div className="text-sm font-bold text-slate-800 break-all">{parent.email}</div>
           </div>
           {children.map(c => (
             <div key={c.id} className="rounded-xl bg-slate-50 border border-slate-200 px-3 py-2">
-              <div className="text-[11px] text-slate-500 font-bold">子女 · 支部</div>
+              <div className="text-sm text-slate-500 font-bold">子女 · 支部</div>
               <div className="text-sm font-bold text-slate-800">{c.name}（{c.ymNumber}）· {c.branchId}</div>
             </div>
           ))}
@@ -148,8 +148,8 @@ export default function Parent(){
       </Panel>
 
       <div className="flex gap-2 flex-wrap">
-        <Link href="/profile" className="no-underline text-[11px] font-bold bg-white text-slate-700 border border-slate-200 px-3 py-2 rounded-xl hover:bg-slate-50 transition">修改個人資料 / 改密碼</Link>
-        <Link href="/calendar" className="no-underline text-[11px] font-bold bg-white text-slate-700 border border-slate-200 px-3 py-2 rounded-xl hover:bg-slate-50 transition">行事曆</Link>
+        <Link href="/profile" className="no-underline text-sm font-bold bg-white text-slate-700 border border-slate-200 px-3 py-2 rounded-xl hover:bg-slate-50 transition">修改個人資料 / 改密碼</Link>
+        <Link href="/calendar" className="no-underline text-sm font-bold bg-white text-slate-700 border border-slate-200 px-3 py-2 rounded-xl hover:bg-slate-50 transition">行事曆</Link>
       </div>
     </div>
   );

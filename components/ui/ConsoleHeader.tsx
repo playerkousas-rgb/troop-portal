@@ -31,25 +31,25 @@ export default function ConsoleHeader({
   action?: ReactNode;
 }) {
   return (
-    <section className={`${TONE[tone]} text-white rounded-2xl px-4 py-3.5 shadow-lg`}>
+    <section className={`${TONE[tone]} text-white rounded-2xl px-5 py-5 shadow-lg`}>
       <div className="flex items-center justify-between gap-3 flex-wrap">
-        <div className="flex items-center gap-3 min-w-0">
+        <div className="flex items-center gap-4 min-w-0">
           <span
-            className="w-11 h-11 bg-white/15 border border-white/25 rounded-xl flex items-center justify-center text-xl flex-shrink-0"
+            className="w-14 h-14 bg-white/15 border border-white/25 rounded-xl flex items-center justify-center text-3xl flex-shrink-0"
             aria-hidden
           >
             {icon}
           </span>
           <div className="min-w-0">
-            <h2 className="font-black text-base sm:text-lg leading-tight truncate m-0">{name}</h2>
-            <p className="text-[11px] sm:text-xs text-white/85 font-semibold truncate m-0">
+            <h2 className="font-black text-xl sm:text-2xl leading-tight truncate m-0">{name}</h2>
+            <p className="text-sm sm:text-base text-white/90 font-semibold truncate m-0 mt-1">
               {[troop, roleLabel].filter(Boolean).join(' · ')}
             </p>
           </div>
         </div>
         {action}
       </div>
-      {tagline && <p className="text-[11px] text-white/75 mt-2 mb-0 leading-relaxed">{tagline}</p>}
+      {tagline && <p className="text-base text-white/80 mt-3 mb-0 leading-relaxed">{tagline}</p>}
     </section>
   );
 }

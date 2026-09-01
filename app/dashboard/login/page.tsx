@@ -13,8 +13,8 @@ export default function MockLogin() {
     <div className="max-w-md mx-auto px-4 py-8 pb-24 space-y-6">
       {/* 預覽提示 */}
       <div className="flex items-center justify-between bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
-        <span className="text-[11px] font-bold text-amber-800">🎨 MOCK 預覽 · 不連接任何後台</span>
-        <Link href="/dashboard" className="text-[11px] font-bold text-amber-800 no-underline underline-offset-2">返回控制台預覽 →</Link>
+        <span className="text-[13px] font-bold text-amber-800">🎨 MOCK 預覽 · 不連接任何後台</span>
+        <Link href="/dashboard" className="text-[13px] font-bold text-amber-800 no-underline underline-offset-2">返回控制台預覽 →</Link>
       </div>
 
       {/* 品牌 */}

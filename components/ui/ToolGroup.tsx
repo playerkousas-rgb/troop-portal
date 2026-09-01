@@ -43,22 +43,22 @@ export default function ToolGroup({
       defaultOpen={defaultOpen}
       bodyClass="pt-3"
     >
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2.5">
         {tools.map(t => (
           <Link key={t.id} href={t.href} className="no-underline text-inherit block group">
-            <div className="h-full rounded-xl border border-slate-200 bg-slate-50/70 p-2.5 flex flex-col gap-1 transition group-hover:bg-white group-hover:border-brand-300 group-hover:shadow-sm">
+            <div className="h-full rounded-xl border border-slate-200 bg-slate-50/70 p-3 flex flex-col gap-1.5 transition group-hover:bg-white group-hover:border-brand-300 group-hover:shadow-sm">
               <span className="flex items-center justify-between gap-1">
-                <span className="text-lg leading-none" aria-hidden>
+                <span className="text-xl leading-none" aria-hidden>
                   {t.icon}
                 </span>
                 {t.badge && (
-                  <span className="text-[10px] bg-rose-100 text-rose-700 border border-rose-200 px-1.5 py-0.5 rounded-full font-bold">
+                  <span className="text-sm bg-rose-100 text-rose-700 border border-rose-200 px-2 py-0.5 rounded-full font-bold">
                     {t.badge}
                   </span>
                 )}
               </span>
-              <span className="font-bold text-xs text-slate-800 leading-tight">{t.label}</span>
-              {t.desc && <span className="text-[11px] text-slate-500 leading-snug line-clamp-2">{t.desc}</span>}
+              <span className="font-bold text-sm text-slate-800 leading-tight">{t.label}</span>
+              {t.desc && <span className="text-sm text-slate-500 leading-snug line-clamp-2">{t.desc}</span>}
             </div>
           </Link>
         ))}

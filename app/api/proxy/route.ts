@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { APPROVED_TROOPS } from '@/lib/troops';
+import { handleMockRequest, DEMO_TROOP_KEY } from '@/lib/mockServer';
 
 /**
  * 2026 Scout System — API Proxy
@@ -12,6 +13,10 @@ import { APPROVED_TROOPS } from '@/lib/troops';
  *
  * 路由：/api/proxy?troopKey=troop_0083&action=xxx&...
  * Debug：/api/proxy?troopKey=troop_0083&action=proxyDebug
+ *
+ * ★ MOCK 已實作進 MAIN：troopKey = troop_demo（演示旅團 0088）的請求
+ *   不再轉去 Apps Script，而是交給內置 MOCK 後台（lib/mockServer.ts）。
+ *   資料格式與 GS 後台完全一致，可以實測整條前後端連線。
  */
 
 export const runtime = 'nodejs';
@@ -22,6 +27,7 @@ type ProxyContext = {
   action: string;
   apiKey: string;
   webAppUrl: string;
+  mock: boolean;
   debug?: Record<string, unknown>;
 };
 
@@ -32,6 +38,31 @@ function getProxyContext(request: NextRequest): NextResponse | ProxyContext {
 
   if (!troopKey || troopKey === 'unknown') {
     return NextResponse.json({ success: false, error: '請先選擇旅團' }, { status: 400 });
+  }
+
+  // ★ 演示旅團：直接進內置 MOCK 後台，不需環境變數
+  if (troopKey === DEMO_TROOP_KEY) {
+    if (action === 'proxyDebug') {
+      return {
+        troopKey,
+        action,
+        apiKey: '',
+        webAppUrl: '',
+        mock: true,
+        debug: {
+          success: true,
+          debug: true,
+          troopKey,
+          troopId: '0088',
+          troopName: '演示旅團(Mock)',
+          envVarName: '',
+          apiKeyFound: true,
+          mock: true,
+          webAppUrl: '(內置 MOCK 後台)',
+        },
+      };
+    }
+    return { troopKey, action, apiKey: '', webAppUrl: '', mock: true };
   }
 
   const troop = APPROVED_TROOPS.find(t => t.key === troopKey);
@@ -48,6 +79,7 @@ function getProxyContext(request: NextRequest): NextResponse | ProxyContext {
       action,
       apiKey,
       webAppUrl: troop.webAppUrl,
+      mock: false,
       debug: {
         success: true,
         debug: true,
@@ -71,7 +103,7 @@ function getProxyContext(request: NextRequest): NextResponse | ProxyContext {
     }, { status: 500 });
   }
 
-  return { troopKey, action, apiKey, webAppUrl: troop.webAppUrl };
+  return { troopKey, action, apiKey, webAppUrl: troop.webAppUrl, mock: false };
 }
 
 async function parseAppsScriptResponse(res: Response) {
@@ -101,6 +133,16 @@ export async function GET(request: NextRequest) {
   if (context.debug) return NextResponse.json(context.debug);
 
   const { searchParams } = new URL(request.url);
+
+  // ★ 演示旅團 → 內置 MOCK 後台（與 GS 相同資料格式）
+  if (context.mock) {
+    const params: Record<string, string> = {};
+    searchParams.forEach((value, key) => {
+      if (key !== 'troopKey' && key !== 'action') params[key] = value;
+    });
+    return NextResponse.json(handleMockRequest(context.action, params));
+  }
+
   const url = new URL(context.webAppUrl);
   url.searchParams.set('action', context.action);
   url.searchParams.set('apiKey', context.apiKey);
@@ -135,6 +177,11 @@ export async function POST(request: NextRequest) {
     body = await request.json();
   } catch {
     body = {};
+  }
+
+  // ★ 演示旅團 → 內置 MOCK 後台（與 GS 相同資料格式）
+  if (context.mock) {
+    return NextResponse.json(handleMockRequest(context.action, body));
   }
 
   try {

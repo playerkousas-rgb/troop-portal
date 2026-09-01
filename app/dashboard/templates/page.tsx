@@ -19,7 +19,7 @@ export default function TemplatesPage() {
         <span className="w-8 h-8 bg-violet-600 text-white rounded-xl flex items-center justify-center text-sm">📂</span>
         <h1 className="font-bold text-lg m-0">模板下載</h1>
       </div>
-      <p className="text-[11px] text-slate-500 m-0 -mt-2 leading-relaxed">
+      <p className="text-[13px] text-slate-500 m-0 -mt-2 leading-relaxed">
         按需要下載模板。活動通告的填寫及加入方式，會在「活動管理」頁面說明。
       </p>
 
@@ -29,10 +29,10 @@ export default function TemplatesPage() {
             <span className="text-2xl flex-shrink-0">{t.icon}</span>
             <div className="flex-1 min-w-0">
               <div className="font-bold text-xs">{t.name}</div>
-              <p className="text-[11px] text-slate-500 m-0 mt-0.5 leading-relaxed">{t.desc}</p>
+              <p className="text-[13px] text-slate-500 m-0 mt-0.5 leading-relaxed">{t.desc}</p>
             </div>
             <a href={t.file} download
-              className="bg-violet-600 text-white text-[11px] font-bold px-3 py-2 rounded-xl no-underline hover:bg-violet-700 transition flex-shrink-0">
+              className="bg-violet-600 text-white text-[13px] font-bold px-3 py-2 rounded-xl no-underline hover:bg-violet-700 transition flex-shrink-0">
               ⬇️ 下載
             </a>
           </div>

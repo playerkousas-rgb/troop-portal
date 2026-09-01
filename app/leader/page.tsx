@@ -42,7 +42,7 @@ export default function Leader(){
   const events = (s?.events || []).filter(e => e.status === 'published' && (e.scope === 'troop' || e.targetMemberIds.includes(myId) || e.branchId === session?.branchId));
   const plugins = (s?.plugins || []).filter(p => p.id !== 'troop_attendance');
 
-  return <Auth roles={['super_admin','admin','group_leader','branch_leader','coach']}><div className="space-y-3">
+  return <Auth roles={['super_admin','admin','group_leader','branch_leader','coach']}><div className="max-w-5xl mx-auto space-y-4">
     <ConsoleHeader
       icon="🧭"
       name={session?.name || '領袖'}
@@ -50,7 +50,7 @@ export default function Leader(){
       tone="blue"
       tagline="管理所屬支部的活動、成員及通告。"
       action={
-        <Link href="/profile" className="no-underline text-[11px] font-bold bg-white/95 text-slate-800 px-3 py-2 rounded-xl hover:bg-white transition whitespace-nowrap">
+        <Link href="/profile" className="no-underline text-sm font-bold bg-white/95 text-slate-800 px-3 py-2 rounded-xl hover:bg-white transition whitespace-nowrap">
           👤 個人設定
         </Link>
       }
@@ -58,7 +58,7 @@ export default function Leader(){
 
     {err && (
       <section className="bg-rose-50 border border-rose-200 rounded-2xl p-4">
-        <p className="text-xs text-rose-700 font-bold m-0 whitespace-pre-wrap leading-relaxed">{err}</p>
+        <p className="text-sm text-rose-700 font-bold m-0 whitespace-pre-wrap leading-relaxed">{err}</p>
       </section>
     )}
 
@@ -76,7 +76,7 @@ export default function Leader(){
       tone="blue"
       count={`${events.length} 個`}
     >
-      <p className="text-[11px] text-slate-500 leading-relaxed mt-0 mb-2.5">
+      <p className="text-sm text-slate-500 leading-relaxed mt-0 mb-3">
         作為領袖或統籌人員，你可在此點選出席旅團通告與集會活動，方便旅長與團隊掌握出席人力。
       </p>
       <div className="grid gap-2">

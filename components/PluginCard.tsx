@@ -68,7 +68,7 @@ export default function PluginIframeCard({
         <span className="text-lg leading-none flex-shrink-0" aria-hidden>{plugin.icon}</span>
         <span className="min-w-0 flex-1">
           <span className="block font-bold text-xs text-slate-800 leading-tight truncate">{plugin.title}</span>
-          <span className="block text-[11px] text-slate-500">點擊開啟新分頁 ↗</span>
+          <span className="block text-[13px] text-slate-500">點擊開啟新分頁 ↗</span>
         </span>
       </a>
     );
@@ -89,10 +89,10 @@ export default function PluginIframeCard({
           <span className="text-lg leading-none flex-shrink-0" aria-hidden>{plugin.icon}</span>
           <span className="min-w-0">
             <span className="block font-bold text-xs text-slate-800 leading-tight truncate">{plugin.title}</span>
-            <span className="block text-[11px] text-slate-500">內嵌開啟</span>
+            <span className="block text-[13px] text-slate-500">內嵌開啟</span>
           </span>
         </span>
-        <span className="text-[11px] font-bold text-violet-700 whitespace-nowrap flex-shrink-0">
+        <span className="text-[13px] font-bold text-violet-700 whitespace-nowrap flex-shrink-0">
           {expanded ? '▲ 收合' : '▼ 展開'}
         </span>
       </button>

@@ -259,24 +259,24 @@ export default function ActivitiesPage() {
   const inputCls = 'flex-1 rounded-lg border border-slate-200 px-2 py-1.5 text-xs';
   const kindBadge = (k: 'internal' | 'external') =>
     k === 'internal'
-      ? <span className="text-[11px] bg-brand-100 text-brand-700 px-1.5 py-0.5 rounded font-bold">🏠 旅團活動</span>
-      : <span className="text-[11px] bg-violet-100 text-violet-700 px-1.5 py-0.5 rounded font-bold">🌐 區／總會活動</span>;
+      ? <span className="text-[13px] bg-brand-100 text-brand-700 px-1.5 py-0.5 rounded font-bold">🏠 旅團活動</span>
+      : <span className="text-[13px] bg-violet-100 text-violet-700 px-1.5 py-0.5 rounded font-bold">🌐 區／總會活動</span>;
 
   return (
     <main className="max-w-2xl mx-auto px-4 py-4 pb-24 space-y-4">
 
       {/* Demo 角色 */}
       <div className="flex gap-1.5 flex-wrap items-center">
-        <span className="text-[11px] text-slate-500 mr-1">Demo：</span>
+        <span className="text-[13px] text-slate-500 mr-1">Demo：</span>
         {['parent', 'member', 'branch_leader', 'admin'].map(r => (
           <button key={r} onClick={() => { setRole(r); setMsg(''); }}
-            className={`text-[11px] px-2 py-0.5 rounded-full border font-bold ${role === r ? 'bg-brand-600 text-white border-brand-600' : 'bg-white text-slate-500 border-slate-200'}`}>
+            className={`text-[13px] px-2 py-0.5 rounded-full border font-bold ${role === r ? 'bg-brand-600 text-white border-brand-600' : 'bg-white text-slate-500 border-slate-200'}`}>
             {r === 'parent' ? '家長' : r === 'member' ? '成員' : r === 'branch_leader' ? '支部領袖' : '管理員'}
           </button>
         ))}
-        {isLeader && <span className="text-[11px] text-emerald-700 font-bold">· 你可直接喺本頁管理</span>}
+        {isLeader && <span className="text-[13px] text-emerald-700 font-bold">· 你可直接喺本頁管理</span>}
         {role === 'member' && (
-          <label className="flex items-center gap-1 text-[11px] font-bold text-slate-600">
+          <label className="flex items-center gap-1 text-[13px] font-bold text-slate-600">
             <input type="checkbox" checked={adult} onChange={e => setAdult(e.target.checked)} />
             18 歲或以上（可自行報名）
           </label>
@@ -288,19 +288,19 @@ export default function ActivitiesPage() {
         <h1 className="font-bold text-lg m-0">🎯 活動</h1>
         {isLeader && (
           <div className="flex gap-1.5">
-            <button onClick={() => openNew('internal')} className="text-[11px] px-2.5 py-1 rounded-lg font-bold bg-brand-600 text-white">+ 新增旅團活動</button>
-            <button onClick={() => openNew('external')} className="text-[11px] px-2.5 py-1 rounded-lg font-bold bg-violet-600 text-white">📚 引入區／總會活動</button>
+            <button onClick={() => openNew('internal')} className="text-[13px] px-2.5 py-1 rounded-lg font-bold bg-brand-600 text-white">+ 新增旅團活動</button>
+            <button onClick={() => openNew('external')} className="text-[13px] px-2.5 py-1 rounded-lg font-bold bg-violet-600 text-white">📚 引入區／總會活動</button>
           </div>
         )}
       </div>
 
-      {msg && <div className="text-[11px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-xl px-3 py-2">{msg}</div>}
+      {msg && <div className="text-[13px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-xl px-3 py-2">{msg}</div>}
 
       {/* 篩選 */}
       <div className="flex gap-1.5">
         {([{ id: 'all', label: '全部' }, { id: 'internal', label: '🏠 旅團活動' }, { id: 'external', label: '🌐 區／總會' }] as const).map(f => (
           <button key={f.id} onClick={() => setFilter(f.id)}
-            className={`text-[11px] px-3 py-1.5 rounded-full font-bold border ${filter === f.id ? 'bg-brand-600 text-white border-brand-600' : 'bg-white text-slate-600 border-slate-200'}`}>
+            className={`text-[13px] px-3 py-1.5 rounded-full font-bold border ${filter === f.id ? 'bg-brand-600 text-white border-brand-600' : 'bg-white text-slate-600 border-slate-200'}`}>
             {f.label}
           </button>
         ))}
@@ -312,9 +312,9 @@ export default function ActivitiesPage() {
         {activeList.map(a => (
           <div key={a.id} className="bg-white rounded-2xl border border-slate-200 p-3.5 card-hover">
             <button onClick={() => { setDetail(a.id); setPreview(null); }} className="w-full text-left bg-transparent border-0 p-0 cursor-pointer">
-              <div className="flex items-center gap-1.5 flex-wrap">{kindBadge(a.kind)}<span className="font-bold text-[13px]">{a.title}</span><span className="text-[11px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded font-bold">🏷️ {a.tag}</span></div>
-              <div className="text-[11px] text-slate-500 mt-1">{a.date} · {a.location || '待定'} · {a.branch}{a.fee ? ` · ${a.fee}` : ''}</div>
-              <div className="text-[11px] text-slate-500 mt-0.5">
+              <div className="flex items-center gap-1.5 flex-wrap">{kindBadge(a.kind)}<span className="font-bold text-[13px]">{a.title}</span><span className="text-[13px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded font-bold">🏷️ {a.tag}</span></div>
+              <div className="text-[13px] text-slate-500 mt-1">{a.date} · {a.location || '待定'} · {a.branch}{a.fee ? ` · ${a.fee}` : ''}</div>
+              <div className="text-[13px] text-slate-500 mt-0.5">
                 {a.deadline ? `報名截止 ${a.deadline} · ` : ''}
                 {a.registerWay === 'app'
                   ? (a.quota ? `名額 ${a.registered}/${a.quota}` : '名額不限')
@@ -322,7 +322,7 @@ export default function ActivitiesPage() {
                 {a.notices.length > 0 && ` · 📎 通告 ${a.notices.length}`}
               </div>
               {a.myStatus !== 'unresponded' && (
-                <span className={`inline-block mt-1.5 text-[11px] px-1.5 py-0.5 rounded font-bold ${
+                <span className={`inline-block mt-1.5 text-[13px] px-1.5 py-0.5 rounded font-bold ${
                   a.myStatus === 'registered' ? 'bg-emerald-100 text-emerald-700' :
                   a.myStatus === 'declined' ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700'}`}>
                   {a.myStatus === 'registered' ? '✅ 已回覆參加' : a.myStatus === 'declined' ? '❌ 已回覆不參加' : '❤️ 已標記有興趣'}
@@ -331,9 +331,9 @@ export default function ActivitiesPage() {
             </button>
             {isLeader && (
               <div className="flex gap-1 justify-end mt-1.5">
-                <button onClick={() => openEdit(a.id)} className="text-[11px] text-slate-600 px-1.5 py-0.5 rounded hover:bg-slate-100" title="編輯">✏️ 編輯</button>
-                <button onClick={() => moveToExpired(a.id)} className="text-[11px] text-amber-700 px-1.5 py-0.5 rounded hover:bg-amber-50" title="移入過期區">⏰ 移入過期區</button>
-                <button onClick={() => del(a.id)} className="text-[11px] text-rose-600 px-1.5 py-0.5 rounded hover:bg-rose-50" title="刪除">🗑 刪除</button>
+                <button onClick={() => openEdit(a.id)} className="text-[13px] text-slate-600 px-1.5 py-0.5 rounded hover:bg-slate-100" title="編輯">✏️ 編輯</button>
+                <button onClick={() => moveToExpired(a.id)} className="text-[13px] text-amber-700 px-1.5 py-0.5 rounded hover:bg-amber-50" title="移入過期區">⏰ 移入過期區</button>
+                <button onClick={() => del(a.id)} className="text-[13px] text-rose-600 px-1.5 py-0.5 rounded hover:bg-rose-50" title="刪除">🗑 刪除</button>
               </div>
             )}
           </div>
@@ -349,11 +349,11 @@ export default function ActivitiesPage() {
             aria-expanded={showExpired}
           >
             <h3 className="font-bold text-sm m-0 flex items-center gap-2">
-              <span className="w-6 h-6 bg-slate-400 text-white rounded-lg flex items-center justify-center text-[11px]">⏰</span>
+              <span className="w-6 h-6 bg-slate-400 text-white rounded-lg flex items-center justify-center text-[13px]">⏰</span>
               過期區（{expiredList.length}）
             </h3>
             <span className="flex items-center gap-2">
-              <span className="text-[11px] text-slate-500 hidden sm:inline">由新至舊 · 已報名者仍可睇集合時間／地點</span>
+              <span className="text-[13px] text-slate-500 hidden sm:inline">由新至舊 · 已報名者仍可睇集合時間／地點</span>
               <span className="text-slate-500 text-xs">{showExpired ? '▲ 收合' : '▼ 展開'}</span>
             </span>
           </button>
@@ -363,16 +363,16 @@ export default function ActivitiesPage() {
                 <div key={a.id} className="bg-white rounded-xl border border-slate-200 p-3 card-hover">
                   <button onClick={() => { setDetail(a.id); setPreview(null); }} className="w-full text-left bg-transparent border-0 p-0 cursor-pointer">
                     <div className="flex items-center gap-1.5 flex-wrap">{kindBadge(a.kind)}<span className="font-bold text-[13px]">{a.title}</span>
-                      <span className="text-[11px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded font-bold">🏷️ {a.tag}</span>
-                      {a.expired && <span className="text-[11px] bg-slate-200 text-slate-600 px-1.5 py-0.5 rounded font-bold">已過期</span>}
+                      <span className="text-[13px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded font-bold">🏷️ {a.tag}</span>
+                      {a.expired && <span className="text-[13px] bg-slate-200 text-slate-600 px-1.5 py-0.5 rounded font-bold">已過期</span>}
                     </div>
-                    <div className="text-[11px] text-slate-500 mt-1">{a.date} · {a.location || '待定'} · {a.branch}</div>
-                    {a.myStatus === 'registered' && <span className="inline-block mt-1.5 text-[11px] px-1.5 py-0.5 rounded font-bold bg-emerald-100 text-emerald-700">✅ 你已報名（仍可睇集合資料）</span>}
+                    <div className="text-[13px] text-slate-500 mt-1">{a.date} · {a.location || '待定'} · {a.branch}</div>
+                    {a.myStatus === 'registered' && <span className="inline-block mt-1.5 text-[13px] px-1.5 py-0.5 rounded font-bold bg-emerald-100 text-emerald-700">✅ 你已報名（仍可睇集合資料）</span>}
                   </button>
                   {isLeader && (
                     <div className="flex gap-1 justify-end mt-1.5">
-                      <button onClick={() => restoreFromExpired(a.id)} className="text-[11px] text-slate-600 px-1.5 py-0.5 rounded hover:bg-slate-100" title="恢復">↺ 恢復</button>
-                      <button onClick={() => del(a.id)} className="text-[11px] text-rose-600 px-1.5 py-0.5 rounded hover:bg-rose-50" title="刪除">🗑 永久刪除</button>
+                      <button onClick={() => restoreFromExpired(a.id)} className="text-[13px] text-slate-600 px-1.5 py-0.5 rounded hover:bg-slate-100" title="恢復">↺ 恢復</button>
+                      <button onClick={() => del(a.id)} className="text-[13px] text-rose-600 px-1.5 py-0.5 rounded hover:bg-rose-50" title="刪除">🗑 永久刪除</button>
                     </div>
                   )}
                 </div>
@@ -387,7 +387,7 @@ export default function ActivitiesPage() {
         <div className="fixed inset-0 z-50 bg-black/30 flex items-end sm:items-center justify-center p-0 sm:p-4" onClick={() => setDetail(null)}>
           <div className="bg-white w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl p-4 space-y-3 max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
             <div className="flex items-center gap-1.5 flex-wrap">{kindBadge(current.kind)}<h3 className="font-bold text-sm m-0">{current.title}</h3></div>
-            <div className="text-[11px] text-slate-600 space-y-0.5">
+            <div className="text-[13px] text-slate-600 space-y-0.5">
               <div>📅 日期：{current.date}{current.deadline ? ` · 報名截止 ${current.deadline}` : ''}</div>
               <div>📍 地點：{current.location || '待定'}</div>
               <div>👥 對象：{current.branch}{current.fee ? ` · 💰 ${current.fee}` : ''}</div>
@@ -396,8 +396,8 @@ export default function ActivitiesPage() {
             </div>
             {current.summary && (
               <div className="bg-slate-50 rounded-xl p-3">
-                <div className="text-[11px] font-bold text-slate-500 mb-1">內文摘要（領袖填寫）</div>
-                <p className="text-[11px] text-slate-700 m-0 leading-relaxed whitespace-pre-wrap">{current.summary}</p>
+                <div className="text-[13px] font-bold text-slate-500 mb-1">內文摘要（領袖填寫）</div>
+                <p className="text-[13px] text-slate-700 m-0 leading-relaxed whitespace-pre-wrap">{current.summary}</p>
               </div>
             )}
             {current.notices.length > 0 && (() => {
@@ -405,7 +405,7 @@ export default function ActivitiesPage() {
               const n = current.notices[idx] || current.notices[0];
               return (
                 <div className="space-y-1.5">
-                  <div className="text-[11px] font-bold text-slate-500">
+                  <div className="text-[13px] font-bold text-slate-500">
                     📎 通告{current.notices.length > 1 ? `（${current.notices.length} 張，揀一張睇）` : ''}
                   </div>
                   {current.notices.length > 1 && (
@@ -420,8 +420,8 @@ export default function ActivitiesPage() {
                   {/* APP 內建內容：直接顯示，唔使開檔案 */}
                   {n.kind === 'inline' ? (
                     <div className="bg-brand-50 border border-brand-200 rounded-xl p-3">
-                      <div className="text-[11px] font-bold text-brand-700 mb-1">{n.label} · APP 內建</div>
-                      <p className="text-[11px] text-slate-700 m-0 leading-relaxed whitespace-pre-wrap">{n.body}</p>
+                      <div className="text-[13px] font-bold text-brand-700 mb-1">{n.label} · APP 內建</div>
+                      <p className="text-[13px] text-slate-700 m-0 leading-relaxed whitespace-pre-wrap">{n.body}</p>
                     </div>
                   ) : (
                     <>
@@ -430,11 +430,11 @@ export default function ActivitiesPage() {
                         <iframe src={toEmbedUrl(n.url || '')} title={n.label} className="w-full h-64 bg-white" />
                       </div>
                       <div className="flex gap-2">
-                        <a href={n.url} target="_blank" rel="noreferrer" className="flex-1 text-center text-[11px] font-bold text-brand-700 bg-brand-50 border border-brand-200 rounded-xl px-3 py-2 no-underline">
+                        <a href={n.url} target="_blank" rel="noreferrer" className="flex-1 text-center text-[13px] font-bold text-brand-700 bg-brand-50 border border-brand-200 rounded-xl px-3 py-2 no-underline">
                           ↗ 開新分頁睇原檔
                         </a>
                       </div>
-                      <p className="text-[11px] text-slate-400 m-0 leading-relaxed">
+                      <p className="text-[13px] text-slate-400 m-0 leading-relaxed">
                         💡 預覽載入唔到？有啲網站唔准內嵌，撳「開新分頁」就得。
                       </p>
                     </>
@@ -443,7 +443,7 @@ export default function ActivitiesPage() {
               );
             })()}
             <div className="rounded-xl bg-amber-50 border border-amber-200 p-2.5">
-              <p className="text-[11px] text-amber-800 m-0 leading-relaxed">
+              <p className="text-[13px] text-amber-800 m-0 leading-relaxed">
                 {current.registerWay === 'app'
                   ? 'ℹ️ 呢個係旅團活動：可以直接喺 APP 回覆，活動已自動列入行事曆。家長不用簽署：用家長帳戶登入報名＝已簽署。'
                   : 'ℹ️ 呢個係區／地域總會活動：有興趣請自己搵領袖報名。'}
@@ -451,7 +451,7 @@ export default function ActivitiesPage() {
             </div>
             {isLeader ? (
               <div className="flex gap-2">
-                <p className="flex-1 text-[11px] text-slate-500 m-0 self-center">領袖請用「編輯」或報名管理處理報名名單。</p>
+                <p className="flex-1 text-[13px] text-slate-500 m-0 self-center">領袖請用「編輯」或報名管理處理報名名單。</p>
                 <button onClick={() => setDetail(null)} className="flex-1 text-[12px] font-bold bg-slate-100 text-slate-600 py-2 rounded-xl">關閉</button>
               </div>
             ) : (
@@ -469,7 +469,7 @@ export default function ActivitiesPage() {
                 ) : (
                   <button onClick={() => respond(current.id, 'interested')} className="w-full text-[12px] font-bold bg-violet-600 text-white py-2 rounded-xl">❤️ 我有興趣（搵領袖報名）</button>
                 )}
-                <p className="text-[11px] text-slate-500 m-0 leading-relaxed">
+                <p className="text-[13px] text-slate-500 m-0 leading-relaxed">
                   {role === 'parent'
                     ? 'ℹ️ 家長可標示：有興趣／參加／不參加。選「參加」才需標記已付款；選「不參加」不用 tick。'
                     : adult
@@ -490,46 +490,46 @@ export default function ActivitiesPage() {
             <h3 className="font-bold text-sm m-0">
               {form.id ? '✏️ 編輯活動' : form.kind === 'internal' ? '➕ 新增旅團活動' : '📚 引入區／總會活動'}
             </h3>
-            <p className="text-[11px] text-slate-500 m-0 -mt-1 leading-relaxed">
+            <p className="text-[13px] text-slate-500 m-0 -mt-1 leading-relaxed">
               {form.kind === 'internal'
                 ? '旅團活動：儲存後會自動加入行事曆，並可掛上你自己嘅通告。'
                 : '區／總會活動：引入俾成員睇下有冇興趣，成員有興趣會自己搵領袖報名（取代以前抄返 WhatsApp 群組嘅做法）。'}
             </p>
             {form.kind === 'external' && !form.id && (
               <div className="rounded-xl border border-violet-200 bg-violet-50 p-3">
-                <div className="text-[11px] font-bold text-violet-800 mb-1">區／地域總會活動：兩種引入方式</div>
-                <p className="text-[11px] text-violet-700 m-0 leading-relaxed">
+                <div className="text-[13px] font-bold text-violet-800 mb-1">區／地域總會活動：兩種引入方式</div>
+                <p className="text-[13px] text-violet-700 m-0 leading-relaxed">
                   ① 從已接入的圖書館選通告；或 ② 直接貼上外部連結。兩種方式都要在這裡補上活動標籤及報名截止日期。
                 </p>
               </div>
             )}
-            <label className="flex items-center gap-2 text-[11px] font-bold text-slate-600">名稱<input className={inputCls} value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} placeholder={form.kind === 'internal' ? '例如：旅團露營' : '例如：地域領袖工作坊'} /></label>
-            <label className="flex items-center gap-2 text-[11px] font-bold text-slate-600">活動日期<input type="date" className={inputCls} value={form.date} onChange={e => setForm({ ...form, date: e.target.value })} /></label>
-            <label className="flex items-center gap-2 text-[11px] font-bold text-slate-600">報名截止<input type="date" className={inputCls} value={form.deadline} onChange={e => setForm({ ...form, deadline: e.target.value })} /></label>
-            <label className="flex items-center gap-2 text-[11px] font-bold text-slate-600">地點<input className={inputCls} value={form.location} onChange={e => setForm({ ...form, location: e.target.value })} placeholder="例如：西貢白沙灣" /></label>
-            <label className="flex items-center gap-2 text-[11px] font-bold text-slate-600">對象
+            <label className="flex items-center gap-2 text-[13px] font-bold text-slate-600">名稱<input className={inputCls} value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} placeholder={form.kind === 'internal' ? '例如：旅團露營' : '例如：地域領袖工作坊'} /></label>
+            <label className="flex items-center gap-2 text-[13px] font-bold text-slate-600">活動日期<input type="date" className={inputCls} value={form.date} onChange={e => setForm({ ...form, date: e.target.value })} /></label>
+            <label className="flex items-center gap-2 text-[13px] font-bold text-slate-600">報名截止<input type="date" className={inputCls} value={form.deadline} onChange={e => setForm({ ...form, deadline: e.target.value })} /></label>
+            <label className="flex items-center gap-2 text-[13px] font-bold text-slate-600">地點<input className={inputCls} value={form.location} onChange={e => setForm({ ...form, location: e.target.value })} placeholder="例如：西貢白沙灣" /></label>
+            <label className="flex items-center gap-2 text-[13px] font-bold text-slate-600">對象
               <select className={inputCls} value={form.branch} onChange={e => setForm({ ...form, branch: e.target.value })}>
                 {BRANCHES.map(b => <option key={b} value={b}>{b}</option>)}
               </select>
             </label>
-            <label className="flex items-center gap-2 text-[11px] font-bold text-slate-600">分類標籤
+            <label className="flex items-center gap-2 text-[13px] font-bold text-slate-600">分類標籤
               <select className={inputCls} value={form.tag} onChange={e => setForm({ ...form, tag: e.target.value })}>
                 {ACTIVITY_TAGS.map(t => <option key={t} value={t}>{t}</option>)}
               </select>
             </label>
-            <label className="flex items-center gap-2 text-[11px] font-bold text-slate-600">費用<input className={inputCls} value={form.fee} onChange={e => setForm({ ...form, fee: e.target.value })} placeholder="例如：$300 或 免費" /></label>
+            <label className="flex items-center gap-2 text-[13px] font-bold text-slate-600">費用<input className={inputCls} value={form.fee} onChange={e => setForm({ ...form, fee: e.target.value })} placeholder="例如：$300 或 免費" /></label>
             {form.kind === 'internal' && (
-              <label className="flex items-center gap-2 text-[11px] font-bold text-slate-600">名額<input type="number" min={0} className={inputCls} value={form.quota} onChange={e => setForm({ ...form, quota: Number(e.target.value) })} placeholder="0＝不限" /></label>
+              <label className="flex items-center gap-2 text-[13px] font-bold text-slate-600">名額<input type="number" min={0} className={inputCls} value={form.quota} onChange={e => setForm({ ...form, quota: Number(e.target.value) })} placeholder="0＝不限" /></label>
             )}
-            <label className="flex flex-col gap-1 text-[11px] font-bold text-slate-600">內文摘要（領袖自己填，系統唔會自動讀通告內容）
+            <label className="flex flex-col gap-1 text-[13px] font-bold text-slate-600">內文摘要（領袖自己填，系統唔會自動讀通告內容）
               <textarea rows={3} className="rounded-lg border border-slate-200 px-2 py-1.5 text-xs" value={form.summary} onChange={e => setForm({ ...form, summary: e.target.value })} placeholder="重點內容、集合時間、要帶咩" />
             </label>
 
             {/* 通告：旅團活動三種方法；區／地域總會活動兩種方法 */}
             <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-3 space-y-2">
               <div>
-                <div className="text-[11px] font-bold text-slate-600">📎 活動通告（可加入多張）</div>
-                <p className="text-[11px] text-slate-500 m-0 mt-1 leading-relaxed">
+                <div className="text-[13px] font-bold text-slate-600">📎 活動通告（可加入多張）</div>
+                <p className="text-[13px] text-slate-500 m-0 mt-1 leading-relaxed">
                   {form.kind === 'internal'
                     ? '旅團自辦活動：模板、貼現成連結、或直接輸入內容，三種都可以。'
                     : '區／地域總會活動：從圖書館引入，或直接貼上外部連結。'}
@@ -538,11 +538,11 @@ export default function ActivitiesPage() {
 
               {form.notices.map((n, i) => (
                 <div key={i} className="flex items-center gap-2 bg-white rounded-lg border border-slate-200 px-2 py-1.5">
-                  <span className="text-[11px] bg-slate-100 text-slate-600 rounded px-1.5 py-0.5 flex-shrink-0">
+                  <span className="text-[13px] bg-slate-100 text-slate-600 rounded px-1.5 py-0.5 flex-shrink-0">
                     {n.source === 'library' ? '📚 圖書館' : n.source === 'template' ? '📋 模板' : n.kind === 'inline' ? '📝 內建' : '🔗 連結'}
                   </span>
-                  <span className="flex-1 min-w-0 text-[11px] text-slate-700 truncate">{n.label}</span>
-                  <button type="button" onClick={() => removeNotice(i)} className="text-[11px] text-rose-600 px-1.5 py-0.5 rounded hover:bg-rose-50">移除</button>
+                  <span className="flex-1 min-w-0 text-[13px] text-slate-700 truncate">{n.label}</span>
+                  <button type="button" onClick={() => removeNotice(i)} className="text-[13px] text-rose-600 px-1.5 py-0.5 rounded hover:bg-rose-50">移除</button>
                 </div>
               ))}
 
@@ -554,7 +554,7 @@ export default function ActivitiesPage() {
                     { id: 'inline' as const, label: '📝 直接輸入' },
                   ]).map(method => (
                     <button key={method.id} type="button" onClick={() => { setNoticeSourcingMethod(method.id); setNoticeDraft({ ...noticeDraft, kind: method.id === 'inline' ? 'inline' : 'link' }); setFormErr(''); }}
-                      className={`text-[11px] font-bold px-2 py-1.5 rounded-lg border ${noticeSourcingMethod === method.id ? 'bg-slate-700 text-white border-slate-700' : 'bg-white text-slate-600 border-slate-200'}`}>
+                      className={`text-[13px] font-bold px-2 py-1.5 rounded-lg border ${noticeSourcingMethod === method.id ? 'bg-slate-700 text-white border-slate-700' : 'bg-white text-slate-600 border-slate-200'}`}>
                       {method.label}
                     </button>
                   ))
@@ -564,7 +564,7 @@ export default function ActivitiesPage() {
                     { id: 'link' as const, label: '🔗 貼上外部連結' },
                   ]).map(method => (
                     <button key={method.id} type="button" onClick={() => { setNoticeSourcingMethod(method.id); setNoticeDraft({ ...noticeDraft, kind: 'link' }); setFormErr(''); }}
-                      className={`text-[11px] font-bold px-2 py-1.5 rounded-lg border ${noticeSourcingMethod === method.id ? 'bg-violet-700 text-white border-violet-700' : 'bg-white text-slate-600 border-slate-200'}`}>
+                      className={`text-[13px] font-bold px-2 py-1.5 rounded-lg border ${noticeSourcingMethod === method.id ? 'bg-violet-700 text-white border-violet-700' : 'bg-white text-slate-600 border-slate-200'}`}>
                       {method.label}
                     </button>
                   ))
@@ -576,13 +576,13 @@ export default function ActivitiesPage() {
                   <select className="w-full rounded-lg border border-slate-200 px-2 py-1.5 text-xs" value={libraryNoticeId} onChange={e => setLibraryNoticeId(e.target.value)}>
                     {LIBRARY_NOTICES.map(n => <option key={n.id} value={n.id}>{n.title} · {n.source}</option>)}
                   </select>
-                  <p className="text-[11px] text-violet-700 m-0 leading-relaxed">揀選後會帶入圖書館通告連結；活動標籤及截止日期仍由你決定。</p>
+                  <p className="text-[13px] text-violet-700 m-0 leading-relaxed">揀選後會帶入圖書館通告連結；活動標籤及截止日期仍由你決定。</p>
                 </>
               ) : noticeSourcingMethod === 'template' ? (
                 <>
                   <input className="w-full rounded-lg border border-slate-200 px-2 py-1.5 text-xs" placeholder="通告名稱（例如：露營通告）" value={noticeDraft.label} onChange={e => setNoticeDraft({ ...noticeDraft, label: e.target.value })} />
-                  <p className="text-[11px] text-slate-500 m-0 leading-relaxed">先下載模板填寫，之後可上傳到 Drive，再用「貼上連結」加入旅團自己的檔案。</p>
-                  <Link href="/dashboard/templates" className="inline-flex text-[11px] font-bold text-brand-700 bg-brand-50 border border-brand-200 rounded-lg px-2.5 py-1.5 no-underline">⬇️ 下載活動通告模板</Link>
+                  <p className="text-[13px] text-slate-500 m-0 leading-relaxed">先下載模板填寫，之後可上傳到 Drive，再用「貼上連結」加入旅團自己的檔案。</p>
+                  <Link href="/dashboard/templates" className="inline-flex text-[13px] font-bold text-brand-700 bg-brand-50 border border-brand-200 rounded-lg px-2.5 py-1.5 no-underline">⬇️ 下載活動通告模板</Link>
                 </>
               ) : noticeSourcingMethod === 'link' ? (
                 <>
@@ -596,10 +596,10 @@ export default function ActivitiesPage() {
                 </>
               )}
 
-              <button type="button" onClick={addNotice} className="w-full text-[11px] font-bold bg-slate-700 text-white px-2.5 py-1.5 rounded-lg">＋ 加入通告</button>
+              <button type="button" onClick={addNotice} className="w-full text-[13px] font-bold bg-slate-700 text-white px-2.5 py-1.5 rounded-lg">＋ 加入通告</button>
             </div>
 
-            {formErr && <p className="text-[11px] font-bold text-rose-700 bg-rose-50 rounded-lg px-2 py-1.5 m-0">{formErr}</p>}
+            {formErr && <p className="text-[13px] font-bold text-rose-700 bg-rose-50 rounded-lg px-2 py-1.5 m-0">{formErr}</p>}
             <div className="flex gap-2 pt-1">
               <button onClick={save} className="flex-1 text-[12px] font-bold bg-brand-600 text-white py-2 rounded-xl">儲存</button>
               <button onClick={() => { setForm(null); setFormErr(''); }} className="flex-1 text-[12px] font-bold bg-slate-100 text-slate-600 py-2 rounded-xl">取消</button>

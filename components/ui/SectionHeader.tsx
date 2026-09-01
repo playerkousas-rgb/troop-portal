@@ -45,11 +45,11 @@ export default function SectionHeader({ icon, title, subtitle, badge, color }: S
         </span>
         {title}
         {subtitle && (
-          <span className="text-[11px] text-slate-500 font-normal">{subtitle}</span>
+          <span className="text-[13px] text-slate-500 font-normal">{subtitle}</span>
         )}
       </h3>
       {badge && (
-        <span className={`text-[11px] px-2 py-0.5 rounded-full border font-semibold ${c.badgeBg}`}>
+        <span className={`text-[13px] px-2 py-0.5 rounded-full border font-semibold ${c.badgeBg}`}>
           {badge}
         </span>
       )}

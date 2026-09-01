@@ -43,28 +43,28 @@ export default function Panel({
         type="button"
         onClick={() => setOpen(o => !o)}
         aria-expanded={open}
-        className="w-full flex items-center justify-between gap-2 px-4 py-3 bg-white hover:bg-slate-50 transition text-left cursor-pointer"
+        className="w-full flex items-center justify-between gap-2 px-4 py-3.5 bg-white hover:bg-slate-50 transition text-left cursor-pointer"
       >
-        <span className="flex items-center gap-2.5 min-w-0">
+        <span className="flex items-center gap-3 min-w-0">
           <span
-            className={`w-7 h-7 ${ICON_TONE[tone]} text-white rounded-lg flex items-center justify-center text-sm flex-shrink-0`}
+            className={`w-8 h-8 ${ICON_TONE[tone]} text-white rounded-lg flex items-center justify-center text-base flex-shrink-0`}
             aria-hidden
           >
             {icon}
           </span>
           <span className="block min-w-0">
-            <span className="block font-bold text-sm text-slate-800 leading-tight">{title}</span>
+            <span className="block font-bold text-base text-slate-800 leading-tight">{title}</span>
             {subtitle && (
-              <span className="block text-[11px] text-slate-500 font-semibold leading-tight mt-0.5 truncate">
+              <span className="block text-sm text-slate-500 font-semibold leading-tight mt-1 truncate">
                 {subtitle}
               </span>
             )}
           </span>
         </span>
         <span className="flex items-center gap-2 flex-shrink-0">
-          {count !== undefined && <span className="text-[11px] text-slate-500 font-bold">{count}</span>}
+          {count !== undefined && <span className="text-sm text-slate-500 font-bold">{count}</span>}
           <span
-            className={`text-[10px] text-slate-400 transition-transform duration-200 ${open ? 'rotate-180' : ''}`}
+            className={`text-sm text-slate-400 transition-transform duration-200 ${open ? 'rotate-180' : ''}`}
             aria-hidden
           >
             ▼

@@ -61,12 +61,12 @@ export default function Downloads() {
               <span className="flex items-center gap-2 flex-wrap">
                 <span className="font-bold text-sm text-slate-800">{t.title}</span>
                 {t.tag && (
-                  <span className="text-[10px] font-black bg-brand-100 text-brand-700 rounded-full px-2 py-0.5">{t.tag}</span>
+                  <span className="text-[12px] font-black bg-brand-100 text-brand-700 rounded-full px-2 py-0.5">{t.tag}</span>
                 )}
               </span>
-              <span className="block text-[11px] text-slate-500 mt-0.5 leading-relaxed">{t.desc}</span>
+              <span className="block text-sm text-slate-500 mt-0.5 leading-relaxed">{t.desc}</span>
             </span>
-            <span className="text-[11px] font-bold text-brand-700 bg-brand-50 border border-brand-200 rounded-xl px-2.5 py-1.5 flex-shrink-0">⬇️ 下載</span>
+            <span className="text-sm font-bold text-brand-700 bg-brand-50 border border-brand-200 rounded-xl px-2.5 py-1.5 flex-shrink-0">⬇️ 下載</span>
           </a>
         ))}
       </div>

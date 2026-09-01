@@ -57,20 +57,20 @@ export default function TopNav() {
         <Link href={user ? home : '/'} className="flex items-center gap-2 no-underline min-w-0">
           <div className="w-8 h-8 bg-scout-blue text-white rounded-xl flex items-center justify-center text-sm flex-shrink-0">⚜</div>
           {mockOn && (
-            <span className="text-[11px] font-black bg-amber-100 text-amber-700 border border-amber-300 rounded-full px-1.5 py-0.5 flex-shrink-0">🎭 DEMO</span>
+            <span className="text-sm font-black bg-amber-100 text-amber-700 border border-amber-300 rounded-full px-1.5 py-0.5 flex-shrink-0">🎭 DEMO</span>
           )}
           <div className="min-w-0">
             {user ? (
               <>
                 <div className="font-bold text-xs text-slate-800 truncate">{user.name}</div>
-                <div className="text-[11px] text-slate-500 font-semibold">
+                <div className="text-sm text-slate-500 font-semibold">
                   {troop?.name || '旅團'} · {ROLE_LABEL[user.role as Role] || user.role}
                 </div>
               </>
             ) : (
               <>
                 <div className="font-bold text-xs text-scout-blue truncate">{hideAuth ? 'Scout System' : troop?.name || '旅團管理系統'}</div>
-                {!hideAuth && <div className="text-[11px] text-slate-500 font-semibold">2026 Scout System</div>}
+                {!hideAuth && <div className="text-sm text-slate-500 font-semibold">2026 Scout System</div>}
               </>
             )}
           </div>
@@ -82,7 +82,7 @@ export default function TopNav() {
             {showHomeSetup ? (
               <Link
                 href="/setup"
-                className="inline-flex items-center gap-1.5 no-underline text-[11px] sm:text-xs font-bold text-violet-700 bg-violet-50 border border-violet-200 px-2.5 py-1.5 rounded-xl hover:bg-violet-100 transition whitespace-nowrap"
+                className="inline-flex items-center gap-1.5 no-underline text-sm font-bold text-violet-700 bg-violet-50 border border-violet-200 px-2.5 py-1.5 rounded-xl hover:bg-violet-100 transition whitespace-nowrap"
               >
                 <span aria-hidden>📖</span> 新旅團申請及教學
               </Link>
@@ -113,7 +113,7 @@ export default function TopNav() {
                   <div className="relative">
                     <button
                       onClick={() => setShowMenu(!showMenu)}
-                      className="text-[11px] font-bold text-slate-600 bg-slate-100 px-2 py-1 rounded-lg hover:bg-slate-200 transition flex items-center gap-1"
+                      className="text-sm font-bold text-slate-600 bg-slate-100 px-2.5 py-1.5 rounded-lg hover:bg-slate-200 transition flex items-center gap-1"
                     >
                       <span>⋮</span>
                     </button>
@@ -149,7 +149,7 @@ export default function TopNav() {
                 ) : (
                   <Link
                     href="/login"
-                    className="text-[11px] font-bold text-white bg-brand-600 px-2.5 py-1 rounded-lg hover:bg-brand-700 transition"
+                    className="text-sm font-bold text-white bg-brand-600 px-3 py-1.5 rounded-lg hover:bg-brand-700 transition"
                   >
                     登入
                   </Link>
