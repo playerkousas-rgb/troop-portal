@@ -1,17 +1,9 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { AppState, loadStateSlice } from '@/lib/store';
-import { apiSaveConfig } from '@/lib/api';
+import { apiSaveConfig, apiTogglePluginStatus } from '@/lib/api';
 import Link from 'next/link';
-
-const QUICK_CONTROLS = [
-  { href: '/admin/users#bulk-onboard', icon: '📥', title: '批量開戶', text: '前端上傳 CSV / JSON，一次建立帳號及成員。' },
-  { href: '/admin/branches', icon: '🏢', title: '支部 / 小隊', text: '設定支部、小隊、啟用狀態。' },
-  { href: '/admin/members', icon: '👥', title: '成員資料', text: '新增、編輯、連結家長及更改密碼。' },
-  { href: '/admin/events', icon: '🗓️', title: '活動', text: '建立、發布、更新活動及收款連結。' },
-  { href: '/admin/calendar', icon: '📅', title: '行事曆', text: '管理恆常集會及取消集會。' },
-  { href: '/admin/plugins', icon: '🧩', title: '元件', text: '前端設定 Tier 2 / Tier 3 元件 URL。' },
-];
+import Auth from '@/components/Auth';
 
 const FRIENDLY_LABELS: Record<string, string> = {
   TROOP_CODE: '旅團號碼',
@@ -19,81 +11,207 @@ const FRIENDLY_LABELS: Record<string, string> = {
   ADMIN_EMAIL: '主要管理員 Email',
   ADMIN_DEFAULT_PASSWORD: '預設管理員密碼',
   ANNOUNCEMENT_FOLDER_ID: '公告 PDF Drive 資料夾 ID',
+  MEETINGS_FOLDER_ID: '會議文件 Drive 資料夾 ID',
   REGISTRY_URL: '元件市場 Registry URL',
   STAFF_TOKEN: '首次登入 STAFF_TOKEN',
   PUBLIC_VIEW: '公開瀏覽（未登入可唔可以睇公開資料）',
   system_locked: '系統鎖定（true / false）',
 };
 
-export default function Page(){
-  const [s,setS]=useState<AppState|null>(null);
-  const [err,setErr]=useState('');
-  const [ok,setOk]=useState('');
-  const [saving,setSaving]=useState('');
-  useEffect(()=>{loadStateSlice(['config']).then(setS).catch(e=>setErr(e.message))},[]);
+/** 大而清晰的開關 —— 用戶一看就知道現在是開／關 */
+function BigSwitch({ on, onToggle, onLabel, offLabel, busy }: {
+  on: boolean;
+  onToggle: () => void;
+  onLabel: string;
+  offLabel: string;
+  busy?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      disabled={busy}
+      onClick={onToggle}
+      className={`flex items-center justify-between gap-3 w-full rounded-2xl px-4 py-3.5 border-2 text-left cursor-pointer transition disabled:opacity-60 ${
+        on ? 'bg-emerald-50 border-emerald-400' : 'bg-slate-50 border-slate-300'
+      }`}
+    >
+      <span className="flex items-center gap-2.5">
+        <span className={`text-xl`} aria-hidden>{on ? '🟢' : '🔴'}</span>
+        <span className={`font-black text-base ${on ? 'text-emerald-800' : 'text-slate-600'}`}>
+          {on ? onLabel : offLabel}
+        </span>
+      </span>
+      <span
+        className={`relative inline-flex h-9 w-16 flex-shrink-0 items-center rounded-full transition ${on ? 'bg-emerald-500' : 'bg-slate-300'}`}
+        aria-hidden
+      >
+        <span className={`inline-block h-7 w-7 transform rounded-full bg-white shadow transition ${on ? 'translate-x-8' : 'translate-x-1'}`} />
+      </span>
+    </button>
+  );
+}
 
-  async function save(k:string,v:string){
-    setErr('');setOk('');setSaving(k);
-    try{const f=await apiSaveConfig(k,v);setS(f);setOk('✅ 已由前端儲存 '+(FRIENDLY_LABELS[k]||k));}
-    catch(e:any){setErr(e.message)}finally{setSaving('')}
+export default function Page() {
+  const [s, setS] = useState<AppState | null>(null);
+  const [err, setErr] = useState('');
+  const [ok, setOk] = useState('');
+  const [busy, setBusy] = useState('');
+  const [folderIds, setFolderIds] = useState<{ key: string; value: string }[]>([]);
+
+  useEffect(() => {
+    loadStateSlice(['config', 'plugins', 'pluginSettings'])
+      .then(st => {
+        setS(st);
+        setFolderIds([
+          { key: 'ANNOUNCEMENT_FOLDER_ID', value: st.config.ANNOUNCEMENT_FOLDER_ID || '' },
+          { key: 'MEETINGS_FOLDER_ID', value: st.config.MEETINGS_FOLDER_ID || '' },
+        ]);
+      })
+      .catch(e => setErr(e.message));
+  }, []);
+
+  async function save(key: string, v: string) {
+    setErr(''); setOk(''); setBusy(key);
+    try { const f = await apiSaveConfig(key, v); setS(f); setOk('✅ 已儲存 ' + (FRIENDLY_LABELS[key] || key)); }
+    catch (e: any) { setErr(e.message); } finally { setBusy(''); }
   }
 
-  /** 未登入可唔可以睇公開資料（TRUE / FALSE） */
-  async function togglePublicView(){
-    if(!s) return;
-    const on = String(s.config.PUBLIC_VIEW || '').trim().toLowerCase();
-    const next = ['false','0','off','no'].includes(on) || !on ? 'FALSE' : 'TRUE';
-    // 未設定過 → 第一次按即係關閉公開瀏覽
-    await save('PUBLIC_VIEW', on ? next : 'FALSE');
+  async function togglePublicView() {
+    if (!s) return;
+    const on = ['false', '0', 'off', 'no'].includes(String(s.config.PUBLIC_VIEW || '').trim().toLowerCase());
+    setBusy('PUBLIC_VIEW');
+    try { const f = await apiSaveConfig('PUBLIC_VIEW', on ? 'TRUE' : 'FALSE'); setS(f); }
+    catch (e: any) { setErr(e.message); } finally { setBusy(''); }
   }
 
-  async function toggleLock(){
-    if(!s) return;
-    const next = String(s.config.system_locked || '').toLowerCase()==='true' ? 'false' : 'true';
-    await save('system_locked', next);
+  async function toggleLock() {
+    if (!s) return;
+    setBusy('system_locked');
+    const next = String(s.config.system_locked || '').toLowerCase() === 'true' ? 'false' : 'true';
+    try { const f = await apiSaveConfig('system_locked', next); setS(f); }
+    catch (e: any) { setErr(e.message); } finally { setBusy(''); }
   }
 
-  if(!s)return <div className="card">{err||'載入中...'}</div>;
-  const locked = String(s.config.system_locked || '').toLowerCase()==='true';
-  // 未設定 PUBLIC_VIEW → 預設開放（保持舊旅團現有行為）
-  const publicOn = !['false','0','off','no'].includes(String(s.config.PUBLIC_VIEW || '').trim().toLowerCase());
+  async function togglePlugin(id: string) {
+    setErr(''); setBusy('plugin-' + id);
+    try { const f = await apiTogglePluginStatus(id); setS(f); }
+    catch (e: any) { setErr(e.message); } finally { setBusy(''); }
+  }
 
-  return <div className="stack"><section className="hero"><span className="badge gold">全前端控制</span><h1>系統設定 / 控制中心</h1><p>日常操作不需要打開 Google Sheet：開戶、成員、活動、行事曆、元件及 SystemConfig 都可在前端完成。</p></section>
-    {err&&<p className="badge red">{err}</p>}{ok&&<p className="badge green">{ok}</p>}
+  if (!s) return <div className="card">{err || '載入中...'}</div>;
 
-    <section className="grid">
-      <div className="card stack">
-        <span className={`badge ${locked?'red':'green'}`}>{locked?'系統已鎖定':'系統開放中'}</span>
-        <h3>服務開關</h3>
-        <p className="muted">鎖定後一般用戶暫停登入；技術測試帳號仍可進入排查。</p>
-        <button className={`btn ${locked?'primary':'gold'}`} disabled={!!saving} onClick={toggleLock}>{locked?'解除鎖定':'暫停服務 / 鎖定系統'}</button>
-      </div>
-      <div className="card stack">
-        <span className={`badge ${publicOn?'green':'red'}`}>{publicOn?'公開瀏覽：開放':'公開瀏覽：已關閉'}</span>
-        <h3>未登入可唔可以睇公開資料</h3>
-        <p className="muted">開放：任何人揀咗旅團就可以睇公開行事曆／公告／活動（唔使開帳戶）。關閉：必須登入先睇到，其他人乜都睇唔到。</p>
-        <button className={`btn ${publicOn?'gold':'primary'}`} disabled={!!saving} onClick={togglePublicView}>{publicOn?'關閉公開瀏覽（改為必須登入）':'開放公開瀏覽'}</button>
-      </div>
-      <div className="card stack">
-        <span className="badge blue">小白友善</span>
-        <h3>不用改 Sheet</h3>
-        <p className="muted">如果要改資料，請優先使用下方前端入口；Sheet 保留作備份及進階修復。</p>
-        <Link href="/admin/audit" className="btn">查看操作紀錄</Link>
-      </div>
+  const locked = String(s.config.system_locked || '').toLowerCase() === 'true';
+  const publicOn = !['false', '0', 'off', 'no'].includes(String(s.config.PUBLIC_VIEW || '').trim().toLowerCase());
+  const plugins = s.plugins || [];
+
+  return <Auth roles={['super_admin', 'troop_super', 'admin']}><div className="max-w-3xl mx-auto space-y-4">
+    <section className="bg-gradient-to-br from-slate-800 to-slate-600 text-white rounded-2xl px-5 py-5 shadow-lg">
+      <h1 className="font-black text-2xl leading-tight m-0">⚙️ 系統設定</h1>
+      <p className="text-base text-white/85 mt-1.5 mb-0 leading-relaxed">
+        服務開關、公開瀏覽、操作紀錄、元件及單位元件設定。開關狀態會即時清楚顯示（🟢 開啟／🔴 關閉）。
+      </p>
     </section>
 
-    <section className="grid">
-      {QUICK_CONTROLS.map(c=><Link key={c.href} href={c.href} className="card feature-card"><div style={{fontSize:28}}>{c.icon}</div><h3>{c.title}</h3><p className="muted">{c.text}</p></Link>)}
-    </section>
+    {err && <p className="badge red" style={{ display: 'block' }}>{err}</p>}
+    {ok && <p className="badge green" style={{ display: 'block' }}>{ok}</p>}
 
+    {/* 1. 系統開放中（清晰開關） */}
     <section className="card stack">
-      <div className="row" style={{justifyContent:'space-between'}}><h3>SystemConfig 前端編輯</h3><Link href="/admin/plugins" className="btn gold">⚙️ 單位元件設定</Link></div>
-      <p className="muted">修改欄位後離開輸入框會自動儲存。API Key Hash 等敏感欄位如非必要請勿更改。</p>
+      <h3 className="m-0">🔒 系統開放中</h3>
+      <p className="muted m-0">鎖定後一般用戶暫停登入；技術測試帳號仍可進入排查。</p>
+      <BigSwitch
+        on={!locked}
+        busy={busy === 'system_locked'}
+        onToggle={toggleLock}
+        onLabel="系統開放中"
+        offLabel="系統已鎖定（暫停服務）"
+      />
+    </section>
+
+    {/* 2. 公開瀏覽（清晰開關） */}
+    <section className="card stack">
+      <h3 className="m-0">🌐 公開瀏覽</h3>
+      <p className="muted m-0">開放：未登入都可以睇公開行事曆／公告／活動。關閉：必須登入先睇到。</p>
+      <BigSwitch
+        on={publicOn}
+        busy={busy === 'PUBLIC_VIEW'}
+        onToggle={togglePublicView}
+        onLabel="公開瀏覽：開放"
+        offLabel="公開瀏覽：已關閉"
+      />
+    </section>
+
+    {/* 3. 查看操作紀錄 */}
+    <section className="card stack">
+      <h3 className="m-0">📜 查看操作紀錄</h3>
+      <p className="muted m-0">所有操作（含審核紀錄）已合併喺一處，並按類別分類。</p>
+      <Link href="/admin/audit" className="btn primary" style={{ alignSelf: 'flex-start' }}>查看操作紀錄 →</Link>
+    </section>
+
+    {/* 4. 元件 */}
+    <section className="card stack">
+      <h3 className="m-0">🧩 元件</h3>
+      <p className="muted m-0">管理已安裝的 2／3 級元件網址與金鑰，並到元件市場安裝新元件。</p>
+      <div className="row">
+        <Link href="/admin/plugins" className="btn primary">單位元件設定 →</Link>
+        <Link href="/marketplace" className="btn gold">🧩 元件市場</Link>
+        <Link href="/connectors" className="btn">🔀 轉駁中心</Link>
+      </div>
+    </section>
+
+    {/* 5. 單位元件設定（清晰開關）＋ Drive 資料夾 */}
+    <section className="card stack">
+      <h3 className="m-0">🔌 單位元件設定</h3>
+      <p className="muted m-0">逐個單位元件開／關（狀態即時清楚顯示）。</p>
+      {plugins.length === 0 ? (
+        <p className="muted m-0">尚未安裝任何擴充元件。簽到／點名已內建，無需在此安裝。</p>
+      ) : (
+        <div className="stack" style={{ gap: 12 }}>
+          {plugins.map(p => (
+            <BigSwitch
+              key={p.id}
+              on={p.enabled}
+              busy={busy === 'plugin-' + p.id}
+              onToggle={() => togglePlugin(p.id)}
+              onLabel={`${p.icon} ${p.title} — 開啟中`}
+              offLabel={`${p.icon} ${p.title} — 已停用`}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* Drive 資料夾設定（也可在本身頁面設定，如會議管理） */}
+      <div style={{ borderTop: '1px solid var(--line)', paddingTop: 14 }}>
+        <h3 className="m-0">🗂 Drive 資料夾設定</h3>
+        <p className="muted m-0">亦可在本身頁面設定（例如會議管理、公告頁）。資料夾需設為「知道連結的人都可檢視」。</p>
+        <div className="grid">
+          {folderIds.map(f => (
+            <label key={f.key}>
+              <span><b>{FRIENDLY_LABELS[f.key] || f.key}</b> <span className="muted">{f.key}</span></span>
+              <input
+                defaultValue={f.value}
+                disabled={busy === f.key}
+                placeholder="貼上資料夾 ID 或完整 URL"
+                onBlur={e => { if (e.target.value !== f.value) save(f.key, e.target.value); }}
+              />
+            </label>
+          ))}
+        </div>
+      </div>
+    </section>
+
+    {/* SystemConfig 前端編輯（保留，收合區） */}
+    <details className="card">
+      <summary style={{ cursor: 'pointer', fontWeight: 800 }}>🔧 SystemConfig 前端編輯（進階）</summary>
+      <p className="muted">修改欄位後離開輸入框會自動儲存。敏感欄位如非必要請勿更改。</p>
       <div className="grid">
-        {Object.entries(s.config).map(([k,v])=>(
-          <label key={k} className="stack" style={{gap:6}}><span><b>{FRIENDLY_LABELS[k]||k}</b> <span className="muted">{k}</span></span><input key={k+v} defaultValue={v} disabled={saving===k} onBlur={e=>{if(e.target.value!==v)save(k,e.target.value)}}/></label>
+        {Object.entries(s.config).map(([k, v]) => (
+          <label key={k}>
+            <span><b>{FRIENDLY_LABELS[k] || k}</b> <span className="muted">{k}</span></span>
+            <input key={k + v} defaultValue={v} disabled={busy === k} onBlur={e => { if (e.target.value !== v) save(k, e.target.value); }} />
+          </label>
         ))}
       </div>
-    </section>
-  </div>;
+    </details>
+  </div></Auth>;
 }

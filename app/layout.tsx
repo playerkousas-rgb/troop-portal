@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import TopNav from '@/components/layout/TopNav';
+import LatestNewsBar from '@/components/LatestNewsBar';
 import BottomNav from '@/components/layout/BottomNav';
 import SiteFooter from '@/components/layout/SiteFooter';
 import './globals.css';
@@ -14,6 +15,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="zh-HK">
       <body>
         <TopNav />
+        <LatestNewsBar />
         <main className="page-container">{children}</main>
         <SiteFooter />
         <BottomNav />

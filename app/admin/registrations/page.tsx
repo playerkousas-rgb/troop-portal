@@ -1,6 +1,6 @@
 'use client';
 import { Suspense, useEffect, useState } from 'react';
-import { AppState, loadState, loadStateSlice, replyStatus } from '@/lib/store';
+import { AppState, loadState, loadStateSlice, replyStatus, eventCategory } from '@/lib/store';
 import { apiTogglePaid } from '@/lib/api';
 import { useSearchParams } from 'next/navigation';
 
@@ -64,8 +64,8 @@ function RegistrationsInner(){
   if(!s)return <div className="card">{err||'載入中...'}</div>;
   const event=s.events.find(e=>e.id===eventId);
   
-  const internalEvents = s.events.filter(e => e.kind !== 'notice_troop_participation' && e.source !== '圖書館引入');
-  const externalEvents = s.events.filter(e => e.kind === 'notice_troop_participation' || e.source === '圖書館引入');
+  const internalEvents = s.events.filter(e => eventCategory(e) === 'self');
+  const externalEvents = s.events.filter(e => eventCategory(e) === 'district');
 
   const memberTargets = event ? s.members.filter(m => event.targetMemberIds.includes(m.id)) : [];
   const userTargets = event ? s.users.filter(u => event.targetMemberIds.includes(u.id) && !memberTargets.some(m => m.id === u.id)) : [];
@@ -113,25 +113,25 @@ function RegistrationsInner(){
 
   return <div className="stack">
     <section className="hero">
-      <span className="badge gold">報名統計與分層對賬</span>
-      <h1>活動報名名單與分層對賬管理</h1>
-      <p>雙下拉選單分流自辦與外部通告，7大直式格完整呈現各支部與領袖出席，點選狀態即可展開具體名單，雙大格直列童軍及幼童軍成員意願與付款。</p>
+      <span className="badge gold">活動統計</span>
+      <h1>📊 活動統計（自行舉辦 ＝ 區地域總會 ＝ 通告統計）</h1>
+      <p>活動統計統一在此：雙下拉選單分流「自行舉辦」與「區地域總會活動（原圖書館引入）」，7大直式格完整呈現各支部與領袖出席，點選狀態即可展開具體名單。</p>
     </section>
     {err&&<p className="badge red">{err}</p>}
 
     {/* 1. 雙下拉選單選擇活動 */}
     <section className="grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 16 }}>
       <div className="card stack" style={{ borderTop: '4px solid #1a73e8', background: '#f8fafc' }}>
-        <strong style={{ fontSize: '1.05rem', color: '#1a73e8' }}>🎪 旅團內部主辦／自辦活動：</strong>
+        <strong style={{ fontSize: '1.05rem', color: '#1a73e8' }}>🏠 自行舉辦（原旅團自辦）：</strong>
         <select value={eventId} onChange={e=>{setEventId(e.target.value);setPaidOverrides({});setExpandedGroup(null);setExpandedOverallStatus(null);setExpandedBranchStatus(null);}}>
-          {internalEvents.length===0&&<option value="">無自辦活動</option>}
+          {internalEvents.length===0&&<option value="">無自行舉辦活動</option>}
           {internalEvents.map(e=><option key={e.id} value={e.id}>{e.title} ({e.date})</option>)}
         </select>
       </div>
       <div className="card stack" style={{ borderTop: '4px solid #f9ab00', background: '#fffef0' }}>
-        <strong style={{ fontSize: '1.05rem', color: '#b06000' }}>📚 外部接入／圖書館引入通告：</strong>
+        <strong style={{ fontSize: '1.05rem', color: '#b06000' }}>🗺️ 區地域總會活動（原圖書館引入）：</strong>
         <select value={eventId} onChange={e=>{setEventId(e.target.value);setPaidOverrides({});setExpandedGroup(null);setExpandedOverallStatus(null);setExpandedBranchStatus(null);}}>
-          {externalEvents.length===0&&<option value="">無外部接入通告</option>}
+          {externalEvents.length===0&&<option value="">無區地域總會活動</option>}
           {externalEvents.map(e=><option key={e.id} value={e.id}>{e.title} ({e.date})</option>)}
         </select>
       </div>

@@ -7,7 +7,7 @@ export type Patrol = { id:string; branchId:string; name:string; short:string; le
 export type User = { id:string; name:string; email:string; role:Role; branchId?:string; memberId?:string; childMemberIds?:string[]; approved:boolean; techTest?:boolean };
 export type Member = { id:string; ymNumber:string; name:string; email?:string; branchId:string; patrolId?:string; patrolRole?:''|'leader'|'deputy'|'member'; specialRole?:string; age:number; dateOfBirth?:string; parentUserId?:string; emergencyContactName?:string; emergencyContactPhone?:string; active:boolean };
 export type Application = { id:string; type:'parent'|'leader'|'member'; name:string; email:string; role:Role; branchId?:string; ymNumbers?:string; status:'pending'|'approved'|'rejected'; createdAt:string; decidedAt?:string };
-export type EventItem = { id:string; title:string; date:string; location:string; scope:'troop'|'branch'; branchId?:string; kind:'activity'|'notice_troop_participation'; status:'draft'|'published'; source?:string; targetMemberIds:string[]; fee?:string; paymentUrl?:string; dutyPatrol?:string };
+export type EventItem = { id:string; title:string; date:string; location:string; scope:'troop'|'branch'; branchId?:string; kind:'activity'|'notice_troop_participation'; status:'draft'|'published'; source?:string; targetMemberIds:string[]; fee?:string; paymentUrl?:string; dutyPatrol?:string; calendarTag?:string; category?:'self'|'district' };
 export type Reply = { id:string; eventId:string; memberId:string; memberName?:string; branchId?:string; parentUserId?:string; type:'interested'|'registered'|'declined'; operatedBy:'member'|'parent'|'leader'|'admin'; paid?:boolean; cancelled?:boolean; updatedAt:string };
 export type Bookmark = { id:string; title:string; source:string; circularKey?:string; region?:string; circularDate?:string; sourceUrl?:string; attachmentUrl?:string; paymentUrl?:string; officialDeadline?:string; internalDeadline?:string; mode:'informational'|'troop_participation'; activityType?:string; targetText?:string; eligibility?:string; fee?:string; branchTags:string[]; audienceTags?:string[]; status:'published'|'converted'; convertedEventId?:string; ownerUserId?:string; importedBy?:string };
 export type AnnouncementPdf = { id:string; name:string; url:string; updatedAt?:string; size?:string; visible?:boolean; branchTags?:string[]; audienceTags?:string[]; note?:string };
@@ -36,8 +36,10 @@ export type Announcement = {
 export type AttendanceRecord = { id:string; memberId:string; ymNumber:string; name:string; branchId:string; patrolId?:string; date:string; status:'P'|'A'|'L'|'E'|'S'|''; note?:string; sessionType:'meeting'|'activity'; eventId?:string; markedBy?:string; markedAt?:string };
 export type PluginCard = { id:string; title:string; icon:string; tier:2|3; url:string; embed:boolean; minRole:Role; enabled:boolean; order:number; needsUnitBackend?:boolean };
 export type PluginSetting = { pluginId:string; frontendUrl?:string; backendUrl?:string; apiKey?:string };
-export type Meeting = { id:string; title:string; type:'agenda'|'minutes'; date:string; startTime?:string; endTime?:string; location?:string; targetRoles?:string[]; branchId?:string; url?:string; status:'draft'|'published' };
+export type Meeting = { id:string; title:string; type:'agenda'|'minutes'; date:string; startTime?:string; endTime?:string; location?:string; targetRoles?:string[]; branchId?:string; url?:string; status:'draft'|'published'; calendarTag?:string };
 export type Audit = { id:string; userId:string; action:string; entity:string; entityId:string; createdAt:string; detail:string };
+/** 最新消息（首頁最上方 BAR，領袖直接點條 BAR 加入，最多 3 條，不同於公告） */
+export type LatestNews = { id:string; text:string; authorUserId?:string; authorName?:string; createdAt:string };
 export type Equipment = { id:string; name:string; category:string; unit:string; totalQty:number; availableQty:number; location?:string; note?:string; enabled:boolean; updatedAt?:string };
 export type EquipmentLoanStatus = 'pending' | 'approved' | 'rejected' | 'returned' | 'cancelled';
 export type EquipmentLoan = {
@@ -55,7 +57,31 @@ export const LOAN_STATUS_LABEL: Record<EquipmentLoanStatus, string> = {
 export const LOAN_STATUS_TONE: Record<EquipmentLoanStatus, string> = {
   pending: 'gold', approved: 'blue', rejected: 'red', returned: 'green', cancelled: 'red',
 };
-export type AppState = { patrols:Patrol[]; users:User[]; members:Member[]; applications:Application[]; events:EventItem[]; replies:Reply[]; bookmarks:Bookmark[]; announcements:Announcement[]; announcementPdfs:AnnouncementPdf[]; regularMeetings:RegularMeeting[]; cancelledMeetings:CancelledMeeting[]; meetings:Meeting[]; plugins:PluginCard[]; pluginSettings?:PluginSetting[]; audits:Audit[]; equipment:Equipment[]; equipmentLoans:EquipmentLoan[]; config:Record<string,string>; userFeatures?:string[] };
+export type AppState = { patrols:Patrol[]; users:User[]; members:Member[]; applications:Application[]; events:EventItem[]; replies:Reply[]; bookmarks:Bookmark[]; announcements:Announcement[]; announcementPdfs:AnnouncementPdf[]; regularMeetings:RegularMeeting[]; cancelledMeetings:CancelledMeeting[]; meetings:Meeting[]; plugins:PluginCard[]; pluginSettings?:PluginSetting[]; audits:Audit[]; equipment:Equipment[]; equipmentLoans:EquipmentLoan[]; latestNews:LatestNews[]; config:Record<string,string>; userFeatures?:string[] };
+
+// ==================== 活動兩大分類（統一命名） ====================
+
+/** 活動分類：自行舉辦（原旅團自辦）／區地域總會活動（原圖書館引入） */
+export type EventCategory = 'self' | 'district';
+export const EVENT_CATEGORY_LABEL: Record<EventCategory, string> = {
+  self: '自行舉辦',
+  district: '區地域總會活動',
+};
+
+/**
+ * 判斷活動屬於「自行舉辦」還是「區地域總會活動」。
+ * 新資料直接讀 category 欄位；舊資料按 kind / source 推斷。
+ */
+export function eventCategory(e: { kind?: string; source?: string; category?: string } | null | undefined): EventCategory {
+  if (!e) return 'self';
+  if (e.category === 'district' || e.category === 'self') return e.category;
+  if (e.kind === 'notice_troop_participation') return 'district';
+  if (/圖書館|地域|區會|區地域|總會/.test(e.source || '')) return 'district';
+  return 'self';
+}
+export function eventCategoryLabel(e: { kind?: string; source?: string; category?: string } | null | undefined): string {
+  return EVENT_CATEGORY_LABEL[eventCategory(e)];
+}
 
 // ==================== 載入（API） ====================
 
@@ -110,10 +136,13 @@ export function nextRegularMeetingDates(count=6){
 
 /** 計算摘要數字（控制台用） */
 export function computeStats(s:AppState){
+  const published = s.events.filter(e=>e.status==='published');
   return {
     users: s.users.length,
     pending: s.applications.filter(a=>a.status==='pending').length,
-    activities: s.events.filter(e=>e.status==='published').length,
+    activities: published.length,
+    selfActivities: published.filter(e=>eventCategory(e)==='self').length,
+    districtActivities: published.filter(e=>eventCategory(e)==='district').length,
     notices: s.bookmarks.length,
   };
 }

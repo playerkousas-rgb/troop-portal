@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { AppState, loadStateSlice } from '@/lib/store';
-import { apiToggleUser, apiCreateUser, apiUpdateUserRole, apiDeleteUser, apiGrantFeature, apiRevokeFeature, apiGetUserFeatures, apiUpdateUserPermissions, apiBatchCreateUsers, apiBatchCreateMembers } from '@/lib/api';
+import { apiToggleUser, apiCreateUser, apiUpdateUserRole, apiDeleteUser, apiGrantFeature, apiRevokeFeature, apiGetUserFeatures, apiUpdateUserPermissions, apiBatchCreateUsers, apiBatchCreateMembers, apiDecideApplication, apiUpdateMember, apiLinkParent, apiDeleteMember } from '@/lib/api';
 import { ROLE_LABEL, branches, LEADER_ROLES } from '@/lib/model';
 import { checkEditPermission, assignableRoles } from '@/lib/permissions';
 import { getSession } from '@/lib/session';
@@ -144,14 +144,20 @@ export default function Page(){
   const [permsUserId,setPermsUserId]=useState<string|null>(null);
   const [perms,setPerms]=useState<any[]>([]);
   const [isMemberPerms, setIsMemberPerms] = useState(false);
+  const [tab,setTab]=useState<'accounts'|'members'|'applications'>('accounts');
+  const [appProcessing,setAppProcessing]=useState('');
   const session=getSession();
 
-  useEffect(()=>{loadStateSlice(['patrols','users','members']).then(setS).catch(e=>setErr(e.message))},[]);
+  useEffect(()=>{loadStateSlice(['patrols','users','members','applications']).then(setS).catch(e=>setErr(e.message))},[]);
   useEffect(()=>{
     if (s && typeof window !== 'undefined' && window.location.hash === '#bulk-onboard') {
       setShowBulk(true);
       window.history.replaceState(null, '', window.location.pathname);
       setTimeout(()=>previewBulk(),0);
+    }
+    if (s && typeof window !== 'undefined' && window.location.hash === '#applications') {
+      setTab('applications');
+      window.history.replaceState(null, '', window.location.pathname);
     }
   },[s]);
 
@@ -375,6 +381,21 @@ export default function Page(){
     }catch(e:any){setErr(e.message)}finally{setLoading(false)}
   }
 
+  async function decideApp(id:string,status:'approved'|'rejected'){
+    setErr('');setAppProcessing(id);
+    try{const f=await apiDecideApplication(id,status);setS(f);setOk(status==='approved'?'✅ 已批核申請':'✅ 已拒絕申請')}
+    catch(e:any){setErr(e.message)}finally{setAppProcessing('')}
+  }
+  async function linkMemberParent(mid:string,pid:string){
+    setErr('');
+    try{const f=await apiLinkParent(mid,pid);setS(f)}catch(e:any){setErr(e.message)}
+  }
+  async function delMember(id:string,name:string){
+    if(!confirm(`確定刪除成員 ${name}？`))return;
+    setErr('');
+    try{const f=await apiDeleteMember(id);setS(f)}catch(e:any){setErr(e.message)}
+  }
+
   if(!s)return <div className="card">{err||'載入中...'}</div>;
   const myRole=session?.role||'guest';
   const myBranchId=session?.branchId||'';
@@ -388,10 +409,18 @@ export default function Page(){
   });
 
   return <div className="stack">
-    <section className="hero"><span className="badge gold">使用者管理</span><h1>使用者管理</h1><p>管理帳號、角色、功能權限。上級可授權下級額外功能。</p></section>
+    <section className="hero"><span className="badge gold">使用者管理</span><h1>👥 使用者管理</h1><p>帳號、成員資料庫與審核申請已合併喺一處，用下方分頁切換。上級可授權下級額外功能。</p></section>
     {err&&<p className="badge red">{err}</p>}
     {ok&&<p className="badge green">{ok}</p>}
 
+    {/* 分頁：帳號 / 成員資料 / 申請審核 */}
+    <div className="row" style={{ gap: 6, flexWrap: 'wrap' }}>
+      <button type="button" className={`btn ${tab==='accounts'?'primary':''}`} onClick={()=>setTab('accounts')}>👤 帳號（{s.users.length}）</button>
+      <button type="button" className={`btn ${tab==='members'?'primary':''}`} onClick={()=>setTab('members')}>👥 成員資料（{s.members.length}）</button>
+      <button type="button" className={`btn ${tab==='applications'?'primary':''}`} onClick={()=>setTab('applications')}>✅ 申請審核（{s.applications.filter(a=>a.status==='pending').length}）</button>
+    </div>
+
+    {tab==='accounts'&&<>
     <section className="card row">
       <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="搜尋姓名或 Email" style={{flex:1}}/>
       <select value={filterRole} onChange={e=>setFilterRole(e.target.value)}>
@@ -573,5 +602,70 @@ export default function Page(){
         ))}</tbody>
       </table>
     </section>
+    </>}
+
+    {/* ── 成員資料（合併自成員資料庫）── */}
+    {tab==='members'&&<section className="card">
+      <div className="row" style={{justifyContent:'space-between'}}>
+        <h3 style={{margin:0}}>👥 成員資料</h3>
+        <a className="btn gold" href="/admin/members">完整成員編輯頁 →</a>
+      </div>
+      <table className="table responsive">
+        <thead><tr><th>姓名</th><th>YMIS</th><th>支部</th><th>小隊</th><th>年齡</th><th>家長連結</th><th>操作</th></tr></thead>
+        <tbody>{s.members.map(m=>{
+          const p=s.patrols.find(x=>x.id===m.patrolId);
+          return <tr key={m.id}>
+            <td data-label="姓名">{m.name}</td>
+            <td data-label="YMIS">{m.ymNumber}</td>
+            <td data-label="支部">{branches.find(b=>b.id===m.branchId)?.short||m.branchId}</td>
+            <td data-label="小隊">{p?.name||'未分隊'}</td>
+            <td data-label="年齡">{m.age>0?m.age:'—'}</td>
+            <td data-label="家長連結"><select value={m.parentUserId||''} onChange={e=>linkMemberParent(m.id,e.target.value)}><option value="">未連結</option>{s.users.filter(u=>u.role==='parent').map(u=><option key={u.id} value={u.id}>{u.name}</option>)}</select></td>
+            <td data-label="操作"><a className="btn" style={{fontSize:'0.8em'}} href="/admin/members">✏️</a> <button className="btn" style={{fontSize:'0.8em',color:'#d93025'}} onClick={()=>delMember(m.id,m.name)}>🗑️</button></td>
+          </tr>;
+        })}</tbody>
+      </table>
+      {s.members.length===0&&<p className="muted">尚無成員。</p>}
+    </section>}
+
+    {/* ── 申請審核（合併自審核申請管理）── */}
+    {tab==='applications'&&<>
+      <section className="card">
+        <h3>待審批申請（{s.applications.filter(a=>a.status==='pending').length}）</h3>
+        <table className="table responsive">
+          <thead><tr><th>姓名</th><th>類型</th><th>身份</th><th>支部</th><th>YMIS</th><th>Email</th><th>狀態</th><th>操作</th></tr></thead>
+          <tbody>{s.applications.filter(a=>a.status==='pending').map(a=>
+            <tr key={a.id}>
+              <td data-label="姓名">{a.name}</td>
+              <td data-label="類型">{a.type}</td>
+              <td data-label="身份">{ROLE_LABEL[a.role]||a.role}</td>
+              <td data-label="支部">{branches.find(b=>b.id===a.branchId)?.short||'-'}</td>
+              <td data-label="YMIS">{a.ymNumbers||'-'}</td>
+              <td data-label="Email">{a.email||'-'}</td>
+              <td data-label="狀態"><span className="badge gold">待批核</span></td>
+              <td data-label="操作">
+                {appProcessing===a.id?<span className="badge gold">處理中...</span>:<>
+                  <button className="btn primary" style={{fontSize:'0.8em'}} onClick={()=>decideApp(a.id,'approved')}>✅ 批核</button>
+                  <button className="btn" style={{fontSize:'0.8em'}} onClick={()=>decideApp(a.id,'rejected')}>✖ 拒絕</button>
+                </>}
+              </td>
+            </tr>)}</tbody>
+        </table>
+        {s.applications.filter(a=>a.status==='pending').length===0&&<p className="muted">沒有待審批申請。</p>}
+      </section>
+      {s.applications.filter(a=>a.status!=='pending').length>0&&<section className="card">
+        <h3>已處理</h3>
+        <table className="table responsive">
+          <thead><tr><th>姓名</th><th>身份</th><th>結果</th><th>處理時間</th></tr></thead>
+          <tbody>{s.applications.filter(a=>a.status!=='pending').map(a=>
+            <tr key={a.id}>
+              <td data-label="姓名">{a.name}</td>
+              <td data-label="身份">{ROLE_LABEL[a.role]||a.role}</td>
+              <td data-label="結果"><span className={`badge ${a.status==='approved'?'green':'red'}`}>{a.status==='approved'?'已批核':'已拒絕'}</span></td>
+              <td data-label="處理時間">{a.decidedAt||'—'}</td>
+            </tr>)}</tbody>
+        </table>
+      </section>}
+    </>}
   </div>;
 }

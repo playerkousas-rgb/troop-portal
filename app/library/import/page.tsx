@@ -123,15 +123,15 @@ function ImportInner(){
 
   return <div className="stack">
     <section className="hero">
-      <span className="badge gold">通告圖書館引入</span>
-      <h1>由童軍通告圖書館引入</h1>
-      <p>從圖書館引入通告時，標題、來源、截止、費用、對象已自動帶入。領袖只需確認、加上本旅截止日期和分類標籤。</p>
+      <span className="badge gold">區地域總會活動引入</span>
+      <h1>🗺️ 引入區地域總會活動</h1>
+      <p>區／地域／總會活動（原通告圖書館引入）。從圖書館引入時，標題、來源、截止、費用、對象已自動帶入。領袖只需確認、加上本旅截止日期和分類標籤。</p>
       <a className="btn primary" href="https://scout-circulars.vercel.app/" target="_blank">📚 打開童軍通告圖書館</a>
     </section>
     {err&&<p className="badge red">{err}</p>}
     {msg&&<p className="badge green">{msg}</p>}
 
-    {fromLibrary&&<p className="badge green">📚 已從圖書館帶入資料，請確認後補上本旅截止日期和分類。</p>}
+    {fromLibrary&&<p className="badge green">🗺️ 已從圖書館帶入區地域總會活動資料，請確認後補上本旅截止日期和分類。</p>}
 
     {!canImport&&<section className="card"><p className="badge red">只有領袖可以引入通告。</p></section>}
 

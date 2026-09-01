@@ -38,6 +38,7 @@ export default function Page(){
   const [spBranches,setSpBranches]=useState<string[]>([]);
   const [spStartTime,setSpStartTime]=useState('');
   const [spEndTime,setSpEndTime]=useState('');
+  const [spTag,setSpTag]=useState('');
 
   useEffect(()=>{loadStateSlice(['events','regularMeetings']).then(setS).catch(e=>setErr(e.message))},[]);
 
@@ -93,6 +94,7 @@ export default function Page(){
   async function addSpecial(){
     if(!spTitle.trim()){setErr('請填活動標題');return;}
     if(!spDate){setErr('請選日期');return;}
+    if(!spTag.trim()){setErr('請加入「行事曆標籤」以便加入行事曆。');return;}
     setErr('');
     try{
       // 0 selected = 全旅; 1 = 支部; 2+ = 跨支部
@@ -109,11 +111,12 @@ export default function Page(){
         kind:'activity',
         status:'published',
         source:'特別集會',
+        calendarTag:spTag,
       });
       const {loadState}=await import('@/lib/store');
       setS(await loadState());
       setOkMsg('✅ 特別集會已加入行事曆');
-      setSpTitle('');setSpDate('');setSpLocation('');setSpBranches([]);setShowSpecial(false);
+      setSpTitle('');setSpDate('');setSpLocation('');setSpBranches([]);setSpTag('');setShowSpecial(false);
     }catch(e:any){setErr(e.message)}
   }
 
@@ -237,6 +240,7 @@ export default function Page(){
           <label>開始時間<input value={spStartTime} onChange={e=>setSpStartTime(e.target.value)} placeholder="14:00"/></label>
           <label>結束時間<input value={spEndTime} onChange={e=>setSpEndTime(e.target.value)} placeholder="16:00"/></label>
           <label>地點<input value={spLocation} onChange={e=>setSpLocation(e.target.value)} placeholder="本中心"/></label>
+          <label>行事曆標籤 🏷️<input value={spTag} onChange={e=>setSpTag(e.target.value)} placeholder="例如：特別集會／露營"/></label>
         </div>
         <div>
           <strong>適用支部：</strong>

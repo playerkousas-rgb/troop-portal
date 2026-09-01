@@ -18,10 +18,10 @@ import { ROLE_LABEL } from '@/lib/model';
 const LEADER_TOOLS: ConsoleTool[] = [
   { id: 'members', icon: '👥', label: '成員資料庫', desc: '查看及管理所屬支部成員。', href: '/admin/members' },
   { id: 'events', icon: '🗓️', label: '活動管理', desc: '新增、發布及管理活動。', href: '/admin/events' },
-  { id: 'registrations', icon: '📋', label: '報名管理', desc: '查看報名狀態及匯出。', href: '/admin/registrations' },
+  { id: 'registrations', icon: '📊', label: '活動統計', desc: '自行舉辦／區地域總會活動統計及匯出。', href: '/admin/registrations' },
   { id: 'equipment', icon: '📦', label: '物資借用管理', desc: '物資清單、批核借用、歸還回補庫存。', href: '/admin/equipment' },
   { id: 'applications', icon: '✅', label: '審核申請', desc: '審核家長／成員申請。', href: '/admin/applications' },
-  { id: 'library', icon: '📚', label: '圖書館標記', desc: '由通告圖書館引入通告。', href: '/library/import' },
+  { id: 'library', icon: '🗺️', label: '區地域總會活動', desc: '引入區／地域／總會活動（原圖書館）。', href: '/library/import' },
   { id: 'calendar', icon: '📅', label: '行事曆', desc: '查看及管理行事曆。', href: '/calendar' },
 ];
 

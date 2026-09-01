@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { AppState, loadStateSlice, replyStatus, isMeetingCancelled, RegularMeeting } from '@/lib/store';
+import { AppState, loadStateSlice, replyStatus, isMeetingCancelled, RegularMeeting, eventCategory } from '@/lib/store';
 import { apiToggleMeetingCancel, apiCreateEvent, apiUpdateEvent, apiDeleteEvent,
   apiCreateRegularMeeting, apiUpdateRegularMeeting, apiDeleteRegularMeeting, apiToggleRegularMeeting,
   apiDeleteMeeting } from '@/lib/api';
@@ -62,7 +62,7 @@ function matchFrequency(r: any, d: Date) {
   return true;
 }
 
-const emptyForm = { id: '', title: '', date: '', kind: 'activity' as 'activity', scope: 'troop', branchId: 'troop', location: '', fee: '', paymentUrl: '', dutyPatrol: '' };
+const emptyForm = { id: '', title: '', date: '', kind: 'activity' as 'activity', scope: 'troop', branchId: 'troop', location: '', fee: '', paymentUrl: '', dutyPatrol: '', calendarTag: '', category: 'self' as 'self' | 'district' };
 const emptyRule = { id: '', branchId: 'b3', title: '', weekday: '1', frequency: 'weekly', startTime: '19:00', endTime: '21:00', location: '', enabled: true };
 
 export default function Calendar() {
@@ -162,13 +162,14 @@ export default function Calendar() {
     if (!form) return;
     if (!form.title.trim()) { setFormErr('請填寫活動名稱。'); return; }
     if (!/^\d{4}-\d{2}-\d{2}$/.test(form.date)) { setFormErr('請選擇日期（YYYY-MM-DD）。'); return; }
+    if (form.date && !form.calendarTag.trim()) { setFormErr('此項目有日期，請加入「行事曆標籤」以便加入行事曆。'); return; }
     setLoading(true); setErr('');
     try {
       if (form.id) {
-        await apiUpdateEvent({ eventId: form.id, title: form.title.trim(), date: form.date, location: form.location, scope: form.scope, branchId: form.branchId, fee: form.fee, paymentUrl: form.paymentUrl, dutyPatrol: form.dutyPatrol });
+        await apiUpdateEvent({ eventId: form.id, title: form.title.trim(), date: form.date, location: form.location, scope: form.scope, branchId: form.branchId, fee: form.fee, paymentUrl: form.paymentUrl, dutyPatrol: form.dutyPatrol, calendarTag: form.calendarTag, category: form.category });
         setMsg(`✅ 已更新「${form.title.trim()}」`);
       } else {
-        await apiCreateEvent({ title: form.title.trim(), scope: form.scope, branchId: form.branchId, date: form.date, location: form.location, fee: form.fee, paymentUrl: form.paymentUrl, dutyPatrol: form.dutyPatrol, status: 'published', source: '領袖新增' });
+        await apiCreateEvent({ title: form.title.trim(), scope: form.scope, branchId: form.branchId, date: form.date, location: form.location, fee: form.fee, paymentUrl: form.paymentUrl, dutyPatrol: form.dutyPatrol, calendarTag: form.calendarTag, category: form.category, status: 'published', source: form.category === 'district' ? '區地域總會活動' : '自行舉辦' });
         setMsg(`✅ 已新增並發布「${form.title.trim()}」（${form.date}）`);
       }
       setForm(null);
@@ -324,7 +325,7 @@ export default function Calendar() {
                   <div className="flex gap-1 flex-shrink-0">
                     {item.type === 'event' ? (
                       <>
-                        <button onClick={() => { setFormErr(''); setForm({ id: item.event.id, title: item.event.title, date: item.event.date, kind: 'activity', scope: item.event.scope || 'troop', branchId: item.event.branchId || 'troop', location: item.event.location || '', fee: item.event.fee || '', paymentUrl: item.event.paymentUrl || '', dutyPatrol: item.event.dutyPatrol || '' }); }} className="text-sm text-slate-600 px-1.5 py-0.5 rounded hover:bg-slate-100 border-0 bg-transparent cursor-pointer" title="編輯">✏️</button>
+                        <button onClick={() => { setFormErr(''); setForm({ id: item.event.id, title: item.event.title, date: item.event.date, kind: 'activity', scope: item.event.scope || 'troop', branchId: item.event.branchId || 'troop', location: item.event.location || '', fee: item.event.fee || '', paymentUrl: item.event.paymentUrl || '', dutyPatrol: item.event.dutyPatrol || '', calendarTag: item.event.calendarTag || '', category: eventCategory(item.event) }); }} className="text-sm text-slate-600 px-1.5 py-0.5 rounded hover:bg-slate-100 border-0 bg-transparent cursor-pointer" title="編輯">✏️</button>
                         <button onClick={() => deleteEvent(item.event.id, item.event.title)} className="text-sm text-rose-600 px-1.5 py-0.5 rounded hover:bg-rose-50 border-0 bg-transparent cursor-pointer" title="刪除">🗑</button>
                       </>
                     ) : item.type === 'oneoff' ? (
@@ -388,10 +389,17 @@ export default function Calendar() {
               </select>
             </label>
             <label className={labelCls}>地點<input className={inputCls} value={form.location} onChange={e => setForm({ ...form, location: e.target.value })} placeholder="例如：西貢" /></label>
+            <label className={labelCls}>分類
+              <select className={inputCls} value={form.category} onChange={e => setForm({ ...form, category: e.target.value as any })}>
+                <option value="self">🏠 自行舉辦</option>
+                <option value="district">🗺️ 區地域總會活動</option>
+              </select>
+            </label>
             <label className={labelCls}>費用<input className={inputCls} value={form.fee} onChange={e => setForm({ ...form, fee: e.target.value })} placeholder="例如：$50（可留空）" /></label>
             <label className={labelCls}>付款連結<input className={inputCls} value={form.paymentUrl} onChange={e => setForm({ ...form, paymentUrl: e.target.value })} placeholder="https://…（可留空）" /></label>
             <label className={labelCls}>當值小隊<input className={inputCls} value={form.dutyPatrol} onChange={e => setForm({ ...form, dutyPatrol: e.target.value })} placeholder="例如：海狸小隊（可留空）" /></label>
-            <p className="text-sm text-slate-500 m-0">💡 對象＝支部全員（scope 全旅／支部會自動帶出成員名單）。儲存即發布，成員即時見到。</p>
+            <label className={labelCls}>行事曆標籤 🏷️<input className={inputCls} value={form.calendarTag} onChange={e => setForm({ ...form, calendarTag: e.target.value })} placeholder="例如：露營／服務／訓練" /></label>
+            <p className="text-sm text-slate-500 m-0">💡 有日期的項目請加入「行事曆標籤」。對象＝支部全員（scope 全旅／支部會自動帶出成員名單）。儲存即發布，成員即時見到。</p>
             {formErr && <p className="text-sm font-bold text-rose-700 bg-rose-50 rounded-lg px-2.5 py-2 m-0">{formErr}</p>}
             <div className="flex gap-2 pt-1">
               <button onClick={saveEvent} disabled={loading} className="flex-1 text-sm font-bold bg-brand-600 text-white py-2.5 rounded-xl border-0 cursor-pointer disabled:opacity-60">{loading ? '儲存中…' : '儲存並發布'}</button>

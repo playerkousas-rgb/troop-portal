@@ -4,87 +4,41 @@ import Link from 'next/link';
 import Auth from '@/components/Auth';
 import ConsoleHeader from '@/components/ui/ConsoleHeader';
 import StatStrip from '@/components/ui/StatStrip';
-import ToolGroup, { ConsoleTool } from '@/components/ui/ToolGroup';
 import { AppState, loadStateSlice, computeStats } from '@/lib/store';
 import { ROLE_LABEL } from '@/lib/model';
 import { getSession } from '@/lib/session';
 
-// 功能定義：未來插件也會動態加入
-const FEATURE_DEFS: Record<string, { title: string; icon: string; text: string; href: string }> = {
-  branches:       { title:'支部管理', icon:'🏢', text:'管理支部及小隊。', href:'/admin/branches' },
-  members:        { title:'成員資料庫', icon:'👥', text:'新增、編輯、連結家長。', href:'/admin/members' },
-  applications:   { title:'審核 / 申請管理', icon:'✅', text:'審核申請，批核後自動建帳號。', href:'/admin/applications' },
-  users:          { title:'使用者管理', icon:'👤', text:'帳號、角色、功能權限分配。', href:'/admin/users' },
-  events:         { title:'活動管理', icon:'🗓️', text:'新增、編輯、發布活動。', href:'/admin/events' },
-  registrations:  { title:'報名管理', icon:'📋', text:'旅團及外間活動的報名狀態、付款與匯出。', href:'/admin/registrations' },
-  attendance:     { title:'簽到／點名', icon:'📝', text:'日常集會及旅團自辦活動的實際出席（P／A／L／E／S）。', href:'/attendance' },
-  calendar:       { title:'行事曆管理', icon:'📅', text:'恆常集會、特別集會。', href:'/admin/calendar' },
-  notices:        { title:'通告管理', icon:'📄', text:'上傳通告、Drive PDF。', href:'/notices' },
-  library_import: { title:'圖書館引入', icon:'📚', text:'由通告圖書館引入。', href:'/library/import' },
-  equipment:      { title:'物資借用管理', icon:'📦', text:'物資清單、庫存調整、借用批核及歸還。', href:'/admin/equipment' },
-  meetings:       { title:'會議管理', icon:'🤝', text:'會議議程及紀錄。', href:'/admin/meetings' },
-  audit:          { title:'審核紀錄', icon:'📜', text:'所有操作紀錄。', href:'/admin/audit' },
-  settings:       { title:'系統設定', icon:'⚙️', text:'SystemConfig。', href:'/admin/settings' },
-  plugins:        { title:'元件管理', icon:'🧩', text:'設定 2/3 級元件網址與金鑰。', href:'/admin/plugins' },
-};
-
-// 同類功能歸類成一張大卡（可收合）—— 取代舊版 15 張獨立功能卡
-const FEATURE_GROUPS: { id: string; icon: string; title: string; subtitle: string; tone: 'emerald' | 'blue' | 'amber' | 'violet' | 'slate'; keys: string[] }[] = [
-  { id: 'people',     icon: '👥', title: '成員與帳號', subtitle: '支部 · 成員 · 申請 · 權限', tone: 'emerald', keys: ['branches', 'members', 'applications', 'users'] },
-  { id: 'events',     icon: '🎯', title: '活動與報名', subtitle: '活動 · 報名 · 點名 · 行事曆', tone: 'blue',    keys: ['events', 'registrations', 'attendance', 'calendar'] },
-  { id: 'resources',  icon: '📦', title: '通告與物資', subtitle: '通告 · 圖書館 · 借用物資', tone: 'amber',   keys: ['notices', 'library_import', 'equipment'] },
-  { id: 'governance', icon: '🤝', title: '會議與紀錄', subtitle: '會議議程 · 審核紀錄', tone: 'violet',  keys: ['meetings', 'audit'] },
-  { id: 'system',     icon: '⚙️', title: '系統設定',   subtitle: 'SystemConfig · 元件', tone: 'slate',   keys: ['settings', 'plugins'] },
+/**
+ * 管理中心 —— 統一為 6 張卡：
+ *   支部管理・使用者管理（合併成員資料庫＋審核申請）・行事曆管理・
+ *   活動管理（自行舉辦＋區地域總會活動）・物資管理・會議管理。
+ * 系統設定改放右上小圖示（TopNav ⚙️）；操作紀錄經系統設定進入。
+ */
+const FEATURES: { id: string; icon: string; title: string; text: string; href: string; tone: string }[] = [
+  { id: 'branches',  icon: '🏢', title: '支部管理',     text: '管理支部、小隊及啟用狀態。', href: '/admin/branches', tone: 'from-emerald-700 to-emerald-500' },
+  { id: 'users',     icon: '👥', title: '使用者管理',   text: '帳號、成員資料庫與審核申請（合併）。', href: '/admin/users', tone: 'from-brand-800 to-brand-500' },
+  { id: 'calendar',  icon: '📅', title: '行事曆管理',   text: '恆常集會、特別集會及取消；亦可在行事曆直接修改。', href: '/admin/calendar', tone: 'from-sky-700 to-sky-500' },
+  { id: 'events',    icon: '🎯', title: '活動管理',     text: '自行舉辦活動 及 區地域總會活動（原圖書館引入）。', href: '/admin/events', tone: 'from-violet-700 to-violet-500' },
+  { id: 'equipment', icon: '📦', title: '物資管理',     text: '物資清單、庫存調整、借用批核及歸還。', href: '/admin/equipment', tone: 'from-amber-700 to-amber-500' },
+  { id: 'meetings',  icon: '🤝', title: '會議管理',     text: '會議議程、紀錄及文件連結。', href: '/admin/meetings', tone: 'from-rose-700 to-rose-500' },
 ];
 
-export default function Admin(){
-  const [s,setS]=useState<AppState|null>(null);
-  const [err,setErr]=useState('');
-  // 按需載入：管理摘要（computeStats 用到 users/applications/events/bookmarks）
-  useEffect(()=>{loadStateSlice(['users','applications','events','bookmarks']).then(setS).catch(e=>setErr(e.message))},[]);
-  const stats=s?computeStats(s):{users:0,pending:0,activities:0,notices:0};
-
-  let features = s?.userFeatures || [];
-
-  if (features.length === 0 && (s?.users[0]?.role === 'admin' || s?.users[0]?.role === 'super_admin' || s?.users[0]?.role === 'troop_super')) {
-    features = Object.keys(FEATURE_DEFS);
-  }
-
-  const allowed = (key: string) => features.includes(key);
-
-  const groups = FEATURE_GROUPS.map(g => ({
-    ...g,
-    tools: g.keys
-      .filter(allowed)
-      .map(k => {
-        const def = FEATURE_DEFS[k];
-        return {
-          id: k,
-          icon: def.icon,
-          label: def.title,
-          desc: def.text,
-          href: def.href,
-          badge: k === 'applications' && stats.pending > 0 ? String(stats.pending) : undefined,
-        } as ConsoleTool;
-      }),
-  })).filter(g => g.tools.length > 0);
+export default function Admin() {
+  const [s, setS] = useState<AppState | null>(null);
+  const [err, setErr] = useState('');
+  useEffect(() => { loadStateSlice(['users', 'applications', 'events', 'bookmarks']).then(setS).catch(e => setErr(e.message)) }, []);
+  const stats = s ? computeStats(s) : { users: 0, pending: 0, activities: 0, selfActivities: 0, districtActivities: 0, notices: 0 };
 
   const session = typeof window === 'undefined' ? null : getSession();
-  // 已登入、但後台什麼資料都沒給 → 幾乎一定是 GS 版本太舊（未重新部署）或 API Key 不符
   const emptyData = !!s && !err && (s.users || []).length === 0;
 
-  return <Auth roles={['super_admin','troop_super','admin','group_leader','branch_leader','coach']}><div className="max-w-5xl mx-auto space-y-4">
+  return <Auth roles={['super_admin', 'troop_super', 'admin', 'group_leader', 'branch_leader', 'coach']}><div className="max-w-5xl mx-auto space-y-4">
     <ConsoleHeader
       icon="🛡️"
-      name={s?.users[0]?.name || '管理員'}
-      roleLabel={ROLE_LABEL[s?.users[0]?.role || 'admin']}
+      name={session?.name || '管理員'}
+      roleLabel={ROLE_LABEL[(session?.role as any) || 'admin']}
       tone="amber"
-      tagline="功能卡按你的權限動態顯示，同類功能已歸類在同一張大卡內，可按標題收合。"
-      action={
-        <Link href="/profile" className="no-underline text-sm font-bold bg-white/95 text-slate-800 px-3 py-2 rounded-xl hover:bg-white transition whitespace-nowrap">
-          👤 個人設定
-        </Link>
-      }
+      tagline="管理中心：功能卡按你的權限動態顯示。系統設定喺右上角 ⚙️ 小圖示；操作紀錄亦可由系統設定進入。"
     />
 
     {err && (
@@ -100,23 +54,46 @@ export default function Admin(){
           登入帳號是「{session?.userId || '—'}」，後台卻回傳空的 user 清單。這通常代表
           Google Sheet 的 Apps Script 還沒更新到 <b>3.0-live</b>（舊版不認得超管／STAFF_TOKEN 的身份，會把它當訪客）。
         </p>
-        <ol className="text-sm text-rose-700 leading-relaxed mt-2 mb-0 pl-5 list-decimal">
-          <li>把 <code className="bg-white/70 border border-rose-200 rounded px-1 py-0.5 font-mono">gs/SCOUTSYSTEM_2_SETUP.gs</code> 整份貼回 Script Editor</li>
-          <li>Deploy → Manage deployments → 新增版本（Who has access = <b>Anyone</b>）</li>
-          <li>回登入頁按「🩺 連線檢查」，確認「後台版本」是 3.0-live</li>
-        </ol>
       </section>
     )}
 
     <StatStrip stats={[
       { label: '用戶', value: stats.users, desc: '總登記人數', tone: 'blue', href: '/admin/users' },
-      { label: '待審批', value: stats.pending, desc: '等待審批', tone: 'red', href: '/admin/applications' },
-      { label: '活動', value: stats.activities, desc: '已發布', tone: 'green', href: '/admin/events' },
-      { label: '通告', value: stats.notices, desc: '通告數', tone: 'gold', href: '/notices' },
+      { label: '待審批', value: stats.pending, desc: '等待審批申請', tone: 'red', href: '/admin/users#applications' },
+      { label: '自行舉辦', value: stats.selfActivities, desc: '已發布活動', tone: 'green', href: '/admin/events' },
+      { label: '區地域總會', value: stats.districtActivities, desc: '區／地域／總會活動', tone: 'violet', href: '/admin/events' },
     ]} />
 
-    {groups.map(g => (
-      <ToolGroup key={g.id} icon={g.icon} title={g.title} subtitle={g.subtitle} tone={g.tone} tools={g.tools} />
-    ))}
+    {/* 6 張功能卡 */}
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      {FEATURES.map(f => (
+        <Link key={f.id} href={f.href} className="no-underline text-inherit block group">
+          <div className="h-full bg-white rounded-2xl border border-slate-200 shadow-sm p-4 flex items-center gap-3.5 transition group-hover:border-brand-300 group-hover:shadow-md">
+            <span className={`w-14 h-14 bg-gradient-to-br ${f.tone} text-white rounded-2xl flex items-center justify-center text-3xl flex-shrink-0 shadow`} aria-hidden>{f.icon}</span>
+            <span className="flex-1 min-w-0">
+              <span className="block font-black text-lg text-slate-800 leading-tight">{f.title}</span>
+              <span className="block text-sm text-slate-500 leading-snug mt-0.5">{f.text}</span>
+            </span>
+            <span className="text-slate-300 group-hover:text-brand-500 font-black text-2xl flex-shrink-0">→</span>
+          </div>
+        </Link>
+      ))}
+    </div>
+
+    {/* 工具捷徑：活動統計（統一）・操作紀錄（含審核紀錄）・點名・通告 */}
+    <div className="flex flex-wrap gap-2">
+      <Link href="/admin/registrations" className="no-underline text-sm font-bold text-slate-700 bg-white border border-slate-200 rounded-xl px-3.5 py-2.5 hover:border-brand-300 hover:shadow-sm transition">
+        📊 活動統計（自行舉辦＝區地域總會＝通告）
+      </Link>
+      <Link href="/admin/audit" className="no-underline text-sm font-bold text-slate-700 bg-white border border-slate-200 rounded-xl px-3.5 py-2.5 hover:border-brand-300 hover:shadow-sm transition">
+        📜 操作紀錄（含審核紀錄）
+      </Link>
+      <Link href="/attendance" className="no-underline text-sm font-bold text-slate-700 bg-white border border-slate-200 rounded-xl px-3.5 py-2.5 hover:border-brand-300 hover:shadow-sm transition">
+        📝 簽到／點名
+      </Link>
+      <Link href="/notices" className="no-underline text-sm font-bold text-slate-700 bg-white border border-slate-200 rounded-xl px-3.5 py-2.5 hover:border-brand-300 hover:shadow-sm transition">
+        📢 通告管理
+      </Link>
+    </div>
   </div></Auth>;
 }

@@ -153,13 +153,13 @@ export default function Notices() {
               <button onClick={() => { setFormErr(''); setOk(''); setForm({ ...emptyAnn }); }}
                 className="text-sm px-3 py-1.5 rounded-lg font-bold bg-brand-600 text-white border-0 cursor-pointer hover:bg-brand-700 transition">+ 發佈公告</button>
               <Link href="/notices/upload" className="no-underline text-sm px-3 py-1.5 rounded-lg font-bold bg-white border border-slate-200 text-slate-600 hover:border-slate-300 transition">📄 上傳通告</Link>
-              <Link href="/library/import" className="no-underline text-sm px-3 py-1.5 rounded-lg font-bold bg-white border border-slate-200 text-slate-600 hover:border-slate-300 transition">📚 圖書館引入</Link>
+              <Link href="/library/import" className="no-underline text-sm px-3 py-1.5 rounded-lg font-bold bg-white border border-slate-200 text-slate-600 hover:border-slate-300 transition">🗺️ 區地域總會活動引入</Link>
             </>
           )}
         </div>
       </div>
       <p className="text-sm text-slate-500 m-0 -mt-2 leading-relaxed">
-        公告＝提示類訊息，例如「活動因天氣取消」「請家長交團費」。通告＝旅團／圖書館引入嘅活動通告；日常公告 PDF 喺下面。
+        公告＝提示類訊息，例如「活動因天氣取消」「請家長交團費」。通告＝區地域總會活動（原圖書館引入）嘅活動通告；日常公告 PDF 喺下面。
       </p>
 
       {ok && <div className="text-sm font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-xl px-3 py-2">{ok}</div>}
