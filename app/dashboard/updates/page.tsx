@@ -18,7 +18,7 @@ export default function UpdatesPage() {
         <span className="w-8 h-8 bg-brand-600 text-white rounded-xl flex items-center justify-center text-sm">📢</span>
         <h1 className="font-bold text-lg m-0">更新公告</h1>
       </div>
-      <p className="text-[11px] text-slate-500 m-0 -mt-2 leading-relaxed">
+      <p className="text-[13px] text-slate-500 m-0 -mt-2 leading-relaxed">
         系統更新紀錄同新功能介紹。最新版本放最上面。
       </p>
 
@@ -26,13 +26,13 @@ export default function UpdatesPage() {
         {UPDATES.map((u, i) => (
           <div key={i} className="bg-white rounded-2xl border border-slate-200 p-3.5">
             <div className="flex items-center gap-2 mb-2">
-              <span className="text-[11px] bg-brand-600 text-white px-2 py-0.5 rounded font-bold">{u.version}</span>
-              <span className="text-[11px] text-slate-500">{u.date}</span>
+              <span className="text-[13px] bg-brand-600 text-white px-2 py-0.5 rounded font-bold">{u.version}</span>
+              <span className="text-[13px] text-slate-500">{u.date}</span>
             </div>
             <h3 className="font-bold text-[13px] m-0 mb-1.5">{u.title}</h3>
             <ul className="m-0 pl-4 space-y-0.5">
               {u.items.map((item, j) => (
-                <li key={j} className="text-[11px] text-slate-600 leading-relaxed">{item}</li>
+                <li key={j} className="text-[13px] text-slate-600 leading-relaxed">{item}</li>
               ))}
             </ul>
           </div>

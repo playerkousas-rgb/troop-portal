@@ -71,13 +71,13 @@ export default function Updates() {
           <section key={u.version} className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 sm:p-5">
             <div className="flex items-center justify-between gap-2 flex-wrap mb-2">
               <h2 className="font-bold text-sm text-slate-800 m-0 flex items-center gap-2">
-                <span className="text-[11px] font-black bg-slate-800 text-white rounded-lg px-2 py-1">{u.version}</span>
+                <span className="text-sm font-black bg-slate-800 text-white rounded-lg px-2 py-1">{u.version}</span>
                 {u.title}
               </h2>
-              <span className="text-[11px] text-slate-400 font-semibold">{u.date}</span>
+              <span className="text-sm text-slate-400 font-semibold">{u.date}</span>
             </div>
             <span
-              className={`inline-block text-[10px] font-black rounded-full px-2 py-0.5 ${
+              className={`inline-block text-[12px] font-black rounded-full px-2 py-0.5 ${
                 u.mandatory ? 'bg-rose-100 text-rose-700' : 'bg-slate-100 text-slate-600'
               }`}
             >

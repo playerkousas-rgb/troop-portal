@@ -2,7 +2,6 @@
 import { AppState } from './store';
 import { Role } from './model';
 import { getSession } from './session';
-import { isMockMode, mockHandle } from './mock';
 
 // ==================== 取得旅團資訊 ====================
 
@@ -30,7 +29,8 @@ function buildUrl(action: string, params?: Record<string, string | undefined>): 
 }
 
 async function apiGet<T = any>(action: string, params?: Record<string, string | undefined>): Promise<T> {
-  if (isMockMode()) return Promise.resolve(mockHandle(action, params || {}) as T);
+  // ★ MOCK 已實作進 MAIN：所有請求（包括演示旅團）都經真實 HTTP 路徑
+  //   /api/proxy。演示旅團由 proxy 轉到內置 MOCK 後台，不再在瀏覽器模擬。
   const res = await fetch(buildUrl(action, params), { cache: 'no-store' });
   const data = await res.json();
   if (!data.success && data.error) {
@@ -40,7 +40,6 @@ async function apiGet<T = any>(action: string, params?: Record<string, string | 
 }
 
 async function apiPost<T = any>(action: string, body: Record<string, any>): Promise<T> {
-  if (isMockMode()) return Promise.resolve(mockHandle(action, { ...body, action }) as T);
   const troopKey = getTroopKey();
   const url = new URL('/api/proxy', window.location.origin);
   url.searchParams.set('action', action);
@@ -106,7 +105,6 @@ export async function apiLogin(params: {
 export async function apiForgotPassword(params: {
   identifier: string; loginType: 'account' | 'member';
 }) {
-  if (isMockMode()) return mockHandle('forgotPassword', params as any);
   const res = await fetch(buildUrl('forgotPassword', params as any), { cache: 'no-store' });
   return res.json();
 }
@@ -129,6 +127,7 @@ export async function apiHealth() {
 export async function apiDiagnose(): Promise<{
   troopKey: string;
   proxyOk: boolean;
+  mock?: boolean;
   apiKeySet?: boolean;
   webAppOk?: boolean;
   version?: string;
@@ -147,6 +146,7 @@ export async function apiDiagnose(): Promise<{
     const dbg = await res.json().catch(() => ({}));
     out.proxyOk = !!dbg?.success || !!dbg?.debug;
     out.apiKeySet = !!dbg?.apiKeyFound;
+    out.mock = !!dbg?.mock;
     if (dbg?.error) out.error = dbg.error;
     if (dbg?.envVarName) out.envVarName = dbg.envVarName;
   } catch (e: any) {
@@ -154,7 +154,7 @@ export async function apiDiagnose(): Promise<{
     return out;
   }
 
-  // 2) Apps Script Web App + 版本
+  // 2) 後台 health（演示旅團 → 內置 MOCK 後台；真實旅團 → Apps Script Web App）
   try {
     const res = await fetch(buildUrl('health'), { cache: 'no-store' });
     const data = await res.json().catch(() => ({}));
@@ -164,7 +164,7 @@ export async function apiDiagnose(): Promise<{
       out.error = data.error || ('Apps Script 回傳：' + String(data.raw || '').slice(0, 120));
     }
   } catch (e: any) {
-    out.error = '無法連到 Google Apps Script：' + (e?.message || String(e));
+    out.error = '無法連到後台：' + (e?.message || String(e));
   }
 
   return out;
@@ -215,7 +215,6 @@ async function apiMutatePost(action: string, body: Record<string, any>): Promise
 // ==================== 公開 API（不需登入） ====================
 
 export async function apiApplyJoin(p: { type: string; name: string; email: string; role: string; branchId?: string; ymNumbers?: string; note?: string }) {
-  if (isMockMode()) return mockHandle('applyJoin', p as any);
   const res = await fetch(buildUrl('applyJoin', p as any), { cache: 'no-store' });
   return res.json();
 }
@@ -407,6 +406,21 @@ export function apiUpdateRegularMeeting(p: any) {
 
 export function apiDeleteRegularMeeting(meetingId: string) {
   return apiMutate('deleteRegularMeeting', { meetingId });
+}
+
+// ==================== 內部公告 ====================
+
+export async function apiGetAnnouncements() {
+  return apiGet<{ success: boolean; data?: any[]; count?: number; error?: string }>('getAnnouncements');
+}
+export function apiAddAnnouncement(p: { title: string; message: string; scope?: string; branchId?: string }) {
+  return apiMutate('addAnnouncement', p as any);
+}
+export function apiUpdateAnnouncement(p: { announcementId: string; title?: string; message?: string; scope?: string; branchId?: string }) {
+  return apiMutate('updateAnnouncement', p as any);
+}
+export function apiDeleteAnnouncement(announcementId: string) {
+  return apiMutate('deleteAnnouncement', { announcementId });
 }
 // ==================== 設定 ====================
 

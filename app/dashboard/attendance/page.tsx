@@ -57,38 +57,38 @@ export default function AttendancePage() {
     <main className="max-w-2xl mx-auto px-4 py-4 pb-24 space-y-4">
       {/* Demo 角色 */}
       <div className="flex gap-1.5 flex-wrap items-center">
-        <span className="text-[11px] text-slate-500 mr-1">Demo：</span>
+        <span className="text-[13px] text-slate-500 mr-1">Demo：</span>
         {['member', 'branch_leader', 'admin'].map(r => (
           <button key={r} onClick={() => setRole(r)}
-            className={`text-[11px] px-2 py-0.5 rounded-full border font-bold ${role === r ? 'bg-brand-600 text-white border-brand-600' : 'bg-white text-slate-500 border-slate-200'}`}>
+            className={`text-[13px] px-2 py-0.5 rounded-full border font-bold ${role === r ? 'bg-brand-600 text-white border-brand-600' : 'bg-white text-slate-500 border-slate-200'}`}>
             {r === 'member' ? '成員' : r === 'branch_leader' ? '支部領袖' : '管理員'}
           </button>
         ))}
-        {isLeader && <span className="text-[11px] text-emerald-700 font-bold">· 你可直接喺本頁點名</span>}
+        {isLeader && <span className="text-[13px] text-emerald-700 font-bold">· 你可直接喺本頁點名</span>}
       </div>
 
       {/* Header */}
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <h1 className="font-bold text-lg m-0">📝 點名</h1>
-        {!isLeader && <span className="text-[11px] text-slate-500">你只可查看自己嘅出席紀錄</span>}
+        {!isLeader && <span className="text-[13px] text-slate-500">你只可查看自己嘅出席紀錄</span>}
       </div>
-      <p className="text-[11px] text-slate-500 m-0 -mt-2 leading-relaxed">
+      <p className="text-[13px] text-slate-500 m-0 -mt-2 leading-relaxed">
         點名＝出席紀錄（P／A／L／E／S），同「報名」分開：報名係「想唔想參加」，點名係「當日實際有冇嚟」。
         領袖開放點名後，成員／家長都可查看自己嘅出席紀錄。
       </p>
 
-      {msg && <div className="text-[11px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-xl px-3 py-2">{msg}</div>}
+      {msg && <div className="text-[13px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-xl px-3 py-2">{msg}</div>}
 
       {/* 選擇場次 */}
       <div className="flex gap-1.5 flex-wrap">
         {SESSIONS.map(s => (
           <button key={s.id} onClick={() => { setSessionId(s.id); setMsg(''); }}
-            className={`text-[11px] px-2.5 py-1.5 rounded-full font-bold border ${sessionId === s.id ? 'bg-brand-600 text-white border-brand-600' : 'bg-white text-slate-600 border-slate-200'}`}>
+            className={`text-[13px] px-2.5 py-1.5 rounded-full font-bold border ${sessionId === s.id ? 'bg-brand-600 text-white border-brand-600' : 'bg-white text-slate-600 border-slate-200'}`}>
             {s.title}
           </button>
         ))}
       </div>
-      <div className="text-[11px] text-slate-500 bg-white border border-slate-200 rounded-xl px-3 py-2">
+      <div className="text-[13px] text-slate-500 bg-white border border-slate-200 rounded-xl px-3 py-2">
         📅 {session.date} · ⏰ {session.time} · 📍 {session.location}
       </div>
 
@@ -96,8 +96,8 @@ export default function AttendancePage() {
       <div className="grid grid-cols-5 gap-1.5">
         {counts.map(c => (
           <div key={c.id} className={`rounded-xl px-2 py-1.5 text-center ${c.n > 0 ? 'bg-white border border-slate-200' : 'bg-slate-50'}`}>
-            <div className="text-[11px] font-extrabold">{c.id} · {c.n}</div>
-            <div className="text-[11px] text-slate-500">{c.label}</div>
+            <div className="text-[13px] font-extrabold">{c.id} · {c.n}</div>
+            <div className="text-[13px] text-slate-500">{c.label}</div>
           </div>
         ))}
       </div>
@@ -108,8 +108,8 @@ export default function AttendancePage() {
           <div key={r.id} className="flex items-center justify-between bg-slate-50 rounded-xl px-3 py-2 gap-2">
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-1.5">
-                <span className="font-bold text-[11px]">{r.name}</span>
-                <span className="text-[11px] text-slate-500">{r.branch} · {r.patrol || '—'}</span>
+                <span className="font-bold text-[13px]">{r.name}</span>
+                <span className="text-[13px] text-slate-500">{r.branch} · {r.patrol || '—'}</span>
               </div>
             </div>
             {isLeader ? (

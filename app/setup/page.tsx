@@ -50,13 +50,13 @@ export default function Setup() {
             <div className="flex items-start gap-2.5">
               <span className="text-lg leading-none flex-shrink-0">{s.icon}</span>
               <div className="min-w-0 flex-1">
-                <div className="font-bold text-[13px] text-slate-800">{s.title}</div>
-                <p className="text-[11px] text-slate-500 mt-1 m-0 leading-relaxed">{s.desc}</p>
+                <div className="font-bold text-sm text-slate-800">{s.title}</div>
+                <p className="text-sm text-slate-500 mt-1 m-0 leading-relaxed">{s.desc}</p>
                 {s.download && (
                   <a
                     href={s.download.href}
                     download
-                    className="inline-flex items-center gap-2 bg-brand-600 text-white text-[11px] font-bold px-3 py-2 rounded-xl no-underline hover:bg-brand-700 transition mt-2"
+                    className="inline-flex items-center gap-2 bg-brand-600 text-white text-sm font-bold px-3 py-2 rounded-xl no-underline hover:bg-brand-700 transition mt-2"
                   >
                     {s.download.label}
                   </a>
@@ -66,7 +66,7 @@ export default function Setup() {
           </div>
         ))}
 
-        <p className="text-[11px] text-slate-500 m-0 leading-relaxed">
+        <p className="text-sm text-slate-500 m-0 leading-relaxed">
           ✅ 等管理員開通後 → 先喺 Sheet 設定管理員（SystemConfig + Members + 重新建立管理員帳號）→ 回首頁選擇旅團 → 用管理員 Email ＋初始密碼登入 → 即時改密碼 → 完成。
         </p>
       </section>
@@ -77,7 +77,7 @@ export default function Setup() {
           <span className="w-7 h-7 bg-amber-500 text-white rounded-lg flex items-center justify-center text-sm">🔑</span>
           關於 API Key
         </h2>
-        <ul className="text-[11px] text-slate-600 leading-relaxed m-0 pl-5 space-y-1">
+        <ul className="text-sm text-slate-600 leading-relaxed m-0 pl-5 space-y-1">
           <li>Setup 彈窗<strong>只顯示一次</strong>，請即複製。</li>
           <li>Google Sheet 只存雜湊值（API_KEY_HASH），唔會存明文。</li>
           <li>複製後提交到「申請接入」頁，由平台管理員存入伺服器環境變數。</li>
@@ -91,7 +91,7 @@ export default function Setup() {
           <span className="w-7 h-7 bg-slate-600 text-white rounded-lg flex items-center justify-center text-sm">🎒</span>
           你需要準備
         </h2>
-        <div className="grid sm:grid-cols-2 gap-x-4 gap-y-1 text-[11px] text-slate-600">
+        <div className="grid sm:grid-cols-2 gap-x-4 gap-y-1 text-sm text-slate-600">
           <p className="m-0">✅ Google 帳號</p>
           <p className="m-0">✅ 空白 Google Sheet</p>
           <p className="m-0">✅ 旅團名稱及旅團號（如 0082）</p>
@@ -107,7 +107,7 @@ export default function Setup() {
           <span className="w-7 h-7 bg-rose-500 text-white rounded-lg flex items-center justify-center text-sm">⚠️</span>
           常見問題
         </h2>
-        <dl className="text-[11px] m-0 space-y-2">
+        <dl className="text-sm m-0 space-y-2">
           <div>
             <dt className="font-bold text-slate-700">看不到我的旅團？</dt>
             <dd className="text-slate-500 m-0 ml-0 mt-0.5">代表尚未開通。請先提交「申請接入」，等平台管理員確認。</dd>

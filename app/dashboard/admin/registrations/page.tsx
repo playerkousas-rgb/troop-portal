@@ -24,13 +24,13 @@ export default function RegistrationsPage() {
 
       <div className="flex gap-2 flex-wrap">
         <div className="flex-1 min-w-[200px]">
-          <label className="text-[11px] font-bold text-slate-500">🏠 旅團內部活動</label>
+          <label className="text-[13px] font-bold text-slate-500">🏠 旅團內部活動</label>
           <select value={eventId} onChange={e => setEventId(e.target.value)} className="w-full rounded-lg border border-slate-200 px-2 py-1.5 text-xs bg-white mt-0.5">
             {EVENTS.filter(e => e.type === 'internal').map(e => <option key={e.id} value={e.id}>{e.title} ({e.date})</option>)}
           </select>
         </div>
         <div className="flex-1 min-w-[200px]">
-          <label className="text-[11px] font-bold text-slate-500">📚 外部（圖書館）活動</label>
+          <label className="text-[13px] font-bold text-slate-500">📚 外部（圖書館）活動</label>
           <select className="w-full rounded-lg border border-slate-200 px-2 py-1.5 text-xs bg-white mt-0.5">
             {EVENTS.filter(e => e.type === 'external').map(e => <option key={e.id} value={e.id}>{e.title} ({e.date})</option>)}
           </select>
@@ -49,7 +49,7 @@ export default function RegistrationsPage() {
             ].map((s, i) => (
               <div key={i} className={`${s.bg} rounded-xl px-2 py-2 text-center`}>
                 <div className={`text-base font-extrabold ${s.text}`}>{s.value}</div>
-                <div className={`text-[11px] font-semibold ${s.text} opacity-80`}>{s.label}</div>
+                <div className={`text-[13px] font-semibold ${s.text} opacity-80`}>{s.label}</div>
               </div>
             ))}
           </div>
@@ -58,25 +58,25 @@ export default function RegistrationsPage() {
           <div className="bg-white rounded-2xl border border-slate-200 p-4">
             <div className="flex items-center justify-between mb-3">
               <h3 className="font-bold text-xs">報名名單 — {event.title}</h3>
-              <button className="text-[11px] bg-emerald-700 text-white px-2 py-1 rounded-lg font-bold">📥 匯出 CSV</button>
+              <button className="text-[13px] bg-emerald-700 text-white px-2 py-1 rounded-lg font-bold">📥 匯出 CSV</button>
             </div>
             <div className="space-y-1.5">
               {REPLIES.map((r, i) => (
                 <div key={i} className="flex items-center justify-between bg-slate-50 rounded-xl px-3 py-2">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1.5">
-                      <span className="font-bold text-[11px]">{r.name}</span>
-                      <span className="text-[11px] text-slate-500">{r.branch} · {r.patrol || '—'}</span>
+                      <span className="font-bold text-[13px]">{r.name}</span>
+                      <span className="text-[13px] text-slate-500">{r.branch} · {r.patrol || '—'}</span>
                     </div>
                   </div>
                   <div className="flex gap-1 items-center flex-shrink-0">
-                    <span className={`text-[11px] px-1.5 py-0.5 rounded-full font-bold ${
+                    <span className={`text-[13px] px-1.5 py-0.5 rounded-full font-bold ${
                       r.status === 'registered' ? 'bg-emerald-100 text-emerald-700' :
                       r.status === 'interested' ? 'bg-amber-100 text-amber-700' : 'bg-slate-200 text-slate-500'
                     }`}>
                       {r.status === 'registered' ? '✅' : r.status === 'interested' ? '❤️' : '⚠️'}
                     </span>
-                    <span className={`text-[11px] px-1.5 py-0.5 rounded-full font-bold ${
+                    <span className={`text-[13px] px-1.5 py-0.5 rounded-full font-bold ${
                       r.paid === 'confirmed' ? 'bg-emerald-100 text-emerald-700' :
                       r.paid === 'pending' ? 'bg-amber-100 text-amber-700' : 'bg-rose-100 text-rose-700'
                     }`}>
@@ -84,7 +84,7 @@ export default function RegistrationsPage() {
                     </span>
                     {/* 領袖可直接核實付款 */}
                     {r.paid !== 'confirmed' && r.status === 'registered' && (
-                      <button className="text-[11px] bg-emerald-700 text-white px-1.5 py-0.5 rounded font-bold ml-1">✓ 核實</button>
+                      <button className="text-[13px] bg-emerald-700 text-white px-1.5 py-0.5 rounded font-bold ml-1">✓ 核實</button>
                     )}
                   </div>
                 </div>

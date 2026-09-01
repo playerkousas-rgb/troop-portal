@@ -44,11 +44,15 @@ export default function HomePage() {
     router.push('/login');
   }
 
-  /** 演示旅團：直接進入 MOCK 控制台，不會誤入真實登入流程。 */
+  /**
+   * 演示旅團：MOCK 已實作進 MAIN —— 進入「真實」登入頁，
+   * 用演示帳號登入後跑真實頁面（/admin /member /parent /leader），
+   * 資料經真實 HTTP 路徑（/api/proxy → 內置 MOCK 後台）回傳，可實測前後端連線。
+   */
   function enterDemo() {
     setMockMode(true);
     localStorage.setItem(TROOP_KEY, JSON.stringify({ key: MOCK_TROOP.key, id: MOCK_TROOP.id, name: MOCK_TROOP.name }));
-    router.push('/dashboard');
+    router.push('/login');
   }
 
   function exitDemo() {
@@ -76,7 +80,7 @@ export default function HomePage() {
         </p>
         <div className="flex items-center justify-center gap-3 flex-wrap">
           <Link href={resume.dash} className="inline-flex items-center justify-center bg-brand-600 text-white font-bold px-6 py-3 rounded-xl no-underline hover:bg-brand-700 transition">繼續 →</Link>
-          <button type="button" onClick={logoutAndStay} className="text-xs font-bold text-slate-500 bg-transparent border-0 cursor-pointer underline underline-offset-2">登出並選擇其他旅團</button>
+          <button type="button" onClick={logoutAndStay} className="text-sm font-bold text-slate-500 bg-transparent border-0 cursor-pointer underline underline-offset-2">登出並選擇其他旅團</button>
         </div>
       </div>
     );
@@ -123,15 +127,15 @@ export default function HomePage() {
               <span className="w-10 h-10 bg-amber-100 rounded-xl flex items-center justify-center text-xl flex-shrink-0">🎭</span>
               <span className="flex-1 min-w-0">
                 <span className="block font-bold text-sm text-amber-800">演示體驗 · 全模擬（MOCK）</span>
-                <span className="block text-[11px] text-amber-700/80">7 種角色帳號 · 假資料 · 免後台 · 睇晒成個 UI</span>
+                <span className="block text-sm text-amber-700/80">7 種角色帳號 · 假資料 · 真前後端連線（內置 MOCK 後台）</span>
               </span>
               <span className="text-amber-600 font-black text-base flex-shrink-0">→</span>
             </div>
           </button>
           {mockOn && (
             <div className="flex items-center gap-2 -mt-0.5 pl-1">
-              <span className="text-[11px] font-bold text-amber-700">🎭 演示模式開啟中</span>
-              <button type="button" onClick={exitDemo} className="text-[11px] text-slate-500 underline underline-offset-2 bg-transparent border-0 cursor-pointer">退出演示模式</button>
+              <span className="text-sm font-bold text-amber-700">🎭 演示模式開啟中</span>
+              <button type="button" onClick={exitDemo} className="text-sm text-slate-500 underline underline-offset-2 bg-transparent border-0 cursor-pointer">退出演示模式</button>
             </div>
           )}
 
@@ -147,7 +151,7 @@ export default function HomePage() {
                 <span className="w-10 h-10 bg-slate-100 rounded-xl flex items-center justify-center text-xl flex-shrink-0">⚜</span>
                 <span className="flex-1 min-w-0">
                   <span className="block font-bold text-sm text-slate-800">{t.name}</span>
-                  <span className="block text-[11px] text-slate-500">編號 {t.id}</span>
+                  <span className="block text-sm text-slate-500">編號 {t.id}</span>
                 </span>
                 <span className="text-slate-400 font-black text-base flex-shrink-0">→</span>
               </div>
@@ -158,7 +162,7 @@ export default function HomePage() {
         {/* 公開內容（行事曆／公告／活動）唔使登入已經喺底部「選擇旅團」後可見，
             所以唔再放「只睇公開資料」按鈕；旅團管理員可以喺「系統設定」關閉公開瀏覽。 */}
         {msg && <p className="mt-3 text-[12px] text-slate-500 font-bold m-0">{msg}</p>}
-        <p className="mt-3 text-[11px] text-slate-500 m-0">
+        <p className="mt-3 text-sm text-slate-500 m-0">
           💡 揀咗旅團之後，公開行事曆／公告／活動唔使登入都可以睇（旅團可自行選擇關閉）。
           看不到你的旅團？代表尚未開通，請用右上角「新旅團申請及教學」。
         </p>
@@ -166,7 +170,7 @@ export default function HomePage() {
 
       {/* 固定底部快捷列上方的版權資訊 */}
       <footer className="pt-5 pb-1 text-center">
-        <p className="text-[11px] text-slate-500 m-0">© 2026 Scout System · 旅團管理系統</p>
+        <p className="text-sm text-slate-500 m-0">© 2026 Scout System · 旅團管理系統</p>
       </footer>
     </div>
   );

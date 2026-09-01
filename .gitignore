@@ -25,3 +25,6 @@ yarn-error.log*
 
 # typescript
 *.tsbuildinfo
+
+# mock 後台持久化資料（演示旅團）
+.mockdata/

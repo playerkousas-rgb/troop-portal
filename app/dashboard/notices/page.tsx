@@ -114,28 +114,28 @@ export default function NoticesPage() {
 
       {/* Demo 角色 */}
       <div className="flex gap-1.5 flex-wrap items-center">
-        <span className="text-[11px] text-slate-500 mr-1">Demo：</span>
+        <span className="text-[13px] text-slate-500 mr-1">Demo：</span>
         {['parent', 'member', 'branch_leader', 'admin'].map(r => (
           <button key={r} onClick={() => { setRole(r); setMsg(''); }}
-            className={`text-[11px] px-2 py-0.5 rounded-full border font-bold ${role === r ? 'bg-brand-600 text-white border-brand-600' : 'bg-white text-slate-500 border-slate-200'}`}>
+            className={`text-[13px] px-2 py-0.5 rounded-full border font-bold ${role === r ? 'bg-brand-600 text-white border-brand-600' : 'bg-white text-slate-500 border-slate-200'}`}>
             {r === 'parent' ? '家長' : r === 'member' ? '成員' : r === 'branch_leader' ? '支部領袖' : '管理員'}
           </button>
         ))}
-        {isLeader && <span className="text-[11px] text-emerald-700 font-bold">· 你可直接喺本頁發佈／編輯</span>}
+        {isLeader && <span className="text-[13px] text-emerald-700 font-bold">· 你可直接喺本頁發佈／編輯</span>}
       </div>
 
       {/* Header */}
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <h1 className="font-bold text-lg m-0">📢 公告</h1>
         {isLeader && (
-          <button onClick={openNew} className="text-[11px] px-2.5 py-1 rounded-lg font-bold bg-brand-600 text-white">+ 發佈公告</button>
+          <button onClick={openNew} className="text-[13px] px-2.5 py-1 rounded-lg font-bold bg-brand-600 text-white">+ 發佈公告</button>
         )}
       </div>
-      <p className="text-[11px] text-slate-500 m-0 -mt-2 leading-relaxed">
+      <p className="text-[13px] text-slate-500 m-0 -mt-2 leading-relaxed">
         公告＝提示類訊息，例如「活動因天氣取消」「請家長交團費」「集會改期」。活動通告文件唔喺呢度，喺「活動」入面。
       </p>
 
-      {msg && <div className="text-[11px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-xl px-3 py-2">{msg}</div>}
+      {msg && <div className="text-[13px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-xl px-3 py-2">{msg}</div>}
 
       {/* 列表 */}
       <div className="space-y-2">
@@ -147,19 +147,19 @@ export default function NoticesPage() {
               <div className="flex items-start gap-2">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1.5 flex-wrap">
-                    {a.urgent && <span className="text-[11px] bg-rose-600 text-white px-1.5 py-0.5 rounded font-bold">緊急</span>}
-                    {expired && <span className="text-[11px] bg-slate-200 text-slate-600 px-1.5 py-0.5 rounded font-bold">已過期</span>}
+                    {a.urgent && <span className="text-[13px] bg-rose-600 text-white px-1.5 py-0.5 rounded font-bold">緊急</span>}
+                    {expired && <span className="text-[13px] bg-slate-200 text-slate-600 px-1.5 py-0.5 rounded font-bold">已過期</span>}
                     <span className="font-bold text-[13px]">{a.title}</span>
                   </div>
-                  <p className="text-[11px] text-slate-600 mt-1.5 m-0 leading-relaxed whitespace-pre-wrap">{a.body}</p>
-                  <div className="text-[11px] text-slate-500 mt-1.5">
+                  <p className="text-[13px] text-slate-600 mt-1.5 m-0 leading-relaxed whitespace-pre-wrap">{a.body}</p>
+                  <div className="text-[13px] text-slate-500 mt-1.5">
                     {a.date} · 對象：{a.target}{a.validUntil ? ` · 有效至 ${a.validUntil}` : ' · 長期'}
                   </div>
                 </div>
                 {isLeader && (
                   <div className="flex gap-1 flex-shrink-0">
-                    <button onClick={() => openEdit(a.id)} className="text-[11px] text-slate-600 px-1.5 py-0.5 rounded hover:bg-slate-100" title="編輯">✏️</button>
-                    <button onClick={() => del(a.id)} className="text-[11px] text-rose-600 px-1.5 py-0.5 rounded hover:bg-rose-50" title="刪除">🗑</button>
+                    <button onClick={() => openEdit(a.id)} className="text-[13px] text-slate-600 px-1.5 py-0.5 rounded hover:bg-slate-100" title="編輯">✏️</button>
+                    <button onClick={() => del(a.id)} className="text-[13px] text-rose-600 px-1.5 py-0.5 rounded hover:bg-rose-50" title="刪除">🗑</button>
                   </div>
                 )}
               </div>
@@ -170,7 +170,7 @@ export default function NoticesPage() {
 
       {/* 過期公告開關 */}
       <div className="flex items-center gap-2">
-        <button onClick={() => setShowExpired(v => !v)} className="text-[11px] font-bold text-slate-600 bg-slate-100 border-0 rounded-lg px-3 py-2 cursor-pointer hover:bg-slate-200">
+        <button onClick={() => setShowExpired(v => !v)} className="text-[13px] font-bold text-slate-600 bg-slate-100 border-0 rounded-lg px-3 py-2 cursor-pointer hover:bg-slate-200">
           {showExpired ? '隱藏已過期公告' : `顯示已過期公告（${items.filter(isExpired).length}）`}
         </button>
       </div>
@@ -180,21 +180,21 @@ export default function NoticesPage() {
         <div className="fixed inset-0 z-50 bg-black/30 flex items-end sm:items-center justify-center p-0 sm:p-4">
           <div className="bg-white w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl p-4 space-y-3 max-h-[90vh] overflow-y-auto">
             <h3 className="font-bold text-sm m-0">{form.id ? '✏️ 編輯公告' : '📢 發佈公告'}</h3>
-            <label className="flex items-center gap-2 text-[11px] font-bold text-slate-600">標題<input className={inputCls} value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} placeholder="例如：9月20日露營因天氣取消" /></label>
-            <label className="flex flex-col gap-1 text-[11px] font-bold text-slate-600">內容
+            <label className="flex items-center gap-2 text-[13px] font-bold text-slate-600">標題<input className={inputCls} value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} placeholder="例如：9月20日露營因天氣取消" /></label>
+            <label className="flex flex-col gap-1 text-[13px] font-bold text-slate-600">內容
               <textarea rows={4} className="rounded-lg border border-slate-200 px-2 py-1.5 text-xs" value={form.body} onChange={e => setForm({ ...form, body: e.target.value })} placeholder="寫清楚發生咩事、成員／家長要做咩、限期" />
             </label>
-            <label className="flex items-center gap-2 text-[11px] font-bold text-slate-600">對象
+            <label className="flex items-center gap-2 text-[13px] font-bold text-slate-600">對象
               <select className={inputCls} value={form.target} onChange={e => setForm({ ...form, target: e.target.value })}>
                 {TARGETS.map(t => <option key={t} value={t}>{t}</option>)}
               </select>
             </label>
-            <label className="flex items-center gap-2 text-[11px] font-bold text-slate-600">有效至<input type="date" className={inputCls} value={form.validUntil} onChange={e => setForm({ ...form, validUntil: e.target.value })} /></label>
-            <label className="flex items-center gap-2 text-[11px] font-bold text-slate-600">
+            <label className="flex items-center gap-2 text-[13px] font-bold text-slate-600">有效至<input type="date" className={inputCls} value={form.validUntil} onChange={e => setForm({ ...form, validUntil: e.target.value })} /></label>
+            <label className="flex items-center gap-2 text-[13px] font-bold text-slate-600">
               <input type="checkbox" checked={form.urgent} onChange={e => setForm({ ...form, urgent: e.target.checked })} />
               標記為緊急（紅色顯示，排最前）
             </label>
-            {formErr && <p className="text-[11px] font-bold text-rose-700 bg-rose-50 rounded-lg px-2 py-1.5 m-0">{formErr}</p>}
+            {formErr && <p className="text-[13px] font-bold text-rose-700 bg-rose-50 rounded-lg px-2 py-1.5 m-0">{formErr}</p>}
             <div className="flex gap-2 pt-1">
               <button onClick={save} className="flex-1 text-[12px] font-bold bg-brand-600 text-white py-2 rounded-xl">{form.id ? '儲存' : '發佈'}</button>
               <button onClick={() => { setForm(null); setFormErr(''); }} className="flex-1 text-[12px] font-bold bg-slate-100 text-slate-600 py-2 rounded-xl">取消</button>

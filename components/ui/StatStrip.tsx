@@ -22,17 +22,17 @@ const TONE: Record<string, string> = {
 export default function StatStrip({ stats }: { stats: Stat[] }) {
   if (!stats.length) return null;
   return (
-    <section className="bg-white rounded-2xl border border-slate-200 shadow-sm p-2.5 grid grid-cols-2 sm:grid-cols-4 gap-2">
+    <section className="bg-white rounded-2xl border border-slate-200 shadow-sm p-3 grid grid-cols-2 sm:grid-cols-4 gap-2.5">
       {stats.map(st => {
         const inner = (
           <div
-            className={`rounded-xl px-3 py-2.5 text-center transition ${TONE[st.tone || 'blue']} ${
+            className={`rounded-xl px-3 py-3.5 text-center transition ${TONE[st.tone || 'blue']} ${
               st.href ? 'hover:shadow-sm hover:brightness-[0.98]' : ''
             }`}
           >
-            <div className="text-xl font-black leading-none">{st.value}</div>
-            <div className="text-[11px] font-bold mt-1">{st.label}</div>
-            {st.desc && <div className="text-[11px] text-slate-500 mt-0.5">{st.desc}</div>}
+            <div className="text-2xl font-black leading-none">{st.value}</div>
+            <div className="text-sm font-bold mt-1.5">{st.label}</div>
+            {st.desc && <div className="text-sm text-slate-500 mt-0.5">{st.desc}</div>}
           </div>
         );
         return st.href ? (

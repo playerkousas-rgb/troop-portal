@@ -13,12 +13,12 @@ export default function BranchesPage() {
         <div key={b.id} className="bg-white rounded-xl border border-slate-200 p-4">
           <div className="flex items-center justify-between mb-1">
             <span className="font-bold text-sm">{b.name}</span>
-            <span className="text-[11px] text-slate-500">{b.members} 人 · {b.patrols} 小隊</span>
+            <span className="text-[13px] text-slate-500">{b.members} 人 · {b.patrols} 小隊</span>
           </div>
-          <p className="text-[11px] text-slate-500">{b.note}</p>
+          <p className="text-[13px] text-slate-500">{b.note}</p>
           <div className="flex gap-2 mt-2">
-            <button className="text-[11px] text-brand-600 font-bold">管理小隊 →</button>
-            <button className="text-[11px] text-slate-500 font-bold">編輯支部 →</button>
+            <button className="text-[13px] text-brand-600 font-bold">管理小隊 →</button>
+            <button className="text-[13px] text-slate-500 font-bold">編輯支部 →</button>
           </div>
         </div>
       ))}

@@ -6,111 +6,142 @@ import { getSession, Session } from '@/lib/session';
 import { branches, ROLE_LABEL, LEADER_ROLES } from '@/lib/model';
 import Link from 'next/link';
 
-export default function Profile(){
-  const [s,setS]=useState<AppState|null>(null);
-  const [err,setErr]=useState('');
-  const [ok,setOk]=useState('');
-  const [saving,setSaving]=useState(false);
+/* ═══════════════════════════════════════════════════
+   個人資料 —— MOCK 乾淨版式：大頭像 + 白卡表單
+   （功能不變：姓名/密碼/Email/電話/小隊/隊內身份）
+   ═══════════════════════════════════════════════════ */
+
+export default function Profile() {
+  const [s, setS] = useState<AppState | null>(null);
+  const [err, setErr] = useState('');
+  const [ok, setOk] = useState('');
+  const [saving, setSaving] = useState(false);
   // 不能在 render 期直接 getSession()：SSR 拿不到 localStorage 會渲染「請先登入」，
   // client 第一次 render 卻有 session → hydration mismatch（React error #425）。
-  // 改用 useState + useEffect（同 components/Auth.tsx 的做法）。
-  const [session,setSession]=useState<Session|null|undefined>(undefined);
-  useEffect(()=>{setSession(getSession())},[]);
+  const [session, setSession] = useState<Session | null | undefined>(undefined);
+  useEffect(() => { setSession(getSession()) }, []);
 
   // editable fields
-  const [name,setName]=useState('');
-  const [password,setPassword]=useState('');
-  const [phone,setPhone]=useState('');
-  const [email,setEmail]=useState('');
-  const [patrolId,setPatrolId]=useState('');
-  const [patrolRole,setPatrolRole]=useState('');
+  const [name, setName] = useState('');
+  const [password, setPassword] = useState('');
+  const [phone, setPhone] = useState('');
+  const [email, setEmail] = useState('');
+  const [patrolId, setPatrolId] = useState('');
+  const [patrolRole, setPatrolRole] = useState('');
 
-  useEffect(()=>{
-    if(!session)return;
-    loadStateSlice(['patrols','users','members']).then(st=>{
+  useEffect(() => {
+    if (!session) return;
+    loadStateSlice(['patrols', 'users', 'members']).then(st => {
       setS(st);
-      if(session.role==='member'){
-        const m=st.members.find(x=>x.id===session.memberId);
-        if(m){setName(m.name);setPhone(m.emergencyContactPhone||'');setEmail('');setPatrolId(m.patrolId||'');setPatrolRole(m.patrolRole||'')}
+      if (session.role === 'member') {
+        const m = st.members.find(x => x.id === session.memberId);
+        if (m) { setName(m.name); setPhone(m.emergencyContactPhone || ''); setEmail(''); setPatrolId(m.patrolId || ''); setPatrolRole(m.patrolRole || '') }
       } else {
-        const u=st.users.find(x=>x.id===session.userId);
-        if(u){setName(u.name);if(!LEADER_ROLES.includes(session.role))setEmail(u.email||'')}
+        const u = st.users.find(x => x.id === session.userId);
+        if (u) { setName(u.name); if (!LEADER_ROLES.includes(session.role)) setEmail(u.email || '') }
       }
-    }).catch(e=>setErr(e.message))
-  },[session]);
+    }).catch(e => setErr(e.message))
+  }, [session]);
 
-  async function save(){
-    setErr('');setOk('');setSaving(true);
-    try{
-      if(session?.role==='member'&&session.memberId){
-        const updates:any={memberId:session.memberId,name};
-        if(password)updates.password=password;
-        if(phone)updates.emergencyContactPhone=phone;
-        if(patrolId!==undefined)updates.patrolId=patrolId;
-        if(patrolRole)updates.patrolRole=patrolRole;
-        const fresh=await apiUpdateMember(updates);
+  async function save() {
+    setErr(''); setOk(''); setSaving(true);
+    try {
+      if (session?.role === 'member' && session.memberId) {
+        const updates: any = { memberId: session.memberId, name };
+        if (password) updates.password = password;
+        if (phone) updates.emergencyContactPhone = phone;
+        if (patrolId !== undefined) updates.patrolId = patrolId;
+        if (patrolRole) updates.patrolRole = patrolRole;
+        const fresh = await apiUpdateMember(updates);
         setS(fresh);
-      } else if(session?.userId){
-        if(name)await apiUpdateUserField(session.userId,'name',name);
-        if(password)await apiUpdateUserField(session.userId,'password',password);
-        if(!LEADER_ROLES.includes(session.role)&&email)await apiUpdateUserField(session.userId,'email',email);
-        const {loadState}=await import('@/lib/store');
+      } else if (session?.userId) {
+        if (name) await apiUpdateUserField(session.userId, 'name', name);
+        if (password) await apiUpdateUserField(session.userId, 'password', password);
+        if (!LEADER_ROLES.includes(session.role) && email) await apiUpdateUserField(session.userId, 'email', email);
+        const { loadState } = await import('@/lib/store');
         setS(await loadState());
       }
       setOk('✅ 已儲存');
       setPassword('');
-    }catch(e:any){setErr(e.message)}finally{setSaving(false)}
+    } catch (e: any) { setErr(e.message) } finally { setSaving(false) }
   }
 
-  if(session===undefined)return <div className="card">載入中...</div>;
-  if(!session)return <div className="card"><p className="muted">請先登入。<Link href="/login">登入</Link></p></div>;
-  if(!s)return <div className="card">載入中...</div>;
+  if (session === undefined) return <main className="max-w-2xl mx-auto px-4 py-8 pb-24 text-sm text-slate-600">載入中...</main>;
+  if (!session) return <main className="max-w-2xl mx-auto px-4 py-8 pb-24 text-sm text-slate-600">請先登入。<Link href="/login" className="font-bold text-brand-700 underline underline-offset-4">登入</Link></main>;
+  if (!s) return <main className="max-w-2xl mx-auto px-4 py-8 pb-24 text-sm text-slate-600">載入中...</main>;
 
-  const myMember = session.role==='member' ? s.members.find(m=>m.id===session.memberId) : null;
-  const availablePatrols = myMember ? s.patrols.filter(p=>p.branchId===myMember.branchId&&p.enabled) : [];
+  const myMember = session.role === 'member' ? s.members.find(m => m.id === session.memberId) : null;
+  const availablePatrols = myMember ? s.patrols.filter(p => p.branchId === myMember.branchId && p.enabled) : [];
 
-  return <div className="stack">
-    <section className="hero">
-      <span className="badge gold">個人資料</span>
-      <h1>{session.name}</h1>
-      <p>角色：{ROLE_LABEL[session.role]}</p>
-    </section>
-    {err&&<p className="badge red">{err}</p>}
-    {ok&&<p className="badge green">{ok}</p>}
+  const inputCls = 'w-full rounded-lg border border-slate-200 px-3 py-2.5 text-base bg-white';
+  const labelCls = 'block text-sm font-bold text-slate-600 mb-1.5';
 
-    <section className="card stack">
-      <label>姓名<input value={name} onChange={e=>setName(e.target.value)}/></label>
+  return (
+    <main className="max-w-2xl mx-auto px-4 py-4 pb-24 space-y-4">
+      {/* 身份頭卡 */}
+      <div className="bg-white rounded-2xl border border-slate-200 p-4 flex items-center gap-3.5">
+        <span className="w-14 h-14 bg-brand-100 text-brand-700 rounded-2xl flex items-center justify-center text-3xl flex-shrink-0" aria-hidden>👤</span>
+        <div className="min-w-0">
+          <h1 className="font-black text-lg text-slate-800 m-0 truncate">{session.name}</h1>
+          <p className="text-sm text-slate-500 font-semibold m-0 mt-0.5">角色：{ROLE_LABEL[session.role]}</p>
+        </div>
+      </div>
 
-      <label>密碼<input type="password" value={password} onChange={e=>setPassword(e.target.value)} placeholder="留空 = 不改"/></label>
+      {err && <p className="text-sm font-bold bg-rose-50 text-rose-700 border border-rose-200 rounded-xl px-3 py-2.5 m-0 whitespace-pre-wrap">{err}</p>}
+      {ok && <p className="text-sm font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-xl px-3 py-2.5 m-0">{ok}</p>}
 
-      {(session.role==='member' || !LEADER_ROLES.includes(session.role)) && (
-        <label>Email（用於找回密碼）<input type="email" value={email} onChange={e=>setEmail(e.target.value)}/></label>
-      )}
-      {LEADER_ROLES.includes(session.role) && (
-        <p className="muted">領袖的 Email 如需更改，請聯絡管理員。</p>
-      )}
-
-      {session.role==='member' && (
-        <>
-          <label>電話<input value={phone} onChange={e=>setPhone(e.target.value)} placeholder="聯絡電話"/></label>
-          <label>小隊
-            <select value={patrolId} onChange={e=>setPatrolId(e.target.value)}>
-              <option value="">不適用 / 未分隊</option>
-              {availablePatrols.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}
-            </select>
-          </label>
-          <label>隊內身份
-            <select value={patrolRole} onChange={e=>setPatrolRole(e.target.value)}>
-              <option value="">隊員</option>
-              <option value="leader">隊長</option>
-              <option value="deputy">副隊長</option>
-            </select>
-          </label>
-          <p className="muted">出生日期和 YMIS 不可自行修改，如有需要請聯絡領袖。</p>
-        </>
-      )}
-
-      <button className="btn primary" disabled={saving} onClick={save}>{saving?'儲存中...':'儲存'}</button>
-    </section>
-  </div>;
+      {/* 資料表單 */}
+      <section className="bg-white rounded-2xl border border-slate-200 p-4 space-y-3.5">
+        <h2 className="font-bold text-base text-slate-800 m-0">個人資料</h2>
+        <div className="grid sm:grid-cols-2 gap-3.5">
+          <div>
+            <span className={labelCls}>姓名</span>
+            <input className={inputCls} value={name} onChange={e => setName(e.target.value)} />
+          </div>
+          <div>
+            <span className={labelCls}>密碼</span>
+            <input className={inputCls} type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="留空 = 不改" />
+          </div>
+          {(session.role === 'member' || !LEADER_ROLES.includes(session.role)) && (
+            <div>
+              <span className={labelCls}>Email（用於找回密碼）</span>
+              <input className={inputCls} type="email" value={email} onChange={e => setEmail(e.target.value)} />
+            </div>
+          )}
+          {session.role === 'member' && (
+            <>
+              <div>
+                <span className={labelCls}>電話</span>
+                <input className={inputCls} value={phone} onChange={e => setPhone(e.target.value)} placeholder="聯絡電話" />
+              </div>
+              <div>
+                <span className={labelCls}>小隊</span>
+                <select className={inputCls} value={patrolId} onChange={e => setPatrolId(e.target.value)}>
+                  <option value="">不適用 / 未分隊</option>
+                  {availablePatrols.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                </select>
+              </div>
+              <div>
+                <span className={labelCls}>隊內身份</span>
+                <select className={inputCls} value={patrolRole} onChange={e => setPatrolRole(e.target.value)}>
+                  <option value="">隊員</option>
+                  <option value="leader">隊長</option>
+                  <option value="deputy">副隊長</option>
+                </select>
+              </div>
+            </>
+          )}
+        </div>
+        {LEADER_ROLES.includes(session.role) && (
+          <p className="text-sm text-slate-500 m-0">領袖的 Email 如需更改，請聯絡管理員。</p>
+        )}
+        {session.role === 'member' && (
+          <p className="text-sm text-slate-500 m-0">出生日期和 YMIS 不可自行修改，如有需要請聯絡領袖。</p>
+        )}
+        <button className="w-full text-base font-black bg-brand-600 text-white py-3 rounded-xl border-0 cursor-pointer hover:bg-brand-700 transition disabled:opacity-60" disabled={saving} onClick={save}>
+          {saving ? '儲存中...' : '儲存'}
+        </button>
+      </section>
+    </main>
+  );
 }

@@ -13,13 +13,13 @@ export default function AuditPage() {
       <div className="space-y-1.5">
         {logs.map((l, i) => (
           <div key={i} className="bg-white rounded-xl border border-slate-200 p-3 flex items-center gap-3">
-            <div className="w-8 h-8 bg-slate-100 rounded-lg flex items-center justify-center text-[11px] flex-shrink-0">📋</div>
+            <div className="w-8 h-8 bg-slate-100 rounded-lg flex items-center justify-center text-[13px] flex-shrink-0">📋</div>
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-1.5">
-                <span className="font-bold text-[11px]">{l.action}</span>
-                <span className="text-[11px] text-slate-500">{l.entity}</span>
+                <span className="font-bold text-[13px]">{l.action}</span>
+                <span className="text-[13px] text-slate-500">{l.entity}</span>
               </div>
-              <div className="text-[11px] text-slate-500">{l.user} · {l.time} · {l.detail}</div>
+              <div className="text-[13px] text-slate-500">{l.user} · {l.time} · {l.detail}</div>
             </div>
           </div>
         ))}

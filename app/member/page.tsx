@@ -24,7 +24,7 @@ export default function Member(){
     { id: 'calendar', icon: '📅', label: '行事曆', desc: '旅團公開行事曆及集會時間。', href: '/calendar' },
   ];
 
-  if(err)return <div className="bg-rose-50 border border-rose-200 rounded-2xl p-4"><p className="text-xs text-rose-700 font-bold m-0 whitespace-pre-wrap leading-relaxed">{err}</p></div>;
+  if(err)return <div className="bg-rose-50 border border-rose-200 rounded-2xl p-4"><p className="text-sm text-rose-700 font-bold m-0 whitespace-pre-wrap leading-relaxed">{err}</p></div>;
   if(!s)return <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 text-sm text-slate-600">載入中...</div>;
   const member=s.members.find(m=>m.id===(session?.memberId))||s.members[0];
   if(!member)return <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 text-sm text-slate-600">找不到成員資料。</div>;
@@ -45,7 +45,7 @@ export default function Member(){
   });
 
   return (
-    <div className="space-y-3">
+    <div className="max-w-5xl mx-auto space-y-4">
       <ConsoleHeader
         icon="👤"
         name={member.name}
@@ -53,7 +53,7 @@ export default function Member(){
         tone="emerald"
         tagline={adult ? '你已 18 歲或以上，可自行回覆活動 ✅ / ❌。' : '你未滿 18 歲，可按 ❤️ 表示有興趣；參加 / 不參加由家長決定。'}
         action={
-          <Link href="/profile" className="no-underline text-[11px] font-bold bg-white/95 text-slate-800 px-3 py-2 rounded-xl hover:bg-white transition whitespace-nowrap">
+          <Link href="/profile" className="no-underline text-sm font-bold bg-white/95 text-slate-800 px-3 py-2 rounded-xl hover:bg-white transition whitespace-nowrap">
             👤 個人設定
           </Link>
         }
@@ -61,7 +61,7 @@ export default function Member(){
 
       {err && (
         <section className="bg-rose-50 border border-rose-200 rounded-2xl p-4">
-          <p className="text-xs text-rose-700 font-bold m-0 whitespace-pre-wrap leading-relaxed">{err}</p>
+          <p className="text-sm text-rose-700 font-bold m-0 whitespace-pre-wrap leading-relaxed">{err}</p>
         </section>
       )}
 
@@ -124,7 +124,7 @@ export default function Member(){
             { k: '小隊', v: s.patrols.find(p=>p.id===member.patrolId)?.name || '—' },
           ].map(item => (
             <div key={item.k} className="rounded-xl bg-slate-50 border border-slate-200 px-3 py-2">
-              <div className="text-[11px] text-slate-500 font-bold">{item.k}</div>
+              <div className="text-sm text-slate-500 font-bold">{item.k}</div>
               <div className="text-sm font-bold text-slate-800">{item.v}</div>
             </div>
           ))}
@@ -132,8 +132,8 @@ export default function Member(){
       </Panel>
 
       <div className="flex gap-2 flex-wrap">
-        <Link href="/profile" className="no-underline text-[11px] font-bold bg-white text-slate-700 border border-slate-200 px-3 py-2 rounded-xl hover:bg-slate-50 transition">我的資料 / 改密碼</Link>
-        <Link href="/calendar" className="no-underline text-[11px] font-bold bg-white text-slate-700 border border-slate-200 px-3 py-2 rounded-xl hover:bg-slate-50 transition">行事曆</Link>
+        <Link href="/profile" className="no-underline text-sm font-bold bg-white text-slate-700 border border-slate-200 px-3 py-2 rounded-xl hover:bg-slate-50 transition">我的資料 / 改密碼</Link>
+        <Link href="/calendar" className="no-underline text-sm font-bold bg-white text-slate-700 border border-slate-200 px-3 py-2 rounded-xl hover:bg-slate-50 transition">行事曆</Link>
       </div>
     </div>
   );
