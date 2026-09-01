@@ -4,6 +4,7 @@ import { AppState, loadState, loadStateSlice } from '@/lib/store';
 import { apiCreateMember, apiLinkParent, apiUpdateMember, apiDeleteMember } from '@/lib/api';
 import { branches } from '@/lib/model';
 import { useConfirm, kv } from '@/components/ConfirmProvider';
+import Auth from '@/components/Auth';
 
 function roleLabel(r?:string){return r==='leader'?'隊長':r==='deputy'?'副隊長':r==='member'?'隊員':'—'}
 function branchName(id?:string){return branches.find(b=>b.id===id)?.short||id||'—'}
@@ -121,7 +122,7 @@ export default function Page(){
   if(!s)return <div className="card">{err||'載入中...'}</div>;
   const parents=s.users.filter(u=>u.role==='parent');
 
-  return <div className="stack">
+  return <Auth roles={['super_admin', 'troop_super', 'admin', 'group_leader', 'branch_leader', 'coach']}><div className="stack">
     <section className="hero"><span className="badge gold">成員資料庫</span><h1>成員資料庫</h1><p>新增、編輯、刪除成員，指派支部 / 小隊，並連結家長。</p></section>
     {err&&<p className="badge red">{err}</p>}
 
@@ -214,5 +215,5 @@ export default function Page(){
       </table>
       {s.members.length===0&&<p className="muted">尚無成員。</p>}
     </section>
-  </div>;
+  </div></Auth>;
 }

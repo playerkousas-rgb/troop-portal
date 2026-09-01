@@ -21,7 +21,7 @@ export default function Activities() {
   // 旅團管理員可以關閉公開瀏覽 → 未登入乜都睇唔到
   if (!session && !publicViewEnabled(s.config)) return <PublicLocked troopName={s.config?.TROOP_NAME} />;
 
-  const published = s.events.filter(e => e.status === 'published');
+  const published = s.events.filter(e => e.status === 'published'); // 'archived'（過期通告）唔會顯示畀成員
   const visible = published.filter(e =>
     filter === 'all' ? true
     : filter === 'internal' ? eventCategory(e) === 'self'

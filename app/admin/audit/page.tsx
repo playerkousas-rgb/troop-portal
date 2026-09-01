@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { AppState, Audit, loadStateSlice } from '@/lib/store';
+import Auth from '@/components/Auth';
 
 /** 操作紀錄分類（審核紀錄已合併喺度） */
 function categoryOf(a: Audit): string {
@@ -27,6 +28,7 @@ export default function Page() {
   const list = s.audits.filter(a => cat === '全部' || categoryOf(a) === cat);
 
   return (
+    <Auth roles={['super_admin', 'troop_super', 'admin']}>
     <div className="stack">
       <section className="hero">
         <span className="badge gold">操作紀錄</span>
@@ -63,5 +65,6 @@ export default function Page() {
         {list.length === 0 && <p className="muted">此分類暫無紀錄。</p>}
       </section>
     </div>
+    </Auth>
   );
 }

@@ -331,7 +331,7 @@ export function buildMockState(userId: string): AppState {
   const visibleEvents = (e: typeof store.events[number]) =>
     guest ? e.status === 'published'
       : admin || leaderAll ? true
-      : leaderBranch ? (e.scope === 'branch' ? e.branchId === branchId : e.status === 'published')
+      : leaderBranch ? (e.status !== 'archived' && (e.scope === 'branch' ? e.branchId === branchId : e.status === 'published'))
       : isMember ? e.status === 'published' && (e.scope === 'troop' || e.branchId === memberBranch)
       : isParent ? e.status === 'published' && (e.scope === 'troop' || (user!.childMemberIds || []).some(id => { const m = store.members.find(mm => mm.id === id); return m && m.branchId === e.branchId; }))
       : false;

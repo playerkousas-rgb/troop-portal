@@ -4,6 +4,7 @@ import { AppState, loadState, loadStateSlice, replyStatus, eventCategory } from 
 import { apiTogglePaid, apiConfirmPayment } from '@/lib/api';
 import { useSearchParams } from 'next/navigation';
 import { useConfirm, kv } from '@/components/ConfirmProvider';
+import Auth from '@/components/Auth';
 
 const GROUP_DEFS = [
   { id: 'b1', name: '🎒 小童軍', full: '小童軍支部', color: '#ff9800', text: '#b06000', border: '#ffe0b2' },
@@ -136,7 +137,7 @@ function RegistrationsInner(){
   function csv(){
     if(!s || !event) return;
     const tabName = activeListTab === 'all' ? '全部總合' : GROUP_DEFS.find(g=>g.id===activeListTab)?.name.replace(/[^a-zA-Z0-9\u4e00-\u9fa5]/g,'') || activeListTab;
-    const rows=[['姓名','YMIS','所屬單位','小隊/職務','回覆出席狀態','緊急聯絡人','緊急電話','付款核對狀態']];
+    const rows=[['姓名','YMIS','所屬單位','小隊/職務','回覆出席狀態','緊急聯絡人','緊急電話','家長付款','領袖收款核實']];
     displayTargets.forEach(m => {
       const r=replyStatus(s,eventId,m.id);
       const p=s.patrols.find(x=>x.id===m.patrolId);
@@ -144,7 +145,8 @@ function RegistrationsInner(){
       const pd = getIsPaid(m.id) ? '已完成付款' : '未付款';
       const bName = GROUP_DEFS.find(g=>g.id===m.branchId)?.full || m.branchId;
       const pName = m.isLeader ? '領袖團隊' : m.isParent ? '家長' : (p?.name || '未分小隊');
-      rows.push([m.name, m.ymNumber, bName, pName, st, m.emergencyContactName||'', m.emergencyContactPhone||'', pd]);
+      const cf = isConfirmed(m.id) ? '已確認收款' : '未核實';
+      rows.push([m.name, m.ymNumber, bName, pName, st, m.emergencyContactName||'', m.emergencyContactPhone||'', pd, cf]);
     });
     const blob=new Blob(['\ufeff'+rows.map(r=>r.map(c=>`"${c}"`).join(',')).join('\n')],{type:'text/csv'});
     const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=`${event.title}_${tabName}_報名名單.csv`;a.click();URL.revokeObjectURL(url);
@@ -162,7 +164,7 @@ function RegistrationsInner(){
 
   const modifiedCount = Object.keys(paidOverrides).length;
 
-  return <div className="stack">
+  return <Auth roles={['super_admin', 'troop_super', 'admin', 'group_leader', 'branch_leader', 'coach']}><div className="stack">
     <section className="hero">
       <span className="badge gold">活動統計</span>
       <h1>📊 活動統計（只計自行舉辦活動）</h1>
@@ -473,7 +475,7 @@ function RegistrationsInner(){
         )}
       </div>
     </Layer></>}
-  </div>;
+  </div></Auth>;
 }
 
 export default function Page(){

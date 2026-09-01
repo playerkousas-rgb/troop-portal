@@ -7,6 +7,7 @@ import { parseNoticeText, ParsedNotice } from '@/lib/noticeParser';
 import { branches } from '@/lib/model';
 import { getSession } from '@/lib/session';
 import { useConfirm, kv } from '@/components/ConfirmProvider';
+import Auth from '@/components/Auth';
 
 const NOTICE_TYPES = ['訓練班', '比賽', '服務', '工作坊', '活動', '其他'];
 
@@ -115,6 +116,7 @@ export default function NoticeUpload(){
   if(!s)return <div className="card">載入中...</div>;
 
   return (
+    <Auth roles={['super_admin', 'troop_super', 'admin', 'group_leader', 'branch_leader', 'coach']}>
     <div className="stack">
       <section className="hero">
         <span className="badge gold">旅團通告上傳</span>
@@ -199,5 +201,6 @@ export default function NoticeUpload(){
         </section>
       )}
     </div>
+    </Auth>
   );
 }
