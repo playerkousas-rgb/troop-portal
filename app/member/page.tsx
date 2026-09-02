@@ -7,7 +7,7 @@ import Panel from '@/components/ui/Panel';
 import EmptyState from '@/components/ui/EmptyState';
 import EventReplyRow from '@/components/ui/EventReplyRow';
 import PluginIframeCard from '@/components/PluginCard';
-import { AppState, loadStateSlice, visibleEventsForMember, replyStatus } from '@/lib/store';
+import { AppState, loadStateSlice, visibleEventsForMember, replyStatus, eventCategory } from '@/lib/store';
 import { apiSetReply } from '@/lib/api';
 import { getSession } from '@/lib/session';
 import { useConfirm, kv } from '@/components/ConfirmProvider';
@@ -79,16 +79,21 @@ export default function Member(){
             events.map(e=>{
               const r=replyStatus(s,e.id,member.id);
               const isDuty = e.dutyPatrol && member.patrolId && s.patrols.find(p => p.id === member.patrolId)?.name === e.dutyPatrol;
-              const badges = [];
-              if (isDuty) badges.push({ text: '你的小隊值日', tone: 'violet' as const });
-              else if (e.dutyPatrol) badges.push({ text: `${e.dutyPatrol} 值日`, tone: 'slate' as const });
+              // 區地域總會活動＝純通告，想報自己去報，旅團唔代收報名
+              const isDistrict = eventCategory(e) === 'district';
+              const badges: { text: string; tone: 'violet' | 'slate' | 'blue' }[] = [];
+              if (isDistrict) badges.push({ text: '🗺️ 區地域總會通告（自行報名）', tone: 'violet' });
+              if (e.status === 'archived') badges.push({ text: '🗂️ 已過期（紀錄保留）', tone: 'slate' });
+              else if (e.lateRegistration) badges.push({ text: '🔓 已重開報名', tone: 'blue' });
+              if (isDuty) badges.push({ text: '你的小隊值日', tone: 'violet' });
+              else if (e.dutyPatrol) badges.push({ text: `${e.dutyPatrol} 值日`, tone: 'slate' });
               return (
                 <EventReplyRow
                   key={e.id}
                   event={e}
                   status={r?.type}
                   badges={badges}
-                  actions={[
+                  actions={(isDistrict || e.status === 'archived') ? [] : [
                     { type: 'interested', idle: '❤️ 有興趣', active: '【已點選】❤️ 有興趣' },
                     ...(adult ? [
                       { type: 'registered' as const, idle: '✅ 參加', active: '【已報名】✅ 參加' },
@@ -97,6 +102,11 @@ export default function Member(){
                   ]}
                   loading={!!loadingId && loadingId.startsWith(e.id)}
                   onAct={t => act(e.id, t)}
+                  footer={isDistrict ? (
+                    <p className="text-sm text-slate-500 m-0 leading-relaxed">
+                      ℹ️ 此為區／地域／總會活動通告，旅團不代收報名及費用。有興趣請按上面的通告連結自行報名。
+                    </p>
+                  ) : undefined}
                 />
               );
             })

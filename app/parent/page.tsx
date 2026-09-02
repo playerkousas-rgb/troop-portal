@@ -5,7 +5,7 @@ import ConsoleHeader from '@/components/ui/ConsoleHeader';
 import Panel from '@/components/ui/Panel';
 import EmptyState from '@/components/ui/EmptyState';
 import EventReplyRow from '@/components/ui/EventReplyRow';
-import { AppState, loadStateSlice, replyStatus } from '@/lib/store';
+import { AppState, loadStateSlice, replyStatus, eventCategory } from '@/lib/store';
 import { apiSetReply, apiTogglePaid } from '@/lib/api';
 import { getSession } from '@/lib/session';
 import { useConfirm, kv } from '@/components/ConfirmProvider';
@@ -90,17 +90,22 @@ export default function Parent(){
                 ) : (
                   events.map(e => {
                     const r = replyStatus(s, e.id, c.id);
+                    // 區地域總會活動：領袖只係精選通告畀你睇，想報就自己按連結報名，
+                    // 旅團唔會代收報名／代收錢，所以唔會有回覆掣同付款格。
+                    const isDistrict = eventCategory(e) === 'district';
                     return (
                       <EventReplyRow
                         key={e.id}
                         event={e}
                         status={r?.type}
                         labels={{ registered: '✅ 狀態：已報名參加', declined: '❌ 狀態：已婉拒參加', interested: '❤️ 狀態：子女有興趣', unresponded: '⚠️ 狀態：尚未回覆' }}
-                        badges={e.status === 'archived'
-                          ? [{ text: '🗂️ 已過期（紀錄保留）', tone: 'slate' as const }]
-                          : e.lateRegistration ? [{ text: '🔓 已重開報名', tone: 'blue' as const }] : []}
+                        badges={[
+                          ...(isDistrict ? [{ text: '🗺️ 區地域總會通告（自行報名）', tone: 'violet' as const }] : []),
+                          ...(e.status === 'archived' ? [{ text: '🗂️ 已過期（紀錄保留）', tone: 'slate' as const }]
+                            : e.lateRegistration ? [{ text: '🔓 已重開報名', tone: 'blue' as const }] : []),
+                        ]}
                         // 已封存＝報名已截止，只保留紀錄，唔再畀改
-                        actions={e.status === 'archived' ? [] : [
+                        actions={(e.status === 'archived' || isDistrict) ? [] : [
                           { type: 'interested', idle: '❤️ 有興趣', active: '【已標記】❤️ 有興趣' },
                           { type: 'registered', idle: '✅ 參加', active: '【已報名】✅ 參加' },
                           { type: 'declined', idle: '❌ 不參加', active: '【已婉拒】❌ 不參加' },
@@ -108,6 +113,11 @@ export default function Parent(){
                         loading={loadingId === e.id + c.id}
                         onAct={t => respond(e.id, c.id, t)}
                         footer={
+                          isDistrict ? (
+                            <p className="text-sm text-slate-500 m-0 leading-relaxed">
+                              ℹ️ 此為區／地域／總會活動通告，旅團不代收報名及費用。有興趣請按上面的通告連結自行報名。
+                            </p>
+                          ) :
                           // 💰 只有 tick 咗「參加」先出現付款格；未報名／婉拒／有興趣完全唔會顯示
                           r?.type === 'registered' ? (
                             <div className="grid gap-2">

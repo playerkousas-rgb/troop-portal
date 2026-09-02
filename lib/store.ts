@@ -117,8 +117,16 @@ export function replyStatus(s:AppState, eventId:string, memberId:string){
 }
 
 export function visibleEventsForMember(s:AppState, member:Member){
-  return s.events.filter(e=>e.status==='published' && (e.scope==='troop' || e.branchId===member.branchId))
-    .filter(e=>replyStatus(s,e.id,member.id)?.type!=='declined');
+  return s.events.filter(e=>{
+    const mine = !!replyStatus(s, e.id, member.id);
+    const inScope = e.scope==='troop' || e.branchId===member.branchId;
+    // 已封存（過期通告）：只有自己報過名先睇到，方便查返紀錄
+    if (e.status==='archived') return mine;
+    if (e.status!=='published') return false;
+    return inScope || mine;
+  });
+  // 註：以前會隱藏「已婉拒」嘅活動，但咁樣改錯咗就搵唔返，
+  //     所以改為照樣顯示（狀態會寫住 ❌ 已婉拒），可以隨時改回覆。
 }
 
 export function isMeetingCancelled(s:AppState, branchId:string, date:string){

@@ -1562,7 +1562,8 @@ function handleGetUserFeatures_(p) {
     overrides[getField_(pm, 'feature')] = String(getField_(pm, 'granted') || '').toLowerCase() === 'true';
   });
   
-  var allFeatures = ['branches','members','applications','events','registrations','attendance','attendance_all','library_import','notices','users','settings','audit','calendar'];
+  // 必須涵蓋前端「授權」畫面所有選項，否則管理員 tick 咗都唔會生效
+  var allFeatures = ['branches','members','applications','events','registrations','attendance','attendance_all','library_import','notices','users','settings','audit','calendar','equipment','meetings','plugins'];
   var result = allFeatures.map(function(f) {
     var isDefault = defaults.indexOf(f) >= 0;
     var overridden = overrides[f] !== undefined;
@@ -1571,6 +1572,74 @@ function handleGetUserFeatures_(p) {
   });
   
   return { success: true, features: result, role: role };
+}
+
+
+// ==================== 動作層角色驗證（後端最後防線） ====================
+//
+// API Key 只證明「請求經過官方 proxy」，唔證明「呢個人有權做呢件事」。
+// operatedBy 由前端傳上嚟，已登入嘅低權限用戶（例如成員／家長）可以自己
+// 砌一個 request 扮管理員。所以高風險 action 要喺後端再檢查一次角色。
+//
+// 效能：getUserFeatures_ / readTable_('Users') 本來每個請求都會行（buildDashboard 一定讀 Users），
+// 呢度只係喺已讀嘅資料上做一次比對，唔會多一次 I/O。
+var ACTION_REQUIRED_FEATURE_ = {
+  // 使用者 / 權限（最高危：可提權）
+  createUser: 'users', deleteUser: 'users', toggleUser: 'users',
+  updateUserRole: 'users', updateUserField: 'users',
+  batchCreateUsers: 'users', batchCreateMembers: 'members',
+  grantFeature: 'users', revokeFeature: 'users', updateUserPermissions: 'users',
+  // 成員資料
+  createMember: 'members', updateMember: 'members', deleteMember: 'members', linkParent: 'members',
+  // 審批
+  decideApplication: 'applications',
+  // 支部 / 小隊
+  createPatrol: 'branches', togglePatrol: 'branches', deletePatrol: 'branches',
+  // 活動
+  createEvent: 'events', updateEvent: 'events', deleteEvent: 'events',
+  publishEvent: 'events', archiveEvent: 'events', restoreEvent: 'events', reopenEvent: 'events',
+  // 收款核實（只有領袖可以核實，家長唔可以自己 tick 話領袖收咗錢）
+  confirmPayment: 'registrations',
+  // 系統設定 / 元件
+  saveConfig: 'settings', savePluginSetting: 'plugins', togglePluginStatus: 'plugins',
+  // 會議 / 物資 / 行事曆
+  createMeeting: 'meetings', updateMeeting: 'meetings', deleteMeeting: 'meetings', publishMeeting: 'meetings',
+  createEquipment: 'equipment', updateEquipment: 'equipment', deleteEquipment: 'equipment',
+  adjustEquipmentQty: 'equipment', decideEquipmentLoan: 'equipment', returnEquipmentLoan: 'equipment',
+  createRegularMeeting: 'calendar', updateRegularMeeting: 'calendar',
+  deleteRegularMeeting: 'calendar', toggleRegularMeeting: 'calendar', toggleMeetingCancel: 'calendar'
+};
+
+/**
+ * 檢查 operatedBy 有冇權做呢個 action。
+ * 回傳 null = 放行；回傳 object = 拒絕（已經係 error payload）。
+ */
+function checkActionPermission_(action, p) {
+  var required = ACTION_REQUIRED_FEATURE_[action];
+  if (!required) return null; // 唔喺清單＝讀取類或低風險，照放行
+
+  var operatedBy = String((p && (p.operatedBy || p.userId)) || '');
+  if (!operatedBy) {
+    return { success: false, error: '未能識別操作者身份，請重新登入' };
+  }
+  // 技術測試 / 系統帳號直接放行
+  if (isPrivilegedOperator_(operatedBy)) return null;
+
+  var users = readTable_('Users');
+  var actor = users.filter(function (u) { return getField_(u, 'userId') === operatedBy; })[0];
+  if (!actor) {
+    return { success: false, error: '找不到操作者帳號，請重新登入' };
+  }
+  if (!parseBool_(getField_(actor, 'approved'))) {
+    return { success: false, error: '帳號已停用，無法執行此操作' };
+  }
+  var role = String(getField_(actor, 'role') || '').toLowerCase();
+  var features = getUserFeatures_(operatedBy, role);
+  if (features.indexOf(required) < 0) {
+    writeAudit_(operatedBy, 'DENIED:' + action, 'Security', '', 'role=' + role + ' 缺少權限 ' + required);
+    return { success: false, error: '權限不足：此操作需要「' + required + '」權限，請聯絡管理員授權。' };
+  }
+  return null;
 }
 
 // ==================== doGet / API 分發 ====================
@@ -1597,6 +1666,10 @@ function doGet(e) {
   }
 
   var action = p.action || 'health';
+
+  // ★ 後端角色驗證：高風險 action 必須有對應權限（前端守衛可被繞過，呢度係最後防線）
+  var permissionError = checkActionPermission_(action, p);
+  if (permissionError) return json(permissionError);
 
   try {
     switch (action) {
@@ -2604,11 +2677,7 @@ function handleArchiveEvent_(p) {
   if (idx < 0) return { success: false, error: '找不到活動' };
   var events = readTable_('Events');
   var ev = events.filter(function (e) { return getField_(e, 'eventId') === p.eventId; })[0];
-  var category = String(getField_(ev, 'category') || '');
-  if (!category) {
-    var src = String(getField_(ev, 'source') || '');
-    category = (String(getField_(ev, 'kind') || '') === 'notice_troop_participation' || /圖書館|地域|區會|區地域|總會/.test(src)) ? 'district' : 'self';
-  }
+  var category = isDistrictEvent_(ev) ? 'district' : 'self';
   var replyCount = readTable_('EventReplies').filter(function (r) {
     return getField_(r, 'eventId') === p.eventId;
   }).length;
@@ -2641,6 +2710,17 @@ function handleRestoreEvent_(p) {
   return { success: true };
 }
 
+
+/** 判斷活動係咪「區地域總會活動」（同前端 eventCategory 邏輯一致） */
+function isDistrictEvent_(evRow) {
+  if (!evRow) return false;
+  var cat = String(getField_(evRow, 'category') || '');
+  if (cat === 'district') return true;
+  if (cat === 'self') return false;
+  if (String(getField_(evRow, 'kind') || '') === 'notice_troop_participation') return true;
+  return /圖書館|地域|區會|區地域|總會/.test(String(getField_(evRow, 'source') || ''));
+}
+
 /**
  * ★ 18 歲 GS 端 guard（1.0 邏輯）
  * registered / declined：18 歲以下必須由家長操作
@@ -2649,6 +2729,12 @@ function handleRestoreEvent_(p) {
 function handleSetReply_(p) {
   var eventId = p.eventId, memberId = p.memberId;
   var type = p.type || 'interested';
+
+  // 區地域總會活動＝純通告，旅團唔代收報名（成員想報自己按連結報）
+  var evRows = readTable_('Events').filter(function (e) { return getField_(e, 'eventId') === eventId; });
+  if (evRows.length && isDistrictEvent_(evRows[0])) {
+    return { success: false, error: '區地域總會活動為通告性質，旅團不代收報名，請按通告連結自行報名。' };
+  }
 
   // 年齡檢查
   if (type === 'registered' || type === 'declined') {
@@ -2704,6 +2790,10 @@ function handleSetReply_(p) {
 }
 
 function handleTogglePaid_(p) {
+  var payRows = readTable_('Events').filter(function (e) { return getField_(e, 'eventId') === p.eventId; });
+  if (payRows.length && isDistrictEvent_(payRows[0])) {
+    return { success: false, error: '區地域總會活動不經旅團收費，無法標記付款。' };
+  }
   var replyId = p.eventId + '_' + p.memberId;
   var idx = findRowIndexById_('EventReplies', 'replyId', replyId);
   if (idx >= 0) {

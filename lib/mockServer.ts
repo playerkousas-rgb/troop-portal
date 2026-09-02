@@ -116,7 +116,7 @@ const seed: AppState = {
     { id: 'e00', title: '八月童軍技能日', date: '2026-08-16', location: '旅團部', scope: 'branch', branchId: 'b3', kind: 'activity', status: 'published', source: '手動新增', targetMemberIds: ['m01', 'm02', 'm03', 'm04'], fee: '0' },
     { id: 'e01', title: '九月山徑健行', date: '2026-09-12', location: '大帽山', scope: 'branch', branchId: 'b3', kind: 'activity', status: 'published', source: '手動新增', targetMemberIds: ['m01', 'm02', 'm03', 'm04'], fee: '50', paymentUrl: 'https://pay.example.com/e01' },
     { id: 'e02', title: '童軍週末營(兩日一夜)', date: '2026-10-03', location: '青年會營地', scope: 'troop', kind: 'activity', status: 'published', source: '手動新增', targetMemberIds: ['m01', 'm02', 'm03', 'm04', 'm08', 'm09', 'm11', 'm12'], fee: '300', paymentUrl: 'https://pay.example.com/e02' },
-    { id: 'e03', title: '十一區運動會', date: '2026-10-01', location: '東區公園', scope: 'branch', branchId: 'b2', kind: 'activity', status: 'published', source: '圖書館轉入', targetMemberIds: ['m05', 'm06', 'm07'], fee: '80' },
+    { id: 'e03', title: '十一區運動會', date: '2026-10-01', location: '東區公園', scope: 'branch', branchId: 'b2', kind: 'activity', status: 'published', source: '圖書館轉入', targetMemberIds: [], fee: '80', noticeUrl: 'https://example.org/circular/district-sports-day.pdf' },
     { id: 'e04', title: '新領袖訓練班', date: '2026-11-08', location: '旅團會議室', scope: 'troop', kind: 'activity', status: 'draft', source: '手動新增', targetMemberIds: ['m04', 'm08', 'm09', 'm11', 'm12'] },
     { id: 'e05', title: '樂行社區服務日', date: '2026-09-20', location: '觀塘邨', scope: 'branch', branchId: 'b5', kind: 'activity', status: 'published', source: '手動新增', targetMemberIds: ['m09', 'm12'], fee: '0' },
     { id: 'e06', title: '深資遠征(兩日一夜)', date: '2026-10-10', location: '西貢麥理浩徑', scope: 'branch', branchId: 'b4', kind: 'activity', status: 'published', source: '手動新增', targetMemberIds: ['m08', 'm11'], fee: '250', paymentUrl: 'https://pay.example.com/e06' },
@@ -129,8 +129,6 @@ const seed: AppState = {
     { id: 'e01_m02', eventId: 'e01', memberId: 'm02', memberName: '王小名', branchId: 'b3', type: 'interested', operatedBy: 'member', updatedAt: '2026-08-22' },
     { id: 'e02_m01', eventId: 'e02', memberId: 'm01', memberName: '陳大文', branchId: 'b3', parentUserId: 'u5', type: 'registered', operatedBy: 'parent', paid: false, updatedAt: '2026-08-23' },
     { id: 'e02_m08', eventId: 'e02', memberId: 'm08', memberName: '周嘉欣', branchId: 'b4', type: 'interested', operatedBy: 'member', updatedAt: '2026-08-24' },
-    { id: 'e03_m05', eventId: 'e03', memberId: 'm05', memberName: '林小雨', branchId: 'b2', parentUserId: 'u9', type: 'registered', operatedBy: 'parent', paid: true, updatedAt: '2026-08-25' },
-    { id: 'e03_m06', eventId: 'e03', memberId: 'm06', memberName: '黃芷晴', branchId: 'b2', type: 'interested', operatedBy: 'parent', updatedAt: '2026-08-25' },
     { id: 'e06_m08', eventId: 'e06', memberId: 'm08', memberName: '周嘉欣', branchId: 'b4', type: 'registered', operatedBy: 'member', paid: false, updatedAt: '2026-08-26' },
     { id: 'e06_m11', eventId: 'e06', memberId: 'm11', memberName: '黃嘉怡', branchId: 'b4', type: 'interested', operatedBy: 'member', updatedAt: '2026-08-26' },
     { id: 'e07_m10', eventId: 'e07', memberId: 'm10', memberName: '鄭蓓蓓', branchId: 'b1', parentUserId: 'u9', type: 'registered', operatedBy: 'parent', updatedAt: '2026-08-27' },
@@ -680,6 +678,20 @@ function logAudit(userId: string, action: string, entity: string, entityId: stri
   if (store.audits.length > 300) store.audits = store.audits.slice(0, 300);
 }
 
+
+/**
+ * 判斷活動係咪「區地域總會活動」。
+ * 必須同 lib/store.ts 的 eventCategory 邏輯一致：
+ * 新資料睇 category；舊資料要按 kind / source 推斷（例如 source='圖書館轉入'）。
+ */
+function isDistrictEvent(e: { kind?: string; source?: string; category?: string } | null | undefined): boolean {
+  if (!e) return false;
+  if (e.category === 'district') return true;
+  if (e.category === 'self') return false;
+  if (e.kind === 'notice_troop_participation') return true;
+  return /圖書館|地域|區會|區地域|總會/.test(e.source || '');
+}
+
 function handleMutate(action: string, p: Record<string, any>) {
   const ob = String(p.operatedBy || '');
   const findIdx = (arr: any[], idField: string, id: string) => arr.findIndex(x => x[idField] === id);
@@ -901,7 +913,7 @@ function handleMutate(action: string, p: Record<string, any>) {
       const i = findIdx(store.events, 'id', String(p.eventId || ''));
       if (i >= 0) {
         const ev = store.events[i];
-        const isDistrict = ev.category === 'district' || ev.kind === 'notice_troop_participation';
+        const isDistrict = isDistrictEvent(ev);
         const replyCount = store.replies.filter(r => r.eventId === ev.id).length;
         if (isDistrict) {
           store.events = store.events.filter(e => e.id !== ev.id);
@@ -932,6 +944,11 @@ function handleMutate(action: string, p: Record<string, any>) {
     }
     // 報名
     case 'setReply': {
+      // 區地域總會活動＝純通告，旅團唔代收報名（想報自己去報）→ 唔接受回覆
+      const tgtEv = store.events.find(e => e.id === p.eventId);
+      if (tgtEv && isDistrictEvent(tgtEv)) {
+        return { success: false, error: '區地域總會活動為通告性質，旅團不代收報名，請按通告連結自行報名。' };
+      }
       const replyId = `${p.eventId}_${p.memberId}`;
       const m = store.members.find(x => x.id === p.memberId);
       const i = findIdx(store.replies, 'id', replyId);
@@ -941,6 +958,10 @@ function handleMutate(action: string, p: Record<string, any>) {
     }
     case 'cancelReply': { const i = findIdx(store.replies, 'id', `${p.eventId}_${p.memberId}`); if (i >= 0) store.replies[i].cancelled = !store.replies[i].cancelled; return S(ob); }
     case 'togglePaid': {
+      const payEv = store.events.find(e => e.id === p.eventId);
+      if (payEv && isDistrictEvent(payEv)) {
+        return { success: false, error: '區地域總會活動不經旅團收費，無法標記付款。' };
+      }
       const i = findIdx(store.replies, 'id', `${p.eventId}_${p.memberId}`);
       if (i >= 0) {
         store.replies[i].paid = !store.replies[i].paid;

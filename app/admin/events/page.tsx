@@ -214,13 +214,11 @@ export default function Page() {
       title: district ? '確認刪除過期外部通告' : '確認放入過期通告',
       message: kv([
         ['活動', e.title],
-        ['已報名', `${c.registered} 人（其中 ${c.paid} 人已付款）`],
+        // 區地域總會活動係純通告（唔收報名／唔收錢），所以唔會有報名數字
+        ...(district ? [] : [['已報名', `${c.registered} 人（其中 ${c.paid} 人已付款）`] as [string, string]]),
         ['處理方式', district
-          ? `外部（區地域總會）通告 → 直接刪除${c.total ? `，連同 ${c.total} 筆回覆紀錄一併移除（不可還原）` : ''}`
+          ? '外部（區地域總會）通告 → 直接刪除（純通告，冇報名及付款紀錄）'
           : '自行舉辦 → 移入「過期通告」；報名及付款紀錄全部保留，隨時可查回或還原'],
-        ...(district && c.total
-          ? [['⚠️ 注意', '此活動已有報名紀錄。如果想保留紀錄，請先匯出活動統計 CSV，或改為「自行舉辦」再封存。'] as [string, string]]
-          : []),
       ]),
       confirmLabel: district ? '確認刪除' : '確認移入過期通告',
       danger: district,
