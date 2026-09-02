@@ -5,7 +5,7 @@ import ConsoleHeader from '@/components/ui/ConsoleHeader';
 import Panel from '@/components/ui/Panel';
 import EmptyState from '@/components/ui/EmptyState';
 import EventReplyRow from '@/components/ui/EventReplyRow';
-import { AppState, loadStateSlice, replyStatus, eventCategory } from '@/lib/store';
+import { AppState, loadStateSlice, replyStatus, eventCategory, visibleEventsForMember } from '@/lib/store';
 import { apiSetReply, apiTogglePaid } from '@/lib/api';
 import { getSession } from '@/lib/session';
 import { useConfirm, kv } from '@/components/ConfirmProvider';
@@ -71,10 +71,10 @@ export default function Parent(){
         />
       ) : (
         children.map(c => {
-          // 已封存（過期通告）但自己報過名嘅活動照樣顯示，方便查返報名／付款紀錄
-          const events = s.events.filter(e =>
-            e.targetMemberIds.includes(c.id) &&
-            (e.status === 'published' || (e.status === 'archived' && !!replyStatus(s, e.id, c.id))));
+          // ★ 單一來源：家長睇到嘅 = 子女本人睇到嘅，完全同一套規則。
+          //   以後可見度規則點改，只需改 visibleEventsForMember 一個地方，兩邊自動同步，
+          //   唔會再出現「仔女見到但家長見唔到」（或者相反）嘅情況。
+          const events = visibleEventsForMember(s, c);
           return (
             <Panel
               key={c.id}

@@ -692,6 +692,42 @@ function isDistrictEvent(e: { kind?: string; source?: string; category?: string 
   return /圖書館|地域|區會|區地域|總會/.test(e.source || '');
 }
 
+
+/**
+ * ★ 伺服器端角色驗證（同 GS 端 ACTION_REQUIRED_FEATURE_ 一致）
+ *
+ * 點解要有：前端隱藏咗個掣，只係「唔畀你撩到」，但攻擊者可以直接用
+ * curl / F12 重放個 request，完全繞過 UI。所以高危動作必須喺後台再驗一次身份。
+ */
+const MOCK_ACTION_FEATURE: Record<string, string> = {
+  createUser: 'users', deleteUser: 'users', toggleUser: 'users',
+  updateUserRole: 'users', updateUserField: 'users',
+  batchCreateUsers: 'users', batchCreateMembers: 'members',
+  grantFeature: 'users', revokeFeature: 'users', updateUserPermissions: 'users',
+  createMember: 'members', updateMember: 'members', deleteMember: 'members', linkParent: 'members',
+  decideApplication: 'applications',
+  createPatrol: 'branches', togglePatrol: 'branches', deletePatrol: 'branches',
+  createEvent: 'events', updateEvent: 'events', deleteEvent: 'events',
+  archiveEvent: 'events', reopenEvent: 'events',
+  togglePaid: 'payments', confirmPayment: 'payments',
+  updateConfig: 'settings', updateSettings: 'settings',
+};
+
+function checkMockPermission(action: string, p: Record<string, any>): { success: false; error: string } | null {
+  const needed = MOCK_ACTION_FEATURE[action];
+  if (!needed) return null;
+  const operator = store.users.find(u => u.id === String(p.operatedBy || ''));
+  if (!operator) {
+    return { success: false, error: '未能確認操作者身份，請重新登入。' };
+  }
+  const role = String((operator as any).role || '');
+  if (role === 'admin' || role === 'super_admin') return null;
+  if (!featuresFor(operator.id, role).includes(needed)) {
+    return { success: false, error: `權限不足：此操作需要「${needed}」權限。` };
+  }
+  return null;
+}
+
 function handleMutate(action: string, p: Record<string, any>) {
   const ob = String(p.operatedBy || '');
   const findIdx = (arr: any[], idField: string, id: string) => arr.findIndex(x => x[idField] === id);
@@ -1130,6 +1166,10 @@ export function handleMockRequest(action: string, params: Record<string, any> = 
     persist();
     return { success: true, message: '演示資料已重設。', state: buildMockState('') };
   }
+
+  // ★ 寫入之前先驗身份（UI 隱藏唔等於安全）
+  const denied = checkMockPermission(action, p);
+  if (denied) return denied;
 
   // 其餘一律視為寫入
   isWrite = true;
