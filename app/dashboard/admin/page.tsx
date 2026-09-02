@@ -15,7 +15,7 @@ const MODULES = [
   { icon: '🎫', title: '報名管理', subtitle: '回覆 · 名額 · 付款', detail: '按活動查看報名名單', href: '/dashboard/admin/registrations', tone: 'violet' },
   { icon: '🤝', title: '會議管理', subtitle: '議程 · 紀錄 · 文件', detail: '領袖會議及相關附件', href: '/dashboard/meetings', tone: 'amber' },
   { icon: '📦', title: '物資管理', subtitle: '清單 · 借用 · 庫存', detail: '審批借用及追蹤歸還', href: '/dashboard/admin/equipment', tone: 'orange' },
-  { icon: '📷', title: '活動相簿', subtitle: '相片 · 分支權限', detail: '查看及管理新加入的活動相簿', href: '/dashboard/admin/albums', tone: 'violet' },
+  { icon: '📷', title: '相簿管理', subtitle: '相片 · 分支權限', detail: '查看及管理新加入的活動相簿', href: '/dashboard/admin/albums', tone: 'violet' },
   { icon: '👤', title: '帳戶管理', subtitle: '成員 · 家長 · 權限', detail: '帳號、角色及支部資料', href: '/dashboard/admin/users', tone: 'slate' },
 ] as const;
 

@@ -6,7 +6,7 @@ import { useEffect, useState } from 'react';
 type Item = { icon: string; label: string; href: string };
 
 // 真實頁面（登入後實際使用的路由）
-// 順序對照 UI 參考：📅 行事曆 · 📢 最新消息 · 🎯 活動 · 👤 我的
+// 順序對照 UI 參考：📅 行事曆 · 📷 相簿 · 🎯 活動 · 👤 主頁
 const REAL_ITEMS: Item[] = [
   { icon: '📅', label: '行事曆', href: '/calendar' },
   { icon: '📷', label: '相簿', href: '/albums' },
@@ -20,7 +20,7 @@ const DEMO_ITEMS: Item[] = [
   { icon: '🎯', label: '活動', href: '/dashboard/activities' },
 ];
 
-// 領袖身份：底部 4 個按鈕同成員／家長唔同（行事曆 · 最新消息 · 點名 · 管理中心）
+// 領袖身份：底部 4 個按鈕同成員／家長唔同（行事曆 · 相簿 · 點名 · 管理中心）
 const LEADER_ROLES = ['super_admin', 'troop_super', 'troop_leader', 'admin', 'group_leader', 'branch_leader', 'coach'];
 const LEADER_ITEMS: Item[] = [
   { icon: '📅', label: '行事曆', href: '/calendar' },
