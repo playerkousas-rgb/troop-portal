@@ -332,8 +332,12 @@ export function buildMockState(userId: string): AppState {
     guest ? e.status === 'published'
       : admin || leaderAll ? true
       : leaderBranch ? (e.status !== 'archived' && (e.scope === 'branch' ? e.branchId === branchId : e.status === 'published'))
-      : isMember ? e.status === 'published' && (e.scope === 'troop' || e.branchId === memberBranch)
-      : isParent ? e.status === 'published' && (e.scope === 'troop' || (user!.childMemberIds || []).some(id => { const m = store.members.find(mm => mm.id === id); return m && m.branchId === e.branchId; }))
+      // 成員／家長：睇到已發布活動；另外「已封存但自己曾經報過名」嘅活動亦要睇到，
+      // 否則佢哋會突然搵唔返自己報咗名／畀咗錢嗰個活動。
+      : isMember ? (e.status === 'published' && (e.scope === 'troop' || e.branchId === memberBranch))
+          || (e.status === 'archived' && store.replies.some(r => r.eventId === e.id && (r.memberId === user!.memberId || r.memberId === user!.id)))
+      : isParent ? (e.status === 'published' && (e.scope === 'troop' || (user!.childMemberIds || []).some(id => { const m = store.members.find(mm => mm.id === id); return m && m.branchId === e.branchId; })))
+          || (e.status === 'archived' && store.replies.some(r => r.eventId === e.id && (user!.childMemberIds || []).includes(r.memberId)))
       : false;
   out.events = store.events.filter(visibleEvents);
 
@@ -898,14 +902,26 @@ function handleMutate(action: string, p: Record<string, any>) {
       if (i >= 0) {
         const ev = store.events[i];
         const isDistrict = ev.category === 'district' || ev.kind === 'notice_troop_participation';
+        const replyCount = store.replies.filter(r => r.eventId === ev.id).length;
         if (isDistrict) {
           store.events = store.events.filter(e => e.id !== ev.id);
           store.replies = store.replies.filter(r => r.eventId !== ev.id);
-          logAudit(ob, 'deleteExpiredEvent', '活動', ev.id, `${ev.title}（外部通告，過期直接刪除）`);
+          logAudit(ob, 'deleteExpiredEvent', '活動', ev.id, `${ev.title}（外部通告，過期直接刪除，連帶 ${replyCount} 筆回覆）`);
         } else {
+          // ★ 只改狀態，報名／付款紀錄一律保留（家長／成員仍可查返自己嗰筆）
           ev.status = 'archived' as any;
-          logAudit(ob, 'archiveEvent', '活動', ev.id, `${ev.title}（放入過期通告）`);
+          logAudit(ob, 'archiveEvent', '活動', ev.id, `${ev.title}（放入過期通告，保留 ${replyCount} 筆報名紀錄）`);
         }
+      }
+      return S(ob);
+    }
+    /** 重開報名：過期／已封存嘅活動重新開放（遲咗報但領袖想畀佢報） */
+    case 'reopenEvent': {
+      const i = findIdx(store.events, 'id', String(p.eventId || ''));
+      if (i >= 0) {
+        store.events[i].status = 'published';
+        store.events[i].lateRegistration = true as any;
+        logAudit(ob, 'reopenEvent', '活動', store.events[i].id, `${store.events[i].title}（重開報名／容許遲交）`);
       }
       return S(ob);
     }

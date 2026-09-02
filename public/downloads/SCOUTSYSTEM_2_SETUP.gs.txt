@@ -266,7 +266,7 @@ function getInitialSheets_() {
       ['meetingId', 'title', 'type', 'date', 'startTime', 'endTime', 'location', 'targetRoles', 'branchId', 'url', 'status', 'calendarTag', 'createdBy', 'createdAt', 'note']
     ],
     Events: [
-      ['eventId', 'title', 'scope', 'branchId', 'date', 'location', 'kind', 'status', 'source', 'category', 'calendarTag', 'fee', 'paymentUrl', 'dutyPatrol', 'noticeUrl', 'noticeFileName', 'inputMode', 'targetMemberIds', 'createdBy', 'createdAt', 'note']
+      ['eventId', 'title', 'scope', 'branchId', 'date', 'location', 'kind', 'status', 'source', 'category', 'calendarTag', 'fee', 'paymentUrl', 'dutyPatrol', 'noticeUrl', 'noticeFileName', 'inputMode', 'lateRegistration', 'targetMemberIds', 'createdBy', 'createdAt', 'note']
     ],
     EventReplies: [
       ['replyId', 'eventId', 'memberId', 'memberName', 'branchId', 'parentUserId', 'type', 'operatedBy', 'paid', 'paymentConfirmed', 'paymentConfirmedBy', 'paymentConfirmedAt', 'cancelled', 'createdAt', 'updatedAt', 'notes']
@@ -860,6 +860,7 @@ function mapEvents_() {
       paymentUrl: getField_(e, 'paymentUrl') || '', dutyPatrol: getField_(e, 'dutyPatrol') || '',
       noticeUrl: getField_(e, 'noticeUrl') || '', noticeFileName: getField_(e, 'noticeFileName') || '',
       inputMode: getField_(e, 'inputMode') || 'form',
+      lateRegistration: parseBool_(getField_(e, 'lateRegistration')),
       targetMemberIds: targets
     };
   });
@@ -1683,6 +1684,7 @@ function doGet(e) {
       case 'confirmPayment': return wrap_(handleConfirmPayment_(p), p);
       case 'archiveEvent': return wrap_(handleArchiveEvent_(p), p);
       case 'restoreEvent': return wrap_(handleRestoreEvent_(p), p);
+      case 'reopenEvent': return wrap_(handleReopenEvent_(p), p);
       case 'decideApplication': return wrap_(handleDecideApplication_(p), p);
       case 'toggleUser': return wrap_(handleToggleUser_(p), p);
       case 'updateUserRole': return wrap_(handleUpdateUserRole_(p), p);
@@ -2607,13 +2609,27 @@ function handleArchiveEvent_(p) {
     var src = String(getField_(ev, 'source') || '');
     category = (String(getField_(ev, 'kind') || '') === 'notice_troop_participation' || /圖書館|地域|區會|區地域|總會/.test(src)) ? 'district' : 'self';
   }
+  var replyCount = readTable_('EventReplies').filter(function (r) {
+    return getField_(r, 'eventId') === p.eventId;
+  }).length;
   if (category === 'district') {
     getSheet_('Events').deleteRow(idx + 1);
-    writeAudit_(p.operatedBy || 'system', 'deleteExpiredEvent', 'Events', p.eventId, '外部通告過期直接刪除');
+    writeAudit_(p.operatedBy || 'system', 'deleteExpiredEvent', 'Events', p.eventId, '外部通告過期直接刪除（連帶 ' + replyCount + ' 筆回覆）');
   } else {
+    // ★ 只改狀態，EventReplies 一律保留（報名／付款紀錄可查回）
     updateCellByName_('Events', 'eventId', p.eventId, 'status', 'archived');
-    writeAudit_(p.operatedBy || 'system', 'archiveEvent', 'Events', p.eventId, '放入過期通告');
+    writeAudit_(p.operatedBy || 'system', 'archiveEvent', 'Events', p.eventId, '放入過期通告（保留 ' + replyCount + ' 筆報名紀錄）');
   }
+  return { success: true, replyCount: replyCount };
+}
+
+/** 重開報名：過期／已封存活動重新開放，畀遲咗嘅家長／成員補報 */
+function handleReopenEvent_(p) {
+  var idx = findRowIndexById_('Events', 'eventId', p.eventId);
+  if (idx < 0) return { success: false, error: '找不到活動' };
+  updateCellByName_('Events', 'eventId', p.eventId, 'status', 'published');
+  updateCellByName_('Events', 'eventId', p.eventId, 'lateRegistration', 'true');
+  writeAudit_(p.operatedBy || 'system', 'reopenEvent', 'Events', p.eventId, '重開報名（容許遲交）');
   return { success: true };
 }
 

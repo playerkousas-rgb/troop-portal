@@ -97,3 +97,18 @@ export function assignableRoles(operatorRole: string): string[] {
   if (operatorRole === 'branch_leader') return ['coach', 'parent', 'member']; // 支部領袖可改教練員/家長/成員角色
   return [];
 }
+
+
+// ==================== 功能卡顯示權限（由管理員／團長喺「使用者管理」開關） ====================
+
+/**
+ * 每張管理卡對應嘅 feature key（同 GS 的 FEATURE_DEFAULTS／UserPermissions 一致）。
+ * 顯示與否 **唔再** hardcode 角色，而係跟後台計好嘅 userFeatures，
+ * 咁管理員／團長就可以喺「使用者管理 → 授權」逐個開關（例如畀某個教練員睇物資管理）。
+ */
+export function hasFeature(userFeatures: string[] | undefined, feature: string, role?: string): boolean {
+  // 技術測試／超管／管理員一律全開（同 GS FEATURE_DEFAULTS 一致）
+  if (role && ['super_admin', 'troop_super', 'admin'].includes(role)) return true;
+  if (!userFeatures) return false;
+  return userFeatures.includes(feature);
+}

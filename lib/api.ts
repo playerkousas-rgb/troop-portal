@@ -307,6 +307,10 @@ export function apiArchiveEvent(eventId: string) {
 export function apiRestoreEvent(eventId: string) {
   return apiMutate('restoreEvent', { eventId });
 }
+/** 重開報名：活動過咗期／已封存，但領袖想畀遲咗嘅人補報 */
+export function apiReopenEvent(eventId: string) {
+  return apiMutate('reopenEvent', { eventId });
+}
 export function apiSetReply(p: { eventId: string; memberId: string; type: string; parentUserId?: string }) {
   const user = currentUser();
   const operatedBy = user?.role === 'parent' ? 'parent' : user?.role === 'member' ? 'member' : 'leader';

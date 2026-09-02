@@ -1,0 +1,5 @@
+User-agent: *
+# /dashboard/** 係公開嘅功能示範樹（全部假資料）。
+# 唔畀收錄，避免搜尋結果出現假資料，或同真實頁面撞內容。
+Disallow: /dashboard/
+Allow: /

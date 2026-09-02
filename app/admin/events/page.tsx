@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
 import { AppState, loadStateSlice, eventCategory, eventCategoryLabel, EventItem } from '@/lib/store';
-import { apiCreateEvent, apiPublishEvent, apiUpdateEvent, apiDeleteEvent, apiArchiveEvent, apiRestoreEvent } from '@/lib/api';
+import { apiCreateEvent, apiPublishEvent, apiUpdateEvent, apiDeleteEvent, apiArchiveEvent, apiRestoreEvent, apiReopenEvent } from '@/lib/api';
 import { parseNoticeText } from '@/lib/noticeParser';
 import { branches } from '@/lib/model';
 import Link from 'next/link';
@@ -34,6 +34,16 @@ const DISTRICT_MODES: { id: DistrictMode; label: string; desc: string }[] = [
   { id: 'library', label: '1️⃣ 圖書館引入', desc: '由童軍通告圖書館挑選通告帶入。' },
   { id: 'link', label: '2️⃣ 貼上通告連結', desc: '直接貼上通告連結，成員自行決定報唔報。' },
 ];
+
+/** 已報名／已付款人數（過期處理前要話畀領袖知） */
+function replyCounts(s: AppState | null, eventId: string) {
+  const rs = (s?.replies || []).filter(r => r.eventId === eventId);
+  return {
+    total: rs.length,
+    registered: rs.filter(r => r.type === 'registered').length,
+    paid: rs.filter(r => r.paid).length,
+  };
+}
 
 function isExpired(e: EventItem): boolean {
   if (!e.date) return false;
@@ -70,7 +80,7 @@ export default function Page() {
 
   const { confirm } = useConfirm();
 
-  useEffect(() => { loadStateSlice(['events']).then(setS).catch(e => setErr(e.message)) }, []);
+  useEffect(() => { loadStateSlice(['events', 'replies']).then(setS).catch(e => setErr(e.message)) }, []);
 
   const category: 'self' | 'district' = tab === 'district' ? 'district' : 'self';
   const inputMode: string = tab === 'district' ? districtMode : selfMode;
@@ -199,11 +209,18 @@ export default function Page() {
     const e = s?.events.find(x => x.id === id);
     if (!e) return;
     const district = eventCategory(e) === 'district';
+    const c = replyCounts(s, id);
     const ok = await confirm({
       title: district ? '確認刪除過期外部通告' : '確認放入過期通告',
       message: kv([
         ['活動', e.title],
-        ['處理方式', district ? '外部（區地域總會）通告 → 直接刪除' : '自行舉辦 → 移入「過期通告」，日後可查回或還原'],
+        ['已報名', `${c.registered} 人（其中 ${c.paid} 人已付款）`],
+        ['處理方式', district
+          ? `外部（區地域總會）通告 → 直接刪除${c.total ? `，連同 ${c.total} 筆回覆紀錄一併移除（不可還原）` : ''}`
+          : '自行舉辦 → 移入「過期通告」；報名及付款紀錄全部保留，隨時可查回或還原'],
+        ...(district && c.total
+          ? [['⚠️ 注意', '此活動已有報名紀錄。如果想保留紀錄，請先匯出活動統計 CSV，或改為「自行舉辦」再封存。'] as [string, string]]
+          : []),
       ]),
       confirmLabel: district ? '確認刪除' : '確認移入過期通告',
       danger: district,
@@ -219,6 +236,23 @@ export default function Page() {
     if (!ok) return;
     setErr('');
     try { const f = await apiRestoreEvent(id); setS(f); setMsg('✅ 已還原成已發布。') } catch (e: any) { setErr(e.message) }
+  }
+
+  /** 重開報名：遲咗報但領袖想畀佢報 */
+  async function reopen(id: string) {
+    const e = s?.events.find(x => x.id === id);
+    const ok = await confirm({
+      title: '確認重開報名',
+      message: kv([
+        ['活動', e?.title || id],
+        ['效果', '活動會重新變成「已發布」，家長／成員可以補交報名'],
+        ['提示', '已有的報名及付款紀錄不受影響'],
+      ]),
+      confirmLabel: '確認重開報名',
+    });
+    if (!ok) return;
+    setErr('');
+    try { const f = await apiReopenEvent(id); setS(f); setMsg('✅ 已重開報名，家長／成員可以補報。') } catch (e: any) { setErr(e.message) }
   }
 
   async function del(id: string) {
@@ -398,11 +432,18 @@ export default function Page() {
             {e.noticeUrl && <p style={{ margin: 0 }}><a href={e.noticeUrl} target="_blank" rel="noopener noreferrer">🔗 開啟通告連結</a></p>}
             {e.paymentUrl && <p className="muted" style={{ color: '#b06000', margin: 0 }}>💳 已設收款連結</p>}
             {e.dutyPatrol && <p className="muted" style={{ color: 'purple', margin: 0 }}>🪖 值日：{e.dutyPatrol}</p>}
-            {cat === 'district' && <p className="muted" style={{ margin: 0 }}>ℹ️ 此類活動不做報名統計</p>}
+            {cat === 'district'
+              ? <p className="muted" style={{ margin: 0 }}>ℹ️ 此類活動不做報名統計</p>
+              : (() => { const c = replyCounts(s, e.id); return c.total > 0
+                  ? <p className="muted" style={{ margin: 0 }}>👥 已報名 {c.registered} 人 · 💰 已付款 {c.paid} 人{e.status === 'archived' ? '（紀錄已保留）' : ''}</p>
+                  : null; })()}
+            {e.lateRegistration && <p className="badge blue" style={{ margin: '4px 0 0' }}>🔓 已重開報名（容許補交）</p>}
             <div className="row" style={{ flexWrap: 'wrap' }}>
               {e.status === 'archived' ? (
                 <>
                   <button className="btn" onClick={() => restore(e.id)}>♻️ 還原</button>
+                  <button className="btn primary" onClick={() => reopen(e.id)}>🔓 重開報名（畀人補交）</button>
+                  <Link className="btn" href={`/admin/registrations?eventId=${e.id}`}>📊 查看報名紀錄</Link>
                   <button className="btn" onClick={() => del(e.id)}>🗑️ 永久刪除</button>
                 </>
               ) : (
@@ -410,6 +451,9 @@ export default function Page() {
                   <button className="btn" onClick={() => startEdit(e.id)}>✏️ 編輯</button>
                   {e.status === 'draft' && <button className="btn primary" onClick={() => publish(e.id)}>發布</button>}
                   {cat === 'self' && <Link className="btn" href={`/admin/registrations?eventId=${e.id}`}>📊 統計</Link>}
+                  {expired && cat === 'self' && (
+                    <button className="btn" onClick={() => reopen(e.id)}>🔓 容許補報</button>
+                  )}
                   <button className="btn gold" onClick={() => expire(e.id)}>
                     {cat === 'district' ? '⏰ 過期處理（直接刪除）' : '⏰ 過期處理（放入過期通告）'}
                   </button>

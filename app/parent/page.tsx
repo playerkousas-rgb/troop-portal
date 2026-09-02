@@ -71,7 +71,10 @@ export default function Parent(){
         />
       ) : (
         children.map(c => {
-          const events = s.events.filter(e => e.status === 'published' && e.targetMemberIds.includes(c.id));
+          // 已封存（過期通告）但自己報過名嘅活動照樣顯示，方便查返報名／付款紀錄
+          const events = s.events.filter(e =>
+            e.targetMemberIds.includes(c.id) &&
+            (e.status === 'published' || (e.status === 'archived' && !!replyStatus(s, e.id, c.id))));
           return (
             <Panel
               key={c.id}
@@ -93,7 +96,11 @@ export default function Parent(){
                         event={e}
                         status={r?.type}
                         labels={{ registered: '✅ 狀態：已報名參加', declined: '❌ 狀態：已婉拒參加', interested: '❤️ 狀態：子女有興趣', unresponded: '⚠️ 狀態：尚未回覆' }}
-                        actions={[
+                        badges={e.status === 'archived'
+                          ? [{ text: '🗂️ 已過期（紀錄保留）', tone: 'slate' as const }]
+                          : e.lateRegistration ? [{ text: '🔓 已重開報名', tone: 'blue' as const }] : []}
+                        // 已封存＝報名已截止，只保留紀錄，唔再畀改
+                        actions={e.status === 'archived' ? [] : [
                           { type: 'interested', idle: '❤️ 有興趣', active: '【已標記】❤️ 有興趣' },
                           { type: 'registered', idle: '✅ 參加', active: '【已報名】✅ 參加' },
                           { type: 'declined', idle: '❌ 不參加', active: '【已婉拒】❌ 不參加' },
