@@ -322,8 +322,21 @@ export function buildMockState(userId: string): AppState {
   const role: Role = (user?.role as Role) || 'guest';
   const branchId = user?.branchId || '';
   const admin = ['super_admin', 'troop_super', 'troop_leader', 'admin'].includes(role);
-  const leaderAll = role === 'group_leader';
-  const leaderBranch = role === 'branch_leader' || role === 'coach';
+  // ★ 可見範圍必須同寫入權限一致：
+  //   團長／支部領袖只管自己支部 → 亦只應該睇到自己支部嘅資料
+  //   （之前團長 leaderAll=true，寫唔到別團但睇得曬別團成員同家長電話）。
+  //   教練員冇固定支部 → 睇到嘅係「獲授權嘅支部」。
+  const leaderAll = false;
+  const leaderBranch = ['group_leader', 'branch_leader', 'coach'].includes(role);
+  // 教練員冇 branchId，用授權嚟決定佢睇到邊個支部
+  const grantedBranchIds = Array.from(new Set(
+    grantsFor(userId).map(g => g.branchId).filter(b => b && b !== '*')
+  ));
+  const wildcard = grantsFor(userId).some(g => g.branchId === '*');
+  const visibleBranches = wildcard
+    ? store.patrols.map(p => p.branchId)
+    : Array.from(new Set([...(branchId ? [branchId] : []), ...grantedBranchIds]));
+  const inScope = (b?: string) => !b || visibleBranches.includes(b);
   const isMember = role === 'member';
   const isParent = role === 'parent';
   const guest = !user;
@@ -342,27 +355,27 @@ export function buildMockState(userId: string): AppState {
 
   // 成員
   if (admin || leaderAll) out.members = [...store.members];
-  else if (leaderBranch) out.members = store.members.filter(m => m.branchId === branchId);
+  else if (leaderBranch) out.members = store.members.filter(m => inScope(m.branchId));
   else if (isMember) out.members = store.members.filter(m => m.id === user!.memberId);
   else if (isParent) out.members = store.members.filter(m => (user!.childMemberIds || []).includes(m.id));
 
   // 物資
   if (user) out.equipment = store.equipment;
   if (admin || leaderAll) out.equipmentLoans = [...store.equipmentLoans];
-  else if (leaderBranch) out.equipmentLoans = store.equipmentLoans.filter(l => !l.branchId || l.branchId === branchId || l.memberId === userId);
+  else if (leaderBranch) out.equipmentLoans = store.equipmentLoans.filter(l => inScope(l.branchId) || l.memberId === userId);
   else if (isMember) out.equipmentLoans = store.equipmentLoans.filter(l => l.memberId === userId || l.memberId === (user!.memberId || ''));
   else if (isParent) out.equipmentLoans = store.equipmentLoans.filter(l => (user!.childMemberIds || []).includes(l.memberId));
 
   // 使用者
   if (admin || leaderAll) out.users = [...store.users];
-  else if (leaderBranch) out.users = store.users.filter(u => u.branchId === branchId || !u.branchId);
+  else if (leaderBranch) out.users = store.users.filter(u => inScope(u.branchId));
   else if (isMember || isParent) out.users = store.users.filter(u => u.id === user!.id);
 
   // 活動
   const visibleEvents = (e: typeof store.events[number]) =>
     guest ? e.status === 'published'
       : admin || leaderAll ? true
-      : leaderBranch ? (e.status !== 'archived' && (e.scope === 'branch' ? e.branchId === branchId : e.status === 'published'))
+      : leaderBranch ? (e.status !== 'archived' && (e.scope === 'branch' ? inScope(e.branchId) : e.status === 'published'))
       // 成員／家長：睇到已發布活動；另外「已封存但自己曾經報過名」嘅活動亦要睇到，
       // 否則佢哋會突然搵唔返自己報咗名／畀咗錢嗰個活動。
       : isMember ? (e.status === 'published' && (e.scope === 'troop' || e.branchId === memberBranch))
@@ -380,14 +393,15 @@ export function buildMockState(userId: string): AppState {
   else if (isParent) out.replies = store.replies.filter(r => (user!.childMemberIds || []).includes(r.memberId));
 
   // 分隊
-  if (admin || leaderAll || leaderBranch) out.patrols = leaderBranch ? store.patrols.filter(p => p.branchId === branchId) : [...store.patrols];
+  if (admin || leaderAll || leaderBranch) out.patrols = leaderBranch ? store.patrols.filter(p => inScope(p.branchId)) : [...store.patrols];
   else if (isMember) out.patrols = [...store.patrols];
 
-  // 申請
+  // 申請：團長／支部領袖睇自己支部嘅（教練員要有授權先）
   if (admin || leaderAll) out.applications = [...store.applications];
+  else if (leaderBranch) out.applications = store.applications.filter(a => inScope(a.branchId));
 
-  // 通告 / PDF
-  if (admin || leaderAll) {
+  // 通告 / PDF（領袖睇曬，包括未發布嘅草稿）
+  if (admin || leaderAll || leaderBranch) {
     out.bookmarks = [...store.bookmarks];
     out.announcementPdfs = [...store.announcementPdfs];
     out.announcements = [...store.announcements];
@@ -407,8 +421,8 @@ export function buildMockState(userId: string): AppState {
     out.regularMeetings = [...store.regularMeetings];
     out.cancelledMeetings = [...store.cancelledMeetings];
   } else if (leaderBranch) {
-    out.regularMeetings = store.regularMeetings.filter(r => r.branchId === branchId);
-    out.cancelledMeetings = store.cancelledMeetings.filter(c => c.branchId === branchId);
+    out.regularMeetings = store.regularMeetings.filter(r => inScope(r.branchId));
+    out.cancelledMeetings = store.cancelledMeetings.filter(c => inScope(c.branchId));
   } else {
     const bs = isMember ? [memberBranch] : isParent ? (user!.childMemberIds || []).map(id => store.members.find(m => m.id === id)?.branchId || '').filter(Boolean) : [];
     out.regularMeetings = store.regularMeetings.filter(r => bs.includes(r.branchId));

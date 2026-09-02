@@ -1145,7 +1145,7 @@ function buildDashboardCore_(userId, loadPdfs) {
     if (pdfResult.success) {
       var allPdfs = pdfResult.files || [];
       // Filter by user's branches and audience
-      if (role === 'admin' || role === 'super_admin' || role === 'troop_super') {
+      if (role === 'admin' || role === 'super_admin' || role === 'troop_super' || role === 'troop_leader') {
         state.announcementPdfs = allPdfs;
       } else if (role === 'member') {
         var myBranchShort = '';
@@ -1218,15 +1218,17 @@ function buildDashboardCore_(userId, loadPdfs) {
     state.pluginSettings = allPluginSettings;
     state.audits = allAudits;
 
-  } else if (role === 'group_leader' || role === 'branch_leader') {
-    // 領袖：所屬支部
-    state.patrols = allPatrols.filter(function (p) { return p.branchId === branchId; });
-    state.members = allMembers.filter(function (m) { return m.branchId === branchId; });
+  } else if (role === 'group_leader' || role === 'branch_leader' || role === 'coach') {
+    // 領袖：自己支部 ＋ 獲其他支部團長授權嘅支部（教練員冇固定支部，全靠授權）
+    var scopeBranches = visibleBranchesFor_(userId, role, branchId);
+    var inScope_ = function (b) { return !b || scopeBranches.indexOf(b) >= 0; };
+    state.patrols = allPatrols.filter(function (p) { return inScope_(p.branchId); });
+    state.members = allMembers.filter(function (m) { return inScope_(m.branchId); });
     state.users = allUsers.filter(function (u) {
-      return u.branchId === branchId || u.role === 'parent' || u.id === userId;
+      return inScope_(u.branchId) || u.role === 'parent' || u.id === userId;
     });
-    state.applications = allApplications.filter(function (a) { return a.branchId === branchId; });
-    state.events = allEvents.filter(function (e) { return e.scope === 'troop' || e.branchId === branchId; });
+    state.applications = allApplications.filter(function (a) { return inScope_(a.branchId); });
+    state.events = allEvents.filter(function (e) { return e.scope === 'troop' || inScope_(e.branchId); });
     var leaderEventIds = state.events.map(function (e) { return e.id; });
     state.replies = allReplies.filter(function (r) { return leaderEventIds.indexOf(r.eventId) >= 0; });
     state.bookmarks = allBookmarks;
@@ -1470,6 +1472,31 @@ function getUserFeatures_(userId, role, branchScope) {
 }
 
 /** 系統內建的高權限操作者（不在 Users 表，跳過角色校驗） */
+
+
+/**
+ * 某人睇得到邊幾個支部嘅資料 = 自己支部 ＋ 獲授權嘅支部。
+ * 可見範圍必須同寫入權限一致，否則會出現「改唔到但睇得曬」嘅漏洞
+ * （例如團長睇到別團所有成員同家長電話）。
+ */
+function visibleBranchesFor_(userId, role, ownBranchId) {
+  var out = [];
+  if (role !== 'coach' && ownBranchId) out.push(ownBranchId);
+  readTable_('UserPermissions').forEach(function (p) {
+    if (getField_(p, 'userId') !== userId) return;
+    if (String(getField_(p, 'granted') || '').toLowerCase() !== 'true') return;
+    var b = String(getField_(p, 'branchId') || '');
+    if (b === '*') {
+      readTable_('Branches').forEach(function (br) {
+        var id = getField_(br, 'branchId');
+        if (out.indexOf(id) < 0) out.push(id);
+      });
+    } else if (b && out.indexOf(b) < 0) {
+      out.push(b);
+    }
+  });
+  return out;
+}
 
 var TROOP_WIDE_ROLES_ = ['super_admin', 'troop_super', 'troop_leader', 'admin'];
 
