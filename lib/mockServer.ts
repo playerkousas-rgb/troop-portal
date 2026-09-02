@@ -985,6 +985,21 @@ function handleMutate(action: string, p: Record<string, any>) {
       if (tgtEv && isDistrictEvent(tgtEv)) {
         return { success: false, error: '區地域總會活動為通告性質，旅團不代收報名，請按通告連結自行報名。' };
       }
+      // ★ 18 歲以下：參加／不參加必須由家長代做（同 GS handleSetReply_ 一致）
+      //   前端個掣鎖咗，但後台一樣要擋，因為個 request 可以繞過 UI 直接發。
+      if (p.type === 'registered' || p.type === 'declined') {
+        const tgtMem = store.members.find(m => m.id === p.memberId);
+        const age = Number(tgtMem?.age);
+        if (tgtMem && Number.isFinite(age) && age < 18) {
+          const op = store.users.find(u => u.id === String(p.operatedBy || ''));
+          const opRole = String((op as any)?.role || '');
+          const isParentOrLeader = opRole === 'parent' || opRole === 'admin' || opRole === 'super_admin'
+            || opRole === 'group_leader' || opRole === 'branch_leader' || opRole === 'coach';
+          if (!isParentOrLeader) {
+            return { success: false, error: '18歲以下成員需由家長代為操作參加 / 不參加' };
+          }
+        }
+      }
       const replyId = `${p.eventId}_${p.memberId}`;
       const m = store.members.find(x => x.id === p.memberId);
       const i = findIdx(store.replies, 'id', replyId);

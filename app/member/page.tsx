@@ -93,12 +93,15 @@ export default function Member(){
                   event={e}
                   status={r?.type}
                   badges={badges}
+                  // ★ 未滿 18 歲：參加／不參加嘅掣照樣顯示，只係鎖住。
+                  //   咁樣成員睇到嘅版面同家長一樣（同一個活動、同一組功能），
+                  //   分別只在於「我冇權撳」，而唔係「呢個功能唔存在」。
                   actions={(isDistrict || e.status === 'archived') ? [] : [
-                    { type: 'interested', idle: '❤️ 有興趣', active: '【已點選】❤️ 有興趣' },
-                    ...(adult ? [
-                      { type: 'registered' as const, idle: '✅ 參加', active: '【已報名】✅ 參加' },
-                      { type: 'declined' as const, idle: '❌ 不參加', active: '【已婉拒】❌ 不參加' },
-                    ] : []),
+                    { type: 'interested' as const, idle: '❤️ 有興趣', active: '【已點選】❤️ 有興趣' },
+                    { type: 'registered' as const, idle: '✅ 參加', active: '【已報名】✅ 參加',
+                      lockedReason: adult ? undefined : '未滿 18 歲，參加／不參加須由家長代為決定（家長登入回覆＝已簽署）。' },
+                    { type: 'declined' as const, idle: '❌ 不參加', active: '【已婉拒】❌ 不參加',
+                      lockedReason: adult ? undefined : '未滿 18 歲，參加／不參加須由家長代為決定（家長登入回覆＝已簽署）。' },
                   ]}
                   loading={!!loadingId && loadingId.startsWith(e.id)}
                   onAct={t => act(e.id, t)}
