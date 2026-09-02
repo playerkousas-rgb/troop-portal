@@ -169,7 +169,7 @@ export default function Calendar() {
       title: form.id ? '確認更新日曆項目' : '確認新增日曆項目',
       message: kv([
         ['名稱', form.title.trim()],
-        ['分類', form.category === 'district' ? '區地域總會活動' : '自行舉辦'],
+        ['分類', form.category === 'district' ? '區地域總會活動' : '旅團活動'],
         ['日期', form.date],
         ['行事曆標籤', form.calendarTag],
         ['支部', BRANCH_OPTIONS.find(b => b.id === form.branchId)?.label || form.branchId],
@@ -185,7 +185,7 @@ export default function Calendar() {
         await apiUpdateEvent({ eventId: form.id, title: form.title.trim(), date: form.date, location: form.location, scope: form.scope, branchId: form.branchId, fee: form.fee, paymentUrl: form.paymentUrl, dutyPatrol: form.dutyPatrol, calendarTag: form.calendarTag, category: form.category });
         setMsg(`✅ 已更新「${form.title.trim()}」`);
       } else {
-        await apiCreateEvent({ title: form.title.trim(), scope: form.scope, branchId: form.branchId, date: form.date, location: form.location, fee: form.fee, paymentUrl: form.paymentUrl, dutyPatrol: form.dutyPatrol, calendarTag: form.calendarTag, category: form.category, status: 'published', source: form.category === 'district' ? '區地域總會活動' : '自行舉辦' });
+        await apiCreateEvent({ title: form.title.trim(), scope: form.scope, branchId: form.branchId, date: form.date, location: form.location, fee: form.fee, paymentUrl: form.paymentUrl, dutyPatrol: form.dutyPatrol, calendarTag: form.calendarTag, category: form.category, status: 'published', source: form.category === 'district' ? '區地域總會活動' : '旅團活動' });
         setMsg(`✅ 已新增並發布「${form.title.trim()}」（${form.date}）`);
       }
       setForm(null);
@@ -431,7 +431,7 @@ export default function Calendar() {
             <label className={labelCls}>地點<input className={inputCls} value={form.location} onChange={e => setForm({ ...form, location: e.target.value })} placeholder="例如：西貢" /></label>
             <label className={labelCls}>分類
               <select className={inputCls} value={form.category} onChange={e => setForm({ ...form, category: e.target.value as any })}>
-                <option value="self">🏠 自行舉辦</option>
+                <option value="self">🏠 旅團活動</option>
                 <option value="district">🗺️ 區地域總會活動</option>
               </select>
             </label>

@@ -10,7 +10,7 @@ const STATS = [
 ] as const;
 
 const MODULES = [
-  { icon: '🎯', title: '活動管理', subtitle: '活動通告 · 過期區', detail: '旅團自辦／區地域總會活動', href: '/dashboard/activities', tone: 'blue' },
+  { icon: '🎯', title: '活動管理', subtitle: '活動通告 · 過期區', detail: '旅團活動／區地域總會活動', href: '/dashboard/activities', tone: 'blue' },
   { icon: '📅', title: '行事曆管理', subtitle: '集會 · 活動 · 標籤', detail: '直接新增、修改及取消', href: '/dashboard/calendar', tone: 'emerald' },
   { icon: '🎫', title: '報名管理', subtitle: '回覆 · 名額 · 付款', detail: '按活動查看報名名單', href: '/dashboard/admin/registrations', tone: 'violet' },
   { icon: '🤝', title: '會議管理', subtitle: '議程 · 紀錄 · 文件', detail: '領袖會議及相關附件', href: '/dashboard/meetings', tone: 'amber' },

@@ -1,6 +1,6 @@
 'use client';
 import Link from 'next/link';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useConfirm, kv } from '@/components/ConfirmProvider';
 
 /* ═══════════════════════════════════════════════════
@@ -120,6 +120,13 @@ export default function ActivitiesPage() {
   const [role, setRole] = useState('parent');
   const [items, setItems] = useState<Act[]>(SEED);
   const [filter, setFilter] = useState<'all' | 'internal' | 'external'>('all');
+  // 上方統計用 ?tab=self|district 直接跳入對應分頁（同真實 /admin/events 一致）
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const t = new URLSearchParams(window.location.search).get('tab');
+    if (t === 'self') setFilter('internal');
+    if (t === 'district') setFilter('external');
+  }, []);
   const [showExpired, setShowExpired] = useState(false); // 過期區：收合做下拉式，撳先展開
   const [adult, setAdult] = useState(false); // 成員示範：18 歲或以上可自行報名
   const [detail, setDetail] = useState<string | null>(null);
@@ -272,7 +279,7 @@ export default function ActivitiesPage() {
   const kindBadge = (k: 'internal' | 'external') =>
     k === 'internal'
       ? <span className="text-[13px] bg-brand-100 text-brand-700 px-1.5 py-0.5 rounded font-bold">🏠 旅團活動</span>
-      : <span className="text-[13px] bg-violet-100 text-violet-700 px-1.5 py-0.5 rounded font-bold">🌐 區／總會活動</span>;
+      : <span className="text-[13px] bg-violet-100 text-violet-700 px-1.5 py-0.5 rounded font-bold">🗺️ 區地域總會活動</span>;
 
   return (
     <main className="max-w-2xl mx-auto px-4 py-4 pb-24 space-y-4">
@@ -301,7 +308,7 @@ export default function ActivitiesPage() {
         {isLeader && (
           <div className="flex gap-1.5">
             <button onClick={() => openNew('internal')} className="text-[13px] px-2.5 py-1 rounded-lg font-bold bg-brand-600 text-white">+ 新增旅團活動</button>
-            <button onClick={() => openNew('external')} className="text-[13px] px-2.5 py-1 rounded-lg font-bold bg-violet-600 text-white">📚 引入區／總會活動</button>
+            <button onClick={() => openNew('external')} className="text-[13px] px-2.5 py-1 rounded-lg font-bold bg-violet-600 text-white">🗺️ 加入區地域總會活動</button>
           </div>
         )}
       </div>
@@ -310,7 +317,7 @@ export default function ActivitiesPage() {
 
       {/* 篩選 */}
       <div className="flex gap-1.5">
-        {([{ id: 'all', label: '全部' }, { id: 'internal', label: '🏠 旅團活動' }, { id: 'external', label: '🌐 區／總會' }] as const).map(f => (
+        {([{ id: 'all', label: '全部' }, { id: 'internal', label: '🏠 旅團活動' }, { id: 'external', label: '🗺️ 區地域總會' }] as const).map(f => (
           <button key={f.id} onClick={() => setFilter(f.id)}
             className={`text-[13px] px-3 py-1.5 rounded-full font-bold border ${filter === f.id ? 'bg-brand-600 text-white border-brand-600' : 'bg-white text-slate-600 border-slate-200'}`}>
             {f.label}
@@ -470,7 +477,10 @@ export default function ActivitiesPage() {
               <div className="space-y-2">
                 {current.registerWay === 'app' ? (
                   <div className="flex gap-2 flex-wrap">
-                    <button onClick={() => respond(current.id, 'interested')} className="flex-1 text-[12px] font-bold bg-amber-500 text-white py-2 rounded-xl">❤️ 有興趣</button>
+                    {/* ❤️ 有興趣＝成員向家長及領袖表達意願，唔等於報名 → 家長端冇呢個掣 */}
+                    {role !== 'parent' && (
+                      <button onClick={() => respond(current.id, 'interested')} className="flex-1 text-[12px] font-bold bg-amber-500 text-white py-2 rounded-xl">❤️ 有興趣（非報名）</button>
+                    )}
                     {(role === 'parent' || adult) && (
                       <>
                         <button onClick={() => respond(current.id, 'registered')} className="flex-1 text-[12px] font-bold bg-brand-600 text-white py-2 rounded-xl">✅ 參加</button>
@@ -478,15 +488,17 @@ export default function ActivitiesPage() {
                       </>
                     )}
                   </div>
+                ) : role === 'parent' ? (
+                  <p className="text-[13px] text-slate-500 m-0">ℹ️ 區地域總會活動由子女／家長自行報名，旅團不代收報名及費用。</p>
                 ) : (
                   <button onClick={() => respond(current.id, 'interested')} className="w-full text-[12px] font-bold bg-violet-600 text-white py-2 rounded-xl">❤️ 我有興趣（搵領袖報名）</button>
                 )}
                 <p className="text-[13px] text-slate-500 m-0 leading-relaxed">
                   {role === 'parent'
-                    ? 'ℹ️ 家長可標示：有興趣／參加／不參加。選「參加」才需標記已付款；選「不參加」不用 tick。'
+                    ? 'ℹ️ 家長只回覆：參加／不參加。「❤️ 有興趣」是子女用來話畀家長及領袖知佢想去（只表達意見，不等於報名）。選「參加」才需標記已付款。'
                     : adult
-                    ? 'ℹ️ 你已 18 歲或以上，可自行報名。'
-                    : 'ℹ️ 你未滿 18 歲，可按「有興趣」；參加／不參加由家長用家長帳戶回覆。'}
+                    ? 'ℹ️ 你已 18 歲或以上，可自行報名。❤️ 有興趣只係表達意見，唔等於報名。'
+                    : 'ℹ️ 你未滿 18 歲，可按「❤️ 有興趣」話畀家長及領袖知（不等於報名）；參加／不參加由家長用家長帳戶回覆。'}
                 </p>
                 <button onClick={() => setDetail(null)} className="w-full text-[12px] font-bold bg-slate-100 text-slate-600 py-2 rounded-xl">關閉</button>
               </div>
@@ -500,7 +512,7 @@ export default function ActivitiesPage() {
         <div className="fixed inset-0 z-50 bg-black/30 flex items-end sm:items-center justify-center p-0 sm:p-4">
           <div className="bg-white w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl p-4 space-y-3 max-h-[90vh] overflow-y-auto">
             <h3 className="font-bold text-sm m-0">
-              {form.id ? '✏️ 編輯活動' : form.kind === 'internal' ? '➕ 新增旅團活動' : '📚 引入區／總會活動'}
+              {form.id ? '✏️ 編輯活動' : form.kind === 'internal' ? '➕ 新增旅團活動' : '🗺️ 加入區地域總會活動'}
             </h3>
             <p className="text-[13px] text-slate-500 m-0 -mt-1 leading-relaxed">
               {form.kind === 'internal'
@@ -543,7 +555,7 @@ export default function ActivitiesPage() {
                 <div className="text-[13px] font-bold text-slate-600">📎 活動通告（可加入多張）</div>
                 <p className="text-[13px] text-slate-500 m-0 mt-1 leading-relaxed">
                   {form.kind === 'internal'
-                    ? '旅團自辦活動：模板、貼現成連結、或直接輸入內容，三種都可以。'
+                    ? '旅團活動：模板、貼現成連結、或直接輸入內容，三種都可以。'
                     : '區／地域總會活動：從圖書館引入，或直接貼上外部連結。'}
                 </p>
               </div>

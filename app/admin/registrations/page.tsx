@@ -167,19 +167,19 @@ function RegistrationsInner(){
   return <Auth roles={['super_admin', 'troop_super', 'troop_leader', 'admin', 'group_leader', 'branch_leader', 'coach']}><div className="stack">
     <section className="hero">
       <span className="badge gold">活動統計</span>
-      <h1>📊 活動統計（只計自行舉辦活動）</h1>
+      <h1>📊 活動統計（只計旅團活動）</h1>
       <p>資料分層展示，預設收起：點各層標題即可展開。區地域總會活動不做統計。</p>
     </section>
     {err&&<p className="badge red">{err}</p>}
 
-    {/* 1. 選擇活動（只計自行舉辦；區地域總會活動不做統計） */}
+    {/* 1. 選擇活動（只計旅團活動；區地域總會活動不做統計） */}
     <section className="card stack" style={{ borderTop: '4px solid #1a73e8', background: '#f8fafc' }}>
-      <strong style={{ fontSize: '1.05rem', color: '#1a73e8' }}>🏠 自行舉辦活動：</strong>
+      <strong style={{ fontSize: '1.05rem', color: '#1a73e8' }}>🏠 旅團活動：</strong>
       <select value={eventId} onChange={e=>{setEventId(e.target.value);setPaidOverrides({});setExpandedGroup(null);setExpandedOverallStatus(null);setExpandedBranchStatus(null);}}>
-        {internalEvents.length===0&&<option value="">無自行舉辦活動</option>}
+        {internalEvents.length===0&&<option value="">無旅團活動</option>}
         {internalEvents.map(e=><option key={e.id} value={e.id}>{e.title} ({e.date})</option>)}
       </select>
-      <p className="muted" style={{ margin: 0 }}>ℹ️ 區地域總會活動（原圖書館引入）只係精選通告畀成員睇，佢想報就自己報，所以不做統計。</p>
+      <p className="muted" style={{ margin: 0 }}>ℹ️ 區地域總會活動（外部）只係精選通告畀成員睇，佢想報就自己報，所以不做統計。</p>
     </section>
 
     {event&&<>

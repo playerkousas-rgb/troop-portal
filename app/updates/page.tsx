@@ -1,6 +1,7 @@
 import Link from 'next/link';
 
-// 更新公告 = 我哋喺 GIT 前台做嘅版本更新，話俾用戶知有咩改動／新功能。
+// 系統更新 = 我哋喺 GIT 前台做嘅版本更新，話俾用戶知有咩改動／新功能。
+// （刻意唔叫「公告」：全 APP 已經冇「公告」呢個概念，旅團訊息一律行最上方嘅 📣 最新消息。）
 // 每一項標明「必須套用」（要重新部署 GS / 更新前端）定「建議」。
 type UpdateItem = {
   version: string;
@@ -59,7 +60,7 @@ export default function Updates() {
 
       <section className="text-center pt-1">
         <div className="text-4xl mb-1" aria-hidden>📢</div>
-        <h1 className="text-2xl font-black text-brand-700 leading-tight m-0">更新公告</h1>
+        <h1 className="text-2xl font-black text-brand-700 leading-tight m-0">系統更新</h1>
         <p className="text-[12px] text-slate-500 mt-2 mb-0 leading-relaxed">
           Scout System 版本更新日誌。紅色「必須」＝要重新部署後台／更新前端先生效；
           灰色「建議」＝選擇性功能。

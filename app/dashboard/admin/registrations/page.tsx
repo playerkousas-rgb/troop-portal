@@ -24,13 +24,13 @@ export default function RegistrationsPage() {
 
       <div className="flex gap-2 flex-wrap">
         <div className="flex-1 min-w-[200px]">
-          <label className="text-[13px] font-bold text-slate-500">🏠 旅團內部活動</label>
+          <label className="text-[13px] font-bold text-slate-500">🏠 旅團活動（內部）</label>
           <select value={eventId} onChange={e => setEventId(e.target.value)} className="w-full rounded-lg border border-slate-200 px-2 py-1.5 text-xs bg-white mt-0.5">
             {EVENTS.filter(e => e.type === 'internal').map(e => <option key={e.id} value={e.id}>{e.title} ({e.date})</option>)}
           </select>
         </div>
         <div className="flex-1 min-w-[200px]">
-          <label className="text-[13px] font-bold text-slate-500">📚 外部（圖書館）活動</label>
+          <label className="text-[13px] font-bold text-slate-500">🗺️ 區地域總會活動（外部）</label>
           <select className="w-full rounded-lg border border-slate-200 px-2 py-1.5 text-xs bg-white mt-0.5">
             {EVENTS.filter(e => e.type === 'external').map(e => <option key={e.id} value={e.id}>{e.title} ({e.date})</option>)}
           </select>

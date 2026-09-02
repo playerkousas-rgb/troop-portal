@@ -8,7 +8,7 @@ import { isCoreNotPlugin } from '@/lib/attendance';
 import { useConfirm, kv } from '@/components/ConfirmProvider';
 
 const FOLDER_FIELDS = [
-  { key: 'ANNOUNCEMENT_FOLDER_ID', label: '公告 PDF 資料夾 ID' },
+  { key: 'ANNOUNCEMENT_FOLDER_ID', label: '通告 PDF 資料夾 ID' },
   { key: 'MEETINGS_FOLDER_ID', label: '會議文件資料夾 ID' },
 ];
 
@@ -100,7 +100,7 @@ export default function PluginManagementPage() {
     if (changed.length === 0) { setOk('✅ 沒有變更需要儲存'); return; }
     const ok = await confirm({
       title: '確認儲存 Drive 資料夾設定',
-      message: kv(changed.map(([k, v]) => [{ ANNOUNCEMENT_FOLDER_ID: '公告 PDF 資料夾 ID', MEETINGS_FOLDER_ID: '會議文件資料夾 ID' }[k] || k, v] as [string, string])),
+      message: kv(changed.map(([k, v]) => [{ ANNOUNCEMENT_FOLDER_ID: '通告 PDF 資料夾 ID', MEETINGS_FOLDER_ID: '會議文件資料夾 ID' }[k] || k, v] as [string, string])),
       confirmLabel: '確認儲存',
     });
     if (!ok) return;
@@ -208,7 +208,7 @@ export default function PluginManagementPage() {
         {/* Drive 資料夾設定（也可在本身頁面設定，如會議管理／公告頁） */}
         <section className="card stack">
           <h3 className="m-0">🗂 Drive 資料夾設定</h3>
-          <p className="muted m-0">各資料夾設定亦可在本身頁面設定（例如會議管理、公告頁）。資料夾需設為「知道連結的人都可檢視」。</p>
+          <p className="muted m-0">各資料夾設定亦可在本身頁面設定（例如會議管理、通告頁）。資料夾需設為「知道連結的人都可檢視」。</p>
           <div className="grid">
             {FOLDER_FIELDS.map(f => (
               <label key={f.key}>

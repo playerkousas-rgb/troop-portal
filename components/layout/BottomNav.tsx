@@ -69,7 +69,7 @@ export default function BottomNav() {
   const isLeader = !!role && LEADER_ROLES.includes(role);
 
   const isDemo = !!pathname?.startsWith('/dashboard');
-  // 首頁（登入旅團頁）：底部就係平台資訊 tab —— 模板下載／更新公告
+  // 首頁（登入旅團頁）：底部就係平台資訊 tab —— 模板下載／系統更新
   const isLanding = pathname === '/';
 
   // 未選旅團又未登入 → 冇嘢可快捷；平台資訊頁一律唔顯示（首頁除外）
@@ -79,7 +79,7 @@ export default function BottomNav() {
   const items: Item[] = isLanding
     ? [
         { icon: '⬇️', label: '模板下載', href: '/downloads' },
-        { icon: '📢', label: '更新公告', href: '/updates' },
+        { icon: '🆕', label: '系統更新', href: '/updates' },
       ]
     : isLeader
     ? (isDemo ? DEMO_LEADER_ITEMS : LEADER_ITEMS)

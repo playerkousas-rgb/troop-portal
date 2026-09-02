@@ -268,7 +268,9 @@ const FEATURES: Record<string, string[]> = {
   admin: ['branches', 'members', 'applications', 'events', 'registrations', 'attendance', 'meetings', 'library_import', 'notices', 'users', 'permissions', 'settings', 'plugins', 'audit', 'calendar', 'equipment'],
   // 旅長：實際職級最高，權限同管理員（管理員 = 代旅長操作嘅「旅內電腦人」）
   troop_leader: ['branches', 'members', 'applications', 'events', 'registrations', 'attendance', 'meetings', 'library_import', 'notices', 'users', 'permissions', 'settings', 'plugins', 'audit', 'calendar', 'equipment'],
-  group_leader: ['members', 'applications', 'events', 'registrations', 'attendance', 'meetings', 'library_import', 'notices', 'calendar', 'equipment', 'permissions'],
+  // 團長：自己支部嘅事一手包辦 —— 包括支部管理（小隊）同使用者管理（帳號／成員／申請），
+  // 但範圍鎖死喺自己支部（見 buildMockState 嘅 leaderBranch 過濾）。
+  group_leader: ['branches', 'members', 'applications', 'events', 'registrations', 'attendance', 'meetings', 'library_import', 'notices', 'users', 'calendar', 'equipment', 'permissions'],
   branch_leader: ['members', 'applications', 'events', 'registrations', 'attendance', 'meetings', 'library_import', 'notices', 'calendar', 'equipment'],
   // 教練員：冇固定支部，預設權限＝家長（即冇任何管理功能）。
   // 想佢幫手就要團長逐項＋逐支部授權（見 USER_SCOPED_GRANTS）。
@@ -380,7 +382,16 @@ export function buildMockState(userId: string): AppState {
   // 使用者
   if (admin || leaderAll) out.users = [...store.users];
   else if (leaderBranch) out.users = store.users.filter(u => inScope(u.branchId));
-  else if (isMember || isParent) out.users = store.users.filter(u => u.id === user!.id);
+  // ★ 成員：除咗自己，亦回傳「已連結嘅家長」帳戶 —— 緊急聯絡資料要直接用家長資料
+  //   （同 GS buildDashboardCore_ 嘅 member 分支一致）。
+  else if (isMember) out.users = store.users.filter(u =>
+    u.id === user!.id ||
+    (u.role === 'parent' && (
+      (u.childMemberIds || []).includes(user!.memberId || '') ||
+      store.members.some(m => m.id === user!.memberId && m.parentUserId === u.id)
+    ))
+  );
+  else if (isParent) out.users = store.users.filter(u => u.id === user!.id);
 
   // 活動
   const visibleEvents = (e: typeof store.events[number]) =>
@@ -1071,7 +1082,7 @@ function handleMutate(action: string, p: Record<string, any>) {
       const category = p.category === 'district' ? 'district' : 'self';
       const source = category === 'district'
         ? (String(p.source || '區地域總會活動'))
-        : (String(p.source || '自行舉辦'));
+        : (String(p.source || '旅團活動'));
       store.events.push({
         id, title: String(p.title || ''), date: String(p.date || ''), location: String(p.location || ''),
         scope: (p.scope || 'troop') as any, branchId: String(p.branchId || ''),
@@ -1101,7 +1112,7 @@ function handleMutate(action: string, p: Record<string, any>) {
     }
     case 'publishEvent': { const i = findIdx(store.events, 'id', String(p.eventId || '')); if (i >= 0) { store.events[i].status = 'published'; logAudit(ob, 'publishEvent', '活動', String(p.eventId || ''), store.events[i].title || ''); } return S(ob); }
     case 'deleteEvent': store.events = store.events.filter(e => e.id !== p.eventId); store.replies = store.replies.filter(r => r.eventId !== p.eventId); logAudit(ob, 'deleteEvent', '活動', String(p.eventId || ''), String(p.title || '')); return S(ob);
-    /** 過期處理：自行舉辦 → 封存成「過期通告」；區地域總會（外部）→ 直接刪除 */
+    /** 過期處理：旅團活動 → 封存成「過期通告」；區地域總會（外部）→ 直接刪除 */
     case 'archiveEvent': {
       const i = findIdx(store.events, 'id', String(p.eventId || ''));
       if (i >= 0) {

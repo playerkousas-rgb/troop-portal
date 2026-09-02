@@ -186,7 +186,7 @@ export default function HomePage() {
         </div>
 
         <p className="mt-4 text-base text-slate-500 m-0 leading-relaxed">
-          💡 揀咗旅團之後，公開行事曆／公告／活動唔使登入都可以睇（旅團可自行選擇關閉）。
+          💡 揀咗旅團之後，公開行事曆／通告／活動唔使登入都可以睇（旅團可自行選擇關閉）。
           看不到你的旅團？代表尚未開通，請用右上角「新旅團申請及教學」。
         </p>
       </section>

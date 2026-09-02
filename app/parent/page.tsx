@@ -5,9 +5,8 @@ import ConsoleHeader from '@/components/ui/ConsoleHeader';
 import Panel from '@/components/ui/Panel';
 import EmptyState from '@/components/ui/EmptyState';
 import EventReplyRow from '@/components/ui/EventReplyRow';
-import AlbumEmbed from '@/components/ui/AlbumEmbed';
-import { canViewAlbum } from '@/lib/album';
-import { AppState, loadStateSlice, replyStatus, eventCategory, visibleEventsForMember } from '@/lib/store';
+import StatStrip from '@/components/ui/StatStrip';
+import { AppState, loadStateSlice, replyStatus, eventCategory, visibleEventsForMember, personActivityStats, emergencyContactFor } from '@/lib/store';
 import { apiSetReply, apiTogglePaid } from '@/lib/api';
 import { getSession } from '@/lib/session';
 import { useConfirm, kv } from '@/components/ConfirmProvider';
@@ -25,10 +24,13 @@ export default function Parent(){
   const parent=s.users.find(u=>u.id===(session?.userId))||s.users.find(u=>u.role==='parent');
   if(!parent)return <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 text-sm text-slate-600">找不到家長帳號。</div>;
   const children=s.members.filter(m=>(parent.childMemberIds||[]).includes(m.id)||m.parentUserId===parent.id);
+  const stats=personActivityStats(s,children);
   // 家長報名＝簽署：用家長帳戶登入回覆，無需再簽通告回條
-  async function respond(eid:string,mid:string,type:'interested'|'registered'|'declined'){
+  // ★ 家長只有「參加 / 不參加」。「❤️ 有興趣」係成員專用（成員向家長及領袖表達意見，
+  //   唔等於報名），所以家長端只會睇到子女標示咗有興趣，唔會有呢個掣。
+  async function respond(eid:string,mid:string,type:'registered'|'declined'){
     const ev=s?.events.find(e=>e.id===eid);
-    const label={interested:'❤️ 有興趣',registered:'✅ 確定參加',declined:'❌ 婉拒不參加'}[type]||type;
+    const label={registered:'✅ 確定參加',declined:'❌ 婉拒不參加'}[type]||type;
     const ok=await confirm({title:'確認代子女回覆活動',message:kv([['活動',ev?.title||eid],['回覆',label]]),confirmLabel:'確認回覆'});
     if(!ok)return;
     setLoadingId(eid+mid);setErr('');
@@ -51,7 +53,7 @@ export default function Parent(){
         name={parent.name}
         roleLabel="家長"
         tone="violet"
-        tagline="管理子女活動報名與資訊。用家長帳戶登入報名＝已簽署，無需再簽通告回條。"
+        tagline="管理子女活動報名與資訊。用家長帳戶登入報名＝已簽署，無需再簽通告回條。「❤️ 有興趣」是子女表達意願（不等於報名），家長只需回覆 ✅ 參加 / ❌ 不參加。"
         action={
           <Link href="/profile" className="no-underline text-sm font-bold bg-white/95 text-slate-800 px-3 py-2 rounded-xl hover:bg-white transition whitespace-nowrap">
             👤 個人設定
@@ -63,6 +65,18 @@ export default function Parent(){
         <section className="bg-rose-50 border border-rose-200 rounded-2xl p-4">
           <p className="text-sm text-rose-700 font-bold m-0 whitespace-pre-wrap leading-relaxed">{err}</p>
         </section>
+      )}
+
+      {/* 上方統計：一眼睇到有幾多個活動進行中、子女報咗未、有冇未找數，
+          以及外部（區地域總會）另外有幾多個活動可以自己去報。 */}
+      {children.length > 0 && (
+        <StatStrip stats={[
+          { label: '進行中活動', value: stats.ongoing, desc: '旅團活動', tone: 'blue', href: '/activities' },
+          { label: '已報名', value: stats.registered, desc: '子女人次', tone: 'green' },
+          { label: '未回覆', value: stats.unresponded, desc: '等你決定', tone: stats.unresponded > 0 ? 'red' : 'slate' },
+          { label: '未付款', value: stats.unpaid, desc: '已報名待付', tone: stats.unpaid > 0 ? 'gold' : 'slate' },
+          { label: '區地域總會', value: stats.district, desc: '外部活動·自行報名', tone: 'violet', href: '/activities?tab=district' },
+        ]} />
       )}
 
       {children.length===0 ? (
@@ -82,7 +96,7 @@ export default function Parent(){
               key={c.id}
               icon="📢"
               title={`${c.name} 的活動`}
-              subtitle="為子女回覆：有興趣 / 參加 / 不參加，並標記付款"
+              subtitle="為子女回覆：參加 / 不參加，並標記付款（❤️ 有興趣是子女表達意願，不等於報名）"
               tone="blue"
               count={`${events.length} 個`}
             >
@@ -108,20 +122,13 @@ export default function Parent(){
                         ]}
                         // 已封存＝報名已截止，只保留紀錄，唔再畀改
                         actions={(e.status === 'archived' || isDistrict) ? [] : [
-                          { type: 'interested', idle: '❤️ 有興趣', active: '【已標記】❤️ 有興趣' },
                           { type: 'registered', idle: '✅ 參加', active: '【已報名】✅ 參加' },
                           { type: 'declined', idle: '❌ 不參加', active: '【已婉拒】❌ 不參加' },
                         ]}
                         loading={loadingId === e.id + c.id}
-                        onAct={t => respond(e.id, c.id, t)}
+                        onAct={t => respond(e.id, c.id, t as 'registered' | 'declined')}
                         footer={
                           <>
-                          {/* 📷 活動相簿：唔理報唔報名都睇到（活動完咗之後相簿先最有價值） */}
-                          {e.albumUrl && canViewAlbum({ role: session?.role, userFeatures: s.userFeatures, ownBranchId: c.branchId, eventBranchId: e.branchId }) && (
-                            <div className="mb-2">
-                              <AlbumEmbed url={e.albumUrl} title={`${e.title}・活動相簿`} />
-                            </div>
-                          )}
                           {isDistrict ? (
                             <p className="text-sm text-slate-500 m-0 leading-relaxed">
                               ℹ️ 此為區／地域／總會活動通告，旅團不代收報名及費用。有興趣請按上面的通告連結自行報名。
@@ -178,7 +185,7 @@ export default function Parent(){
       <Panel
         icon="📝"
         title="子女出席紀錄"
-        subtitle="日常集會及旅團自辦活動的出席情況"
+        subtitle="日常集會及旅團活動的出席情況"
         tone="emerald"
         count={`${children.length} 名子女`}
       >
@@ -199,28 +206,37 @@ export default function Parent(){
         </div>
       </Panel>
 
-      <Panel icon="🆘" title="家庭聯絡資料" subtitle="家長及子女資料" tone="rose" defaultOpen={false}>
+      {/* 🆘 緊急聯絡資料：子女已連結家長帳戶 → 緊急聯絡人就係你，唔使另外再填一次。 */}
+      <Panel icon="🆘" title="緊急聯絡資料" subtitle="子女已連結家長帳戶，緊急聯絡人即為家長" tone="rose" defaultOpen={false}>
+        <div className="rounded-xl border border-rose-200 bg-rose-50/70 px-3 py-2.5 mb-2">
+          <p className="text-sm text-rose-800 font-bold m-0 leading-relaxed">
+            ℹ️ 你的子女已連結你的家長帳戶，領袖及急救時會直接聯絡你，不需要另外填寫緊急聯絡人。
+            聯絡電話請在「個人設定」更新。
+          </p>
+        </div>
         <div className="grid sm:grid-cols-2 gap-2">
           <div className="rounded-xl bg-slate-50 border border-slate-200 px-3 py-2">
-            <div className="text-sm text-slate-500 font-bold">家長</div>
+            <div className="text-sm text-slate-500 font-bold">緊急聯絡人（家長）</div>
             <div className="text-sm font-bold text-slate-800">{parent.name}</div>
           </div>
           <div className="rounded-xl bg-slate-50 border border-slate-200 px-3 py-2">
             <div className="text-sm text-slate-500 font-bold">Email</div>
             <div className="text-sm font-bold text-slate-800 break-all">{parent.email}</div>
           </div>
-          {children.map(c => (
-            <div key={c.id} className="rounded-xl bg-slate-50 border border-slate-200 px-3 py-2">
-              <div className="text-sm text-slate-500 font-bold">子女 · 支部</div>
-              <div className="text-sm font-bold text-slate-800">{c.name}（{c.ymNumber}）· {c.branchId}</div>
-            </div>
-          ))}
+          {children.map(c => {
+            const ec = emergencyContactFor(s, c);
+            return (
+              <div key={c.id} className="rounded-xl bg-slate-50 border border-slate-200 px-3 py-2">
+                <div className="text-sm text-slate-500 font-bold">子女 · 支部 · 聯絡電話</div>
+                <div className="text-sm font-bold text-slate-800">
+                  {c.name}（{c.ymNumber}）· {c.branchId} · {ec.phone || '未填電話'}
+                </div>
+              </div>
+            );
+          })}
         </div>
       </Panel>
-
-      <div className="flex gap-2 flex-wrap">
-        <Link href="/profile" className="no-underline text-sm font-bold bg-white text-slate-700 border border-slate-200 px-3 py-2 rounded-xl hover:bg-slate-50 transition">修改個人資料 / 改密碼</Link>
-      </div>
     </div>
   );
 }
+

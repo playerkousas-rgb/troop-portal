@@ -52,7 +52,7 @@ export type AttendanceMatrix = {
   rows: Array<Record<string, string>>;
 };
 
-/** 後補／補改：一個可以點名嘅「場次」（恆常集會日 或 旅團自辦活動） */
+/** 後補／補改：一個可以點名嘅「場次」（恆常集會日 或 旅團活動） */
 export type AttendanceSession = {
   id: string;
   date: string;

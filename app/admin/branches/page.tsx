@@ -1,5 +1,7 @@
 'use client';
-import { branches } from '@/lib/model';
+import { branches, ROLE_LABEL } from '@/lib/model';
+import type { Role } from '@/lib/model';
+import { getSession } from '@/lib/session';
 import { AppState, loadStateSlice } from '@/lib/store';
 import { apiCreatePatrol, apiTogglePatrol, apiDeletePatrol } from '@/lib/api';
 import { useEffect, useState } from 'react';
@@ -11,7 +13,14 @@ export default function Page(){
   const [loadingId,setLoadingId]=useState('');
   const [selected,setSelected]=useState('b3');const [name,setName]=useState('');const [short,setShort]=useState('');
   const { confirm } = useConfirm();
+  const session=getSession();
+  const myRole=session?.role||'guest';
+  const myBranchId=session?.branchId||'';
+  // ★ 團長／支部領袖：支部管理只管自己支部（睇唔到、亦改唔到其他支部嘅小隊）
+  const branchScoped=['group_leader','branch_leader'].includes(myRole)&&!!myBranchId;
+  const visibleBranches=branchScoped?branches.filter(b=>b.id===myBranchId):branches;
   useEffect(()=>{loadStateSlice(['patrols','members']).then(setS).catch(e=>setErr(e.message))},[]);
+  useEffect(()=>{ if(branchScoped) setSelected(myBranchId); },[branchScoped,myBranchId]);
   function memberName(id?:string){return s?.members.find(m=>m.id===id)?.name||'未指定'}
   async function add(){
     if(!name.trim())return;
@@ -32,9 +41,11 @@ export default function Page(){
   }
   if(!s)return <div className="card">{err||'載入中...'}</div>;
   const ps=s.patrols.filter(p=>p.branchId===selected);
-  return <Auth roles={['super_admin', 'troop_super', 'troop_leader', 'admin', 'group_leader']}><div className="stack"><section className="hero"><span className="badge gold">支部管理</span><h1>支部與小隊設定</h1><p>新增、啟用／停用及刪除各支部小隊。</p></section>
+  return <Auth roles={['super_admin', 'troop_super', 'troop_leader', 'admin', 'group_leader', 'branch_leader']}><div className="stack"><section className="hero"><span className="badge gold">支部管理</span><h1>支部與小隊設定</h1><p>新增、啟用／停用及刪除各支部小隊。</p>
+    {branchScoped&&<p className="badge blue" style={{marginTop:6}}>🏢 你是{ROLE_LABEL[myRole as Role]}：只會顯示及管理「{branches.find(b=>b.id===myBranchId)?.name||myBranchId}」支部的小隊。</p>}
+    </section>
     {err&&<p className="badge red">{err}</p>}
-    <section className="grid">{branches.map(b=><button className={`card ${selected===b.id?'notice-mode active':''}`} key={b.id} onClick={()=>setSelected(b.id)} style={{textAlign:'left'}}><span className="badge blue">{b.id}</span><h3>{b.name}</h3><p className="muted">{branchHint(b.id)}</p></button>)}</section>
+    <section className="grid">{visibleBranches.map(b=><button className={`card ${selected===b.id?'notice-mode active':''}`} key={b.id} onClick={()=>setSelected(b.id)} style={{textAlign:'left'}}><span className="badge blue">{b.id}</span><h3>{b.name}</h3><p className="muted">{branchHint(b.id)}</p></button>)}</section>
     <section className="grid-wide"><div className="card stack"><h2>{branches.find(b=>b.id===selected)?.name} · 小隊設定</h2><p className="muted">{branchHint(selected)}</p>
       {ps.length===0?<div className="card" style={{boxShadow:'none',background:'#f8fafc'}}><strong>此支部目前沒有分隊。</strong></div>:
       <table className="table"><thead><tr><th>名稱</th><th>簡稱</th><th>隊長</th><th>成員數</th><th>狀態</th><th>操作</th></tr></thead><tbody>{ps.map((p)=><tr key={p.id}><td>{p.name}</td><td>{p.short}</td><td>{memberName(p.leaderMemberId)}</td><td>{s.members.filter(m=>m.patrolId===p.id).length}</td><td>{p.enabled?<span className="badge green">啟用</span>:<span className="badge red">停用</span>}</td><td>

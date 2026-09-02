@@ -20,12 +20,14 @@ import { useConfirm, kv } from '@/components/ConfirmProvider';
 // feature：對應後台 UserPermissions 權限鍵。顯示與否由管理員／團長
 // 喺「使用者管理 → 授權」逐個帳號開關，唔再 hardcode 角色。
 const LEADER_TOOLS: (ConsoleTool & { feature: string })[] = [
+  { id: 'users', icon: '🧑‍💼', label: '使用者管理', desc: '帳號、成員資料及申請審核（只限自己支部）。', href: '/admin/users', feature: 'users' },
+  { id: 'branches', icon: '🏢', label: '支部管理', desc: '自己支部的小隊設定（只限自己支部）。', href: '/admin/branches', feature: 'branches' },
   { id: 'members', icon: '👥', label: '成員資料庫', desc: '查看及管理所屬支部成員。', href: '/admin/members', feature: 'members' },
   { id: 'events', icon: '🗓️', label: '活動管理', desc: '新增、發布及管理活動。', href: '/admin/events', feature: 'events' },
-  { id: 'registrations', icon: '📊', label: '活動統計', desc: '自行舉辦／區地域總會活動統計及匯出。', href: '/admin/registrations', feature: 'registrations' },
+  { id: 'registrations', icon: '📊', label: '活動統計', desc: '旅團活動報名及付款統計、匯出名單。', href: '/admin/registrations', feature: 'registrations' },
   { id: 'equipment', icon: '📦', label: '物資借用管理', desc: '物資清單、批核借用、歸還回補庫存。', href: '/admin/equipment', feature: 'equipment' },
   { id: 'applications', icon: '✅', label: '審核申請', desc: '審核家長／成員申請。', href: '/admin/applications', feature: 'applications' },
-  { id: 'library', icon: '🗺️', label: '區地域總會活動', desc: '引入區／地域／總會活動（原圖書館）。', href: '/library/import', feature: 'library_import' },
+  { id: 'library', icon: '🗺️', label: '區地域總會活動', desc: '引入區／地域／總會活動通告。', href: '/admin/events?tab=district', feature: 'library_import' },
   { id: 'calendar', icon: '📅', label: '行事曆', desc: '查看及管理行事曆。', href: '/calendar', feature: 'calendar' },
 ];
 
@@ -33,9 +35,9 @@ export default function Leader(){
   const [s,setS]=useState<AppState|null>(null);const [err,setErr]=useState('');
   const [loadingId,setLoadingId]=useState('');
   const { confirm } = useConfirm();
-  // 按需載入：領袖摘要（computeStats 用到 users/applications/events/bookmarks）+ 活動回覆
-  useEffect(()=>{loadStateSlice(['events','plugins','pluginSettings','users','applications','bookmarks','replies','userFeatures']).then(setS).catch(e=>setErr(e.message))},[]);
-  const stats=s?computeStats(s):{users:0,pending:0,activities:0,notices:0};
+  // 按需載入：領袖摘要（computeStats 用到 users/applications/events）+ 活動回覆
+  useEffect(()=>{loadStateSlice(['events','plugins','pluginSettings','users','applications','replies','userFeatures']).then(setS).catch(e=>setErr(e.message))},[]);
+  const stats=s?computeStats(s):{users:0,pending:0,activities:0,selfActivities:0,districtActivities:0,archivedActivities:0,notices:0};
   const session = getSession();
   const myId = session?.userId || '';
   const canEvents = hasFeature(s?.userFeatures, 'events', session?.role);
@@ -75,12 +77,20 @@ export default function Leader(){
       </section>
     )}
 
+    {/* ★ 統計＝「活動」為主。公告已經變成最上方嘅「最新消息」BAR，
+        再冇獨立管理／觀看位置，所以呢度唔再有「公告 / 通告」格。
+        活動就係通告，只分內部（旅團活動）同外部（區地域總會活動）。
+        ★ 完全冇權限嘅項目直接唔顯示 —— 見到數字但撳唔入去（或者根本批唔到）
+        對用戶冇任何幫助。 */}
     <StatStrip stats={[
-      // 冇權限嘅功能只顯示數字，唔畀連結（避免撳咗變「需要合適權限」）
-      { label: '活動', value: stats.activities, desc: '已發布活動', tone: 'green', ...(canEvents ? { href: '/admin/events' } : {}) },
-      { label: '待審批', value: stats.pending, desc: '等待審批申請', tone: 'red', ...(canApplications ? { href: '/admin/applications' } : {}) },
-      { label: '通告', value: stats.notices, desc: '圖書館引入通告', tone: 'gold', href: '/notices' },
-      { label: '用戶', value: stats.users, desc: '總登記人數', tone: 'blue', ...(canUsers ? { href: '/admin/users' } : {}) },
+      { label: '旅團活動', value: stats.selfActivities, desc: '內部·已發布', tone: 'green', ...(canEvents ? { href: '/admin/events?tab=self' } : {}) },
+      { label: '區地域總會', value: stats.districtActivities, desc: '外部·已發布', tone: 'violet', ...(canEvents ? { href: '/admin/events?tab=district' } : {}) },
+      // 待審批＝帳號／成員／家長申請 → 直接跳入「使用者管理 → 申請審核」
+      ...(canApplications || canUsers ? [{
+        label: '待審批', value: stats.pending, desc: '帳號 / 成員申請', tone: 'red' as const,
+        href: canUsers ? '/admin/users?tab=applications' : '/admin/applications',
+      }] : []),
+      ...(canUsers ? [{ label: '用戶', value: stats.users, desc: '總登記人數', tone: 'blue' as const, href: '/admin/users' }] : []),
     ]} />
 
     <Panel
@@ -123,7 +133,7 @@ export default function Leader(){
     <ToolGroup
       icon="🧰"
       title="管理工具"
-      subtitle="成員 · 活動 · 報名 · 物資 · 通告"
+      subtitle="使用者 · 支部 · 成員 · 活動 · 報名 · 物資"
       tone="emerald"
       tools={LEADER_TOOLS.map(t => hasFeature(s?.userFeatures, t.feature, session?.role)
         ? t

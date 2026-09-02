@@ -9,13 +9,13 @@ function categoryOf(a: Audit): string {
   if (/decide|Application|申請|審核|批核|批准|拒絕/.test(s)) return '申請審核';
   if (/Event|活動|報名|Reply|reply/.test(s)) return '活動與報名';
   if (/Member|User|成員|使用者|帳號|createUser|createMember|deleteMember|deleteUser/.test(s)) return '成員與帳號';
-  if (/Announcement|公告|最新消息|LatestNews|News|通告|Bookmark/.test(s)) return '公告與消息';
+  if (/Announcement|公告|最新消息|LatestNews|News|通告|Bookmark/.test(s)) return '最新消息與通告';
   if (/Meeting|會議|集會|cancel|Calendar/.test(s)) return '會議與集會';
   if (/Config|Plugin|元件|系統|saveConfig|system/.test(s)) return '系統設定';
   return '其他';
 }
 
-const CATS = ['全部', '申請審核', '活動與報名', '成員與帳號', '公告與消息', '會議與集會', '系統設定', '其他'];
+const CATS = ['全部', '申請審核', '活動與報名', '成員與帳號', '最新消息與通告', '會議與集會', '系統設定', '其他'];
 
 export default function Page() {
   const [s, setS] = useState<AppState | null>(null);

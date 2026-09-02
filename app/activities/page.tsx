@@ -10,9 +10,16 @@ import PublicLocked from '@/components/ui/PublicLocked';
 export default function Activities() {
   const [s, setS] = useState<AppState | null>(null);
   const [err, setErr] = useState('');
-  const [filter, setFilter] = useState<'all' | 'internal' | 'library'>('all');
+  const [filter, setFilter] = useState<'all' | 'internal' | 'district'>('all');
 
   useEffect(() => { loadStateSlice(['events']).then(setS).catch(e => setErr(e.message)) }, []);
+
+  // 家長／成員上方統計嘅「區地域總會」用 ?tab=district 直接跳入外部活動清單
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const t = new URLSearchParams(window.location.search).get('tab');
+    if (t === 'district' || t === 'internal' || t === 'all') setFilter(t as any);
+  }, []);
 
   if (err) return <main className="max-w-4xl mx-auto px-4 py-8 pb-24"><p className="bg-rose-50 border border-rose-200 rounded-xl p-4 text-sm text-rose-700 font-bold m-0 whitespace-pre-wrap">{err}</p></main>;
   if (!s) return <main className="max-w-4xl mx-auto px-4 py-8 pb-24 text-sm text-slate-600">載入中...</main>;
@@ -33,14 +40,14 @@ export default function Activities() {
         <h1 className="font-bold text-xl m-0">🎯 活動</h1>
         {!session && <Link href="/login" className="no-underline text-sm font-bold bg-brand-600 text-white px-3 py-2 rounded-xl hover:bg-brand-700 transition">登入查看詳情</Link>}
       </div>
-      <p className="text-sm text-slate-500 m-0 -mt-2">活動統一分成兩類：自行舉辦 與 區地域總會活動。登入後可回覆參加／不參加。</p>
+      <p className="text-sm text-slate-500 m-0 -mt-2">活動統一分成兩類：旅團活動（內部）與 區地域總會活動（外部）。登入後可回覆參加／不參加。</p>
 
       {/* 篩選 chips */}
       <div className="flex gap-1 overflow-x-auto pb-1 -mx-1 px-1">
         {([
           { id: 'all' as const, label: '全部' },
-          { id: 'internal' as const, label: '🏠 自行舉辦' },
-          { id: 'library' as const, label: '🗺️ 區地域總會活動' },
+          { id: 'internal' as const, label: '🏠 旅團活動' },
+          { id: 'district' as const, label: '🗺️ 區地域總會活動' },
         ]).map(f => (
           <button key={f.id} onClick={() => setFilter(f.id)}
             className={`text-sm px-2.5 py-1 rounded-full font-bold whitespace-nowrap border cursor-pointer ${filter === f.id ? 'bg-slate-700 text-white border-slate-700' : 'bg-white text-slate-600 border-slate-200'}`}>
@@ -51,7 +58,13 @@ export default function Activities() {
 
       {visible.length === 0 ? (
         <div className="bg-white rounded-2xl border border-slate-200">
-          <EmptyState icon="📅" title="暫無已發布活動" desc="旅團活動發布後會自動顯示在這裡。" />
+          <EmptyState
+            icon="📅"
+            title={filter === 'district' ? '暫無區地域總會活動' : filter === 'internal' ? '暫無旅團活動' : '暫無已發布活動'}
+            desc={filter === 'district'
+              ? '領袖引入區／地域／總會通告後，會自動顯示在這裡（自行報名，旅團不代收費用）。'
+              : '旅團活動發布後會自動顯示在這裡。'}
+          />
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
@@ -61,7 +74,7 @@ export default function Activities() {
                 <div className="min-w-0">
                   <div className="flex items-center gap-1.5 flex-wrap">
                     <span className={`text-sm px-1.5 py-0.5 rounded font-bold ${eventCategory(e) === 'district' ? 'bg-violet-100 text-violet-700' : 'bg-blue-100 text-blue-700'}`}>
-                      {eventCategory(e) === 'district' ? '🗺️ 區地域總會活動' : '🏠 自行舉辦'}
+                      {eventCategory(e) === 'district' ? '🗺️ 區地域總會活動' : '🏠 旅團活動'}
                     </span>
                   </div>
                   <h3 className="font-bold text-base text-slate-800 m-0 mt-1.5">{e.title}</h3>

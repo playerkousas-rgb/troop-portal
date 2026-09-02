@@ -59,7 +59,7 @@ export default function MockLogin() {
         <p className="text-[13px] text-slate-700 m-0">
           未有帳號? <Link href="/dashboard" className="font-bold text-brand-700 underline underline-offset-4">申請加入</Link>
         </p>
-        {/* 「只睇公開資料」已移除：唔登入都睇到公開行事曆／公告／活動 */}
+        {/* 「只睇公開資料」已移除：唔登入都睇到公開行事曆／通告／活動 */}
       </div>
     </div>
   );
