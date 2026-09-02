@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "check:gs": "bash scripts/check-gs-sync.sh"
+    "check:gs": "bash scripts/check-gs-sync.sh",
+    "check:perms": "node scripts/check-permissions.mjs"
   },
   "dependencies": {
     "@tailwindcss/postcss": "^4.3.3",

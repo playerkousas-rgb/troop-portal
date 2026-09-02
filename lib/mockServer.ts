@@ -709,8 +709,15 @@ const MOCK_ACTION_FEATURE: Record<string, string> = {
   createPatrol: 'branches', togglePatrol: 'branches', deletePatrol: 'branches',
   createEvent: 'events', updateEvent: 'events', deleteEvent: 'events',
   archiveEvent: 'events', reopenEvent: 'events',
-  togglePaid: 'payments', confirmPayment: 'payments',
+  togglePaid: 'registrations', confirmPayment: 'registrations',
   updateConfig: 'settings', updateSettings: 'settings',
+  saveConfig: 'settings', savePluginSetting: 'plugins', togglePluginStatus: 'plugins',
+  publishEvent: 'events', restoreEvent: 'events',
+  createMeeting: 'meetings', updateMeeting: 'meetings', deleteMeeting: 'meetings', publishMeeting: 'meetings',
+  createRegularMeeting: 'calendar', updateRegularMeeting: 'calendar',
+  deleteRegularMeeting: 'calendar', toggleRegularMeeting: 'calendar', toggleMeetingCancel: 'calendar',
+  createEquipment: 'equipment', updateEquipment: 'equipment', deleteEquipment: 'equipment',
+  adjustEquipmentQty: 'equipment', decideEquipmentLoan: 'equipment', returnEquipmentLoan: 'equipment',
 };
 
 function checkMockPermission(action: string, p: Record<string, any>): { success: false; error: string } | null {

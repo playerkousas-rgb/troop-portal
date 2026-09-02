@@ -1599,9 +1599,10 @@ var ACTION_REQUIRED_FEATURE_ = {
   createEvent: 'events', updateEvent: 'events', deleteEvent: 'events',
   publishEvent: 'events', archiveEvent: 'events', restoreEvent: 'events', reopenEvent: 'events',
   // 收款核實（只有領袖可以核實，家長唔可以自己 tick 話領袖收咗錢）
-  confirmPayment: 'registrations',
+  togglePaid: 'registrations', confirmPayment: 'registrations',
   // 系統設定 / 元件
-  saveConfig: 'settings', savePluginSetting: 'plugins', togglePluginStatus: 'plugins',
+  saveConfig: 'settings', updateConfig: 'settings', updateSettings: 'settings',
+  savePluginSetting: 'plugins', togglePluginStatus: 'plugins',
   // 會議 / 物資 / 行事曆
   createMeeting: 'meetings', updateMeeting: 'meetings', deleteMeeting: 'meetings', publishMeeting: 'meetings',
   createEquipment: 'equipment', updateEquipment: 'equipment', deleteEquipment: 'equipment',
