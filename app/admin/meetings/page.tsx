@@ -73,7 +73,7 @@ export default function MeetingsAdmin() {
   if (!s) return <div className="card">載入中...</div>;
 
   return (
-    <Auth roles={['super_admin', 'troop_super', 'admin', 'group_leader', 'branch_leader', 'coach']}>
+    <Auth roles={['super_admin', 'troop_super', 'troop_leader', 'admin', 'group_leader', 'branch_leader', 'coach']}>
     <div className="stack">
       <section className="hero">
         <span className="badge gold">會議管理</span>

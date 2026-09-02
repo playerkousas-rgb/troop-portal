@@ -178,7 +178,7 @@ export function branchPeopleStats(
   s: AppState,
   opts: { role?: string; branchId?: string } = {}
 ): BranchPeopleStat[] {
-  const seeAll = ['super_admin', 'troop_super', 'admin'].includes(String(opts.role || ''));
+  const seeAll = ['super_admin', 'troop_super', 'troop_leader', 'admin'].includes(String(opts.role || ''));
   const scope = seeAll ? BRANCH_DEFS : BRANCH_DEFS.filter(b => b.id === opts.branchId);
   return scope.map(b => {
     const leaders = (s.users || []).filter(u => LEADER_ROLE_SET.includes(u.role) && u.branchId === b.id).length;

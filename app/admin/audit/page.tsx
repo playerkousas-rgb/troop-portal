@@ -28,7 +28,7 @@ export default function Page() {
   const list = s.audits.filter(a => cat === '全部' || categoryOf(a) === cat);
 
   return (
-    <Auth roles={['super_admin', 'troop_super', 'admin']}>
+    <Auth roles={['super_admin', 'troop_super', 'troop_leader', 'admin']}>
     <div className="stack">
       <section className="hero">
         <span className="badge gold">操作紀錄</span>

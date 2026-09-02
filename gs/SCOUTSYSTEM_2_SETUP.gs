@@ -292,7 +292,7 @@ function getInitialSheets_() {
       ['noticeId', 'title', 'mode', 'branchTags', 'publishedAt', 'createdBy', 'status', 'note']
     ],
     UserPermissions: [
-      ['userId', 'feature', 'granted', 'grantedBy', 'grantedAt', 'note']
+      ['userId', 'feature', 'branchId', 'granted', 'grantedBy', 'grantedAt', 'note']
     ],
     Plugins: [
       ['cardId', 'title', 'icon', 'tier', 'url', 'embed', 'minRole', 'enabled', 'order', 'note']
@@ -1417,18 +1417,27 @@ var FEATURE_DEFAULTS = {
   'admin': ['branches','members','applications','events','registrations','attendance','meetings','library_import','notices','users','permissions','settings','plugins','audit','calendar','equipment'],
   'troop_super': ['branches','members','applications','events','registrations','attendance','meetings','library_import','notices','users','permissions','settings','plugins','audit','calendar','equipment'],
   'super_admin': ['branches','members','applications','events','registrations','attendance','meetings','library_import','notices','users','permissions','settings','plugins','audit','calendar','equipment'],
+  // 旅長：實際職級最高，權限同管理員（管理員 = 代旅長操作嘅旅內電腦人）
+  'troop_leader': ['branches','members','applications','events','registrations','attendance','meetings','library_import','notices','users','permissions','settings','plugins','audit','calendar','equipment'],
   // 團長：自己支部全部
-  'group_leader': ['members','applications','events','registrations','attendance','meetings','library_import','notices','calendar','equipment'],
+  'group_leader': ['members','applications','events','registrations','attendance','meetings','library_import','notices','calendar','equipment','permissions'],
   // 支部領袖：自己支部
   'branch_leader': ['members','applications','events','registrations','attendance','meetings','library_import','notices','calendar','equipment'],
-  // 教練員：預設只有活動和圖書館
-  'coach': ['events','registrations','attendance','library_import','notices'],
+  // 教練員：冇固定支部，預設權限＝家長（即冇任何管理功能）。
+  // 要幫邊個支部做邊樣嘢，就由嗰個支部嘅團長逐項授權（UserPermissions 有 branchId 欄）。
+  'coach': [],
   // 家長和成員不需要管理卡片
   'parent': [],
   'member': []
 };
 
-function getUserFeatures_(userId, role) {
+/**
+ * 攞用戶功能清單。
+ * @param branchScope 可選：只計適用於呢個支部嘅授權。
+ *        UserPermissions 有 branchId 欄（空 或 '*' = 全旅通用）。
+ *        唔傳 = 唔理支部（攤平，淨係用嚟決定卡片顯示）。
+ */
+function getUserFeatures_(userId, role, branchScope) {
   var defaults = FEATURE_DEFAULTS[role] || [];
   var overrides = {};
   readTable_('UserPermissions').filter(function(p) {
@@ -1436,6 +1445,9 @@ function getUserFeatures_(userId, role) {
   }).forEach(function(p) {
     var feature = getField_(p, 'feature');
     var granted = String(getField_(p, 'granted') || '').toLowerCase() === 'true';
+    var gBranch = String(getField_(p, 'branchId') || '');
+    // 有指定支部範圍時，唔夾嘅授權當唔存在
+    if (branchScope && gBranch && gBranch !== '*' && gBranch !== branchScope) return;
     overrides[feature] = granted;
   });
   // Merge: start with defaults, apply overrides
@@ -1458,6 +1470,46 @@ function getUserFeatures_(userId, role) {
 }
 
 /** 系統內建的高權限操作者（不在 Users 表，跳過角色校驗） */
+
+var TROOP_WIDE_ROLES_ = ['super_admin', 'troop_super', 'troop_leader', 'admin'];
+
+/**
+ * 某人喺某支部有冇某項功能。
+ * 旅長／管理員／超管 = 全旅通行；
+ * 團長／支部領袖 = 只限自己支部（除非另有 scoped 授權）；
+ * 教練員 = 冇固定支部，全部靠 scoped 授權。
+ */
+function hasFeatureInBranch_(userRow, feature, branchId) {
+  var role = String(getField_(userRow, 'role') || '').toLowerCase();
+  if (TROOP_WIDE_ROLES_.indexOf(role) >= 0) return true;
+  var userId = getField_(userRow, 'userId');
+  var own = String(getField_(userRow, 'branchId') || '');
+  // 教練員冇固定支部 → 唔會自動擁有任何支部嘅預設權限
+  if (role !== 'coach' && own && branchId === own) {
+    if ((FEATURE_DEFAULTS[role] || []).indexOf(feature) >= 0) return true;
+  }
+  return getUserFeatures_(userId, role, branchId).indexOf(feature) >= 0;
+}
+
+/** 由 request 參數推斷目標支部 */
+function resolveTargetBranch_(p) {
+  if (p.branchId) return String(p.branchId);
+  var i;
+  if (p.memberId) {
+    var ms = readTable_('Members');
+    for (i = 0; i < ms.length; i++) if (getField_(ms[i], 'memberId') === p.memberId) return String(getField_(ms[i], 'branchId') || '');
+  }
+  if (p.userId) {
+    var us = readTable_('Users');
+    for (i = 0; i < us.length; i++) if (getField_(us[i], 'userId') === p.userId) return String(getField_(us[i], 'branchId') || '');
+  }
+  if (p.eventId) {
+    var es = readTable_('Events');
+    for (i = 0; i < es.length; i++) if (getField_(es[i], 'eventId') === p.eventId) return String(getField_(es[i], 'branchId') || '');
+  }
+  return '';
+}
+
 function isPrivilegedOperator_(id) {
   if (!id) return false;
   if (id === 'system' || id === 'staff_token' || id === 'SUPER_ADMIN') return true;
@@ -1469,27 +1521,41 @@ function handleGrantFeature_(p) {
   var targetUserId = p.targetUserId;
   var feature = p.feature;
   
+  // 授權範圍：邊個支部。空 = 授權人自己嘅支部。
+  var grantBranch = String(p.branchId || '');
+
   if (!isPrivilegedOperator_(operatedBy)) {
     var users = mapUsers_();
     var operator = users.filter(function(u){return u.id === operatedBy;})[0];
     var opRole = operator ? operator.role : '';
-    if (opRole !== 'admin' && opRole !== 'super_admin' && opRole !== 'troop_super') {
-      var opFeatures = getUserFeatures_(operatedBy, opRole);
+    if (TROOP_WIDE_ROLES_.indexOf(opRole) < 0) {
+      var opBranch = operator ? String(operator.branchId || '') : '';
+      if (!grantBranch) grantBranch = opBranch;
+      // ★ 團長只可以授權自己支部 —— 唔可以幫第二個團開權限。
+      //   （童軍團團長邀請人幫手，只可以邀請入童軍團。）
+      if (grantBranch !== opBranch) {
+        return { success: false, error: '你只可以授權自己支部的權限，其他支部須由該支部團長授權。' };
+      }
+      // 亦唔可以授出自己都冇嘅功能
+      var opFeatures = getUserFeatures_(operatedBy, opRole, opBranch);
       if (opFeatures.indexOf(feature) < 0) {
         return { success: false, error: '你沒有權限授權此功能給他人。' };
       }
+    } else if (!grantBranch) {
+      grantBranch = '*'; // 全旅級角色預設授全旅
     }
   }
 
   appendRowByHeaders_('UserPermissions', {
     userId: targetUserId,
     feature: feature,
+    branchId: grantBranch,
     granted: p.granted !== false ? 'true' : 'false',
     grantedBy: operatedBy,
     grantedAt: now_(),
     note: p.note || ''
   });
-  writeAudit_(operatedBy, 'grantFeature', 'UserPermissions', targetUserId, feature + '=' + (p.granted !== false));
+  writeAudit_(operatedBy, 'grantFeature', 'UserPermissions', targetUserId, feature + '=' + (p.granted !== false) + ' @branch=' + grantBranch);
   return { success: true };
 }
 
@@ -1563,7 +1629,7 @@ function handleGetUserFeatures_(p) {
   });
   
   // 必須涵蓋前端「授權」畫面所有選項，否則管理員 tick 咗都唔會生效
-  var allFeatures = ['branches','members','applications','events','registrations','attendance','attendance_all','library_import','notices','users','settings','audit','calendar','equipment','meetings','plugins'];
+  var allFeatures = ['branches','members','applications','events','registrations','attendance','attendance_all','library_import','notices','users','permissions','settings','audit','calendar','equipment','meetings','plugins'];
   var result = allFeatures.map(function(f) {
     var isDefault = defaults.indexOf(f) >= 0;
     var overridden = overrides[f] !== undefined;
@@ -1588,7 +1654,8 @@ var ACTION_REQUIRED_FEATURE_ = {
   createUser: 'users', deleteUser: 'users', toggleUser: 'users',
   updateUserRole: 'users', updateUserField: 'users',
   batchCreateUsers: 'users', batchCreateMembers: 'members',
-  grantFeature: 'users', revokeFeature: 'users', updateUserPermissions: 'users',
+  // 授權：團長喺自己支部就可以授權（唔需要 users＝帳號管理權）
+  grantFeature: 'permissions', revokeFeature: 'permissions', updateUserPermissions: 'permissions',
   // 成員資料
   createMember: 'members', updateMember: 'members', deleteMember: 'members', linkParent: 'members',
   // 審批
@@ -1635,9 +1702,18 @@ function checkActionPermission_(action, p) {
     return { success: false, error: '帳號已停用，無法執行此操作' };
   }
   var role = String(getField_(actor, 'role') || '').toLowerCase();
-  var features = getUserFeatures_(operatedBy, role);
-  if (features.indexOf(required) < 0) {
-    writeAudit_(operatedBy, 'DENIED:' + action, 'Security', '', 'role=' + role + ' 缺少權限 ' + required);
+
+  // ★ 支部範圍檢查：唔單止「有冇呢個功能」，仲要「喺邊個支部有」。
+  //   深資團團長被童軍團團長邀請去幫手點名，就淨係喺童軍團點到名，
+  //   唔會連童軍團其他嘢都管得到。
+  var targetBranch = resolveTargetBranch_(p) || String(getField_(actor, 'branchId') || '');
+  if (!hasFeatureInBranch_(actor, required, targetBranch)) {
+    var own = String(getField_(actor, 'branchId') || '');
+    writeAudit_(operatedBy, 'DENIED:' + action, 'Security', '',
+      'role=' + role + ' 缺少權限 ' + required + ' @branch=' + targetBranch);
+    if (targetBranch && own && targetBranch !== own) {
+      return { success: false, error: '權限不足：你未獲授權管理該支部的「' + required + '」，請由該支部團長授權。' };
+    }
     return { success: false, error: '權限不足：此操作需要「' + required + '」權限，請聯絡管理員授權。' };
   }
   return null;
@@ -4340,7 +4416,7 @@ function resolveAttendanceCaller_(p) {
 
 function canMarkAttendance_(caller) {
   if (!caller) return false;
-  return ['super_admin', 'troop_super', 'admin', 'group_leader', 'branch_leader', 'coach'].indexOf(caller.role) >= 0;
+  return ['super_admin', 'troop_super', 'troop_leader', 'admin', 'group_leader', 'branch_leader', 'coach'].indexOf(caller.role) >= 0;
 }
 
 function patrolNameById_(patrols, patrolId) {
@@ -4350,16 +4426,18 @@ function patrolNameById_(patrols, patrolId) {
 
 function scopedAttendanceBranch_(caller, requestedBranch) {
   if (!caller) return { error: '請先登入' };
-  // 團長（group_leader）以上：看全旅
-  if (['super_admin', 'troop_super', 'admin', 'group_leader'].indexOf(caller.role) >= 0) return { branchId: requestedBranch || '' };
-  // 支部領袖／教練員：預設只有自己支部；獲授 attendance_all 後可點所有支部
-  if (['branch_leader', 'coach'].indexOf(caller.role) >= 0) {
-    var features = getUserFeatures_(caller.userId, caller.role);
-    if (features.indexOf('attendance_all') >= 0) return { branchId: requestedBranch || caller.branchId || '' };
-    if (requestedBranch && caller.branchId && requestedBranch !== caller.branchId) {
-      return { error: '只能處理自己支部的點名（如需點全旅，請管理員授權「全旅點名」）' };
-    }
-    return { branchId: caller.branchId || requestedBranch || '' };
+  // 旅長／管理員／超管：全旅通行
+  if (TROOP_WIDE_ROLES_.indexOf(caller.role) >= 0) return { branchId: requestedBranch || '' };
+  // 團長／支部領袖／教練員：只限自己支部，或獲該支部團長授權（scoped grant）
+  if (['group_leader', 'branch_leader', 'coach'].indexOf(caller.role) >= 0) {
+    var own = caller.branchId || '';
+    var target = requestedBranch || own;
+    if (!target) return { error: '未設定支部，請聯絡管理員。' };
+    // 教練員冇固定支部，一定要有授權
+    if (caller.role !== 'coach' && target === own) return { branchId: target };
+    var feats = getUserFeatures_(caller.userId, caller.role, target);
+    if (feats.indexOf('attendance') >= 0 || feats.indexOf('attendance_all') >= 0) return { branchId: target };
+    return { error: '你未獲授權為該支部點名，請由該支部團長授權。' };
   }
   return { error: '只有領袖可以點名' };
 }

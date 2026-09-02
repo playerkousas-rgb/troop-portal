@@ -12,7 +12,7 @@ import Auth from '@/components/Auth';
 const FEATURE_LABELS: Record<string,string> = {
   branches: '支部管理', members: '成員資料庫', applications: '審核 / 申請管理',
   events: '活動管理', registrations: '報名管理', attendance: '簽到／點名', attendance_all: '全旅點名（跨支部）', library_import: '區地域總會活動引入',
-  notices: '通告管理', users: '使用者管理', settings: '系統設定', meetings: '會議管理',
+  notices: '通告管理', users: '使用者管理', permissions: '授權其他人（限自己支部）', settings: '系統設定', meetings: '會議管理',
   equipment: '物資管理', plugins: '單位元件設定',
   audit: '操作紀錄', calendar: '行事曆管理',
 };
@@ -453,7 +453,7 @@ export default function Page(){
   const myBranchId=session?.branchId||'';
   const myUserId=session?.userId||'';
   const assignable=assignableRoles(myRole);
-  const seeAllBranches=['super_admin','troop_super','admin'].includes(myRole);
+  const seeAllBranches=['super_admin','troop_super', 'troop_leader', 'admin'].includes(myRole);
   const branchStats=branchPeopleStats(s,{role:myRole,branchId:myBranchId});
 
   const filtered=s.users.filter(u=>{
@@ -462,7 +462,7 @@ export default function Page(){
     return true;
   });
 
-  return <Auth roles={['super_admin', 'troop_super', 'admin', 'group_leader', 'branch_leader']}><div className="stack">
+  return <Auth roles={['super_admin', 'troop_super', 'troop_leader', 'admin', 'group_leader', 'branch_leader']}><div className="stack">
     <section className="hero"><span className="badge gold">使用者管理</span><h1>👥 使用者管理</h1><p>帳號、成員資料庫與審核申請已合併喺一處，用下方分頁切換。上級可授權下級額外功能。</p></section>
 
     {/* 支部人數統計：一眼睇晒自己支部（管理員／超管睇全部支部）的領袖／家長／成員人數 */}

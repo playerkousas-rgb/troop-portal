@@ -7,7 +7,7 @@ import { AppState, EQUIPMENT_BORROW_BRANCHES, Equipment, EquipmentLoan, LOAN_STA
 import { branches } from '@/lib/model';
 import { useConfirm, kv } from '@/components/ConfirmProvider';
 
-const LEADER_ROLES = ['super_admin', 'troop_super', 'admin', 'group_leader', 'branch_leader', 'coach'];
+const LEADER_ROLES = ['super_admin', 'troop_super', 'troop_leader', 'admin', 'group_leader', 'branch_leader', 'coach'];
 
 function today() { return new Date().toISOString().slice(0, 10); }
 function branchName(id: string) { return branches.find(b => b.id === id)?.name || id || '—'; }

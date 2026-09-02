@@ -55,7 +55,7 @@ export default function Leader(){
   const events = (s?.events || []).filter(e => e.status === 'published' && (e.scope === 'troop' || e.targetMemberIds.includes(myId) || e.branchId === session?.branchId));
   const plugins = (s?.plugins || []).filter(p => p.id !== 'troop_attendance');
 
-  return <Auth roles={['super_admin','troop_super','admin','group_leader','branch_leader','coach']}><div className="max-w-5xl mx-auto space-y-4">
+  return <Auth roles={['super_admin','troop_super', 'troop_leader', 'admin','group_leader','branch_leader','coach']}><div className="max-w-5xl mx-auto space-y-4">
     <ConsoleHeader
       icon="🧭"
       name={session?.name || '領袖'}
@@ -118,7 +118,17 @@ export default function Leader(){
       </div>
     </Panel>
 
-    <ToolGroup icon="🧰" title="管理工具" subtitle="成員 · 活動 · 報名 · 物資 · 通告" tone="emerald" tools={LEADER_TOOLS.filter(t => hasFeature(s?.userFeatures, t.feature, session?.role))} />
+    {/* ★ 未獲授權嘅工具照樣顯示（鎖住），唔會隱藏 —— 教練員／執委／管委要知道
+        系統有呢啲功能、同埋知道要搵團長授權，而唔係對住空白畫面以為系統壞咗。 */}
+    <ToolGroup
+      icon="🧰"
+      title="管理工具"
+      subtitle="成員 · 活動 · 報名 · 物資 · 通告"
+      tone="emerald"
+      tools={LEADER_TOOLS.map(t => hasFeature(s?.userFeatures, t.feature, session?.role)
+        ? t
+        : { ...t, lockedReason: '未獲授權，請聯絡所屬支部團長開啟此功能。' })}
+    />
 
     {plugins.length > 0 && (
       <Panel icon="🧩" title="擴充元件" subtitle="旅團已啟用的 2／3 級元件" tone="violet" count={`${plugins.length} 個`} bodyClass="pt-3" defaultOpen={false}>

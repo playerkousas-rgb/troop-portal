@@ -122,7 +122,7 @@ export default function Page(){
   if(!s)return <div className="card">{err||'載入中...'}</div>;
   const parents=s.users.filter(u=>u.role==='parent');
 
-  return <Auth roles={['super_admin', 'troop_super', 'admin', 'group_leader', 'branch_leader', 'coach']}><div className="stack">
+  return <Auth roles={['super_admin', 'troop_super', 'troop_leader', 'admin', 'group_leader', 'branch_leader', 'coach']}><div className="stack">
     <section className="hero"><span className="badge gold">成員資料庫</span><h1>成員資料庫</h1><p>新增、編輯、刪除成員，指派支部 / 小隊，並連結家長。</p></section>
     {err&&<p className="badge red">{err}</p>}
 

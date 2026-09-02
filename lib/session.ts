@@ -9,6 +9,8 @@ export function dashboardFor(role: Role): string {
     case 'parent': return '/parent';
     case 'member': return '/member';
     case 'admin':
+    case 'troop_leader':
+    case 'troop_super':
     case 'super_admin': return '/admin';
     default: return '/leader';
   }
@@ -40,10 +42,11 @@ export function demoSession(role: Role): Session {
   const map: Record<Role, Session> = {
     super_admin: { userId:'admin', name:'管理員', role, ...base },
     troop_super: { userId:'troop_super', name:'超管', role, ...base },
+    troop_leader: { userId:'u_tl', name:'周旅長', role, ...base },
     admin: { userId:'u1', name:'陳管理員', role, ...base },
     group_leader: { userId:'u2', name:'李團長', role, branchId:'b3', ...base },
     branch_leader: { userId:'u3', name:'黃支部領袖', role, branchId:'b3', ...base },
-    coach: { userId:'u4', name:'何教練員', role, branchId:'b3', ...base },
+    coach: { userId:'u4', name:'何教練員', role, ...base }, // 教練員冇固定支部
     parent: { userId:'u5', name:'王家長', role, ...base },
     member: { userId:'u6', name:'王小明', role, branchId:'b3', memberId:'m1', age:13, ...base },
     guest: { userId:'guest', name:'訪客', role:'guest', ...base },

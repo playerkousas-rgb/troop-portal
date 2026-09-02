@@ -32,7 +32,7 @@ export default function Page(){
   }
   if(!s)return <div className="card">{err||'載入中...'}</div>;
   const ps=s.patrols.filter(p=>p.branchId===selected);
-  return <Auth roles={['super_admin', 'troop_super', 'admin', 'group_leader']}><div className="stack"><section className="hero"><span className="badge gold">支部管理</span><h1>支部與小隊設定</h1><p>新增、啟用／停用及刪除各支部小隊。</p></section>
+  return <Auth roles={['super_admin', 'troop_super', 'troop_leader', 'admin', 'group_leader']}><div className="stack"><section className="hero"><span className="badge gold">支部管理</span><h1>支部與小隊設定</h1><p>新增、啟用／停用及刪除各支部小隊。</p></section>
     {err&&<p className="badge red">{err}</p>}
     <section className="grid">{branches.map(b=><button className={`card ${selected===b.id?'notice-mode active':''}`} key={b.id} onClick={()=>setSelected(b.id)} style={{textAlign:'left'}}><span className="badge blue">{b.id}</span><h3>{b.name}</h3><p className="muted">{branchHint(b.id)}</p></button>)}</section>
     <section className="grid-wide"><div className="card stack"><h2>{branches.find(b=>b.id===selected)?.name} · 小隊設定</h2><p className="muted">{branchHint(selected)}</p>

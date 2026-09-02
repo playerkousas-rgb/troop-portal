@@ -172,7 +172,7 @@ export default function Page(){
 
   if(!s)return <div className="card">{err||'載入中...'}</div>;
 
-  return <Auth roles={['super_admin', 'troop_super', 'admin', 'group_leader', 'branch_leader', 'coach']}><div className="stack">
+  return <Auth roles={['super_admin', 'troop_super', 'troop_leader', 'admin', 'group_leader', 'branch_leader', 'coach']}><div className="stack">
     <section className="hero">
       <span className="badge gold">行事曆設定</span>
       <h1>行事曆管理</h1>

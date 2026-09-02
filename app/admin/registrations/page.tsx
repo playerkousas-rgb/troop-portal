@@ -164,7 +164,7 @@ function RegistrationsInner(){
 
   const modifiedCount = Object.keys(paidOverrides).length;
 
-  return <Auth roles={['super_admin', 'troop_super', 'admin', 'group_leader', 'branch_leader', 'coach']}><div className="stack">
+  return <Auth roles={['super_admin', 'troop_super', 'troop_leader', 'admin', 'group_leader', 'branch_leader', 'coach']}><div className="stack">
     <section className="hero">
       <span className="badge gold">活動統計</span>
       <h1>📊 活動統計（只計自行舉辦活動）</h1>

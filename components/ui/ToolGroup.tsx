@@ -9,6 +9,8 @@ export type ConsoleTool = {
   desc?: string;
   href: string;
   badge?: string;
+  /** 有值 = 卡片照顯示但鎖住（未獲授權），內容為原因 */
+  lockedReason?: string;
 };
 
 /**
@@ -44,24 +46,51 @@ export default function ToolGroup({
       bodyClass="pt-3"
     >
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2.5">
-        {tools.map(t => (
-          <Link key={t.id} href={t.href} className="no-underline text-inherit block group">
-            <div className="h-full rounded-xl border border-slate-200 bg-slate-50/70 p-3 flex flex-col gap-1.5 transition group-hover:bg-white group-hover:border-brand-300 group-hover:shadow-sm">
+        {tools.map(t => {
+          const body = (
+            <div
+              className={`h-full rounded-xl border p-3 flex flex-col gap-1.5 transition ${
+                t.lockedReason
+                  ? 'border-dashed border-slate-300 bg-slate-100/70'
+                  : 'border-slate-200 bg-slate-50/70 group-hover:bg-white group-hover:border-brand-300 group-hover:shadow-sm'
+              }`}
+            >
               <span className="flex items-center justify-between gap-1">
-                <span className="text-xl leading-none" aria-hidden>
+                <span className={`text-xl leading-none ${t.lockedReason ? 'grayscale opacity-60' : ''}`} aria-hidden>
                   {t.icon}
                 </span>
-                {t.badge && (
+                {t.lockedReason ? (
+                  <span className="text-sm bg-slate-200 text-slate-600 border border-slate-300 px-2 py-0.5 rounded-full font-bold">
+                    🔒 未授權
+                  </span>
+                ) : t.badge ? (
                   <span className="text-sm bg-rose-100 text-rose-700 border border-rose-200 px-2 py-0.5 rounded-full font-bold">
                     {t.badge}
                   </span>
-                )}
+                ) : null}
               </span>
-              <span className="font-bold text-sm text-slate-800 leading-tight">{t.label}</span>
-              {t.desc && <span className="text-sm text-slate-500 leading-snug line-clamp-2">{t.desc}</span>}
+              <span className={`font-bold text-sm leading-tight ${t.lockedReason ? 'text-slate-500' : 'text-slate-800'}`}>
+                {t.label}
+              </span>
+              {t.desc && (
+                <span className="text-sm text-slate-500 leading-snug line-clamp-2">
+                  {t.lockedReason || t.desc}
+                </span>
+              )}
             </div>
-          </Link>
-        ))}
+          );
+          // 鎖住嘅卡片唔做連結 —— 撳落去彈「未獲授權」頁對用戶冇幫助，
+          // 不如當場講清楚要搵團長授權。
+          return t.lockedReason ? (
+            <div key={t.id} title={t.lockedReason} aria-disabled="true" className="cursor-not-allowed">
+              {body}
+            </div>
+          ) : (
+            <Link key={t.id} href={t.href} className="no-underline text-inherit block group">
+              {body}
+            </Link>
+          );
+        })}
       </div>
     </Panel>
   );

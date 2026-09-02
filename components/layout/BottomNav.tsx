@@ -21,7 +21,7 @@ const DEMO_ITEMS: Item[] = [
 ];
 
 // 領袖身份：底部 4 個按鈕同成員／家長唔同（行事曆 · 公告 · 點名 · 管理中心）
-const LEADER_ROLES = ['super_admin', 'troop_super', 'admin', 'group_leader', 'branch_leader', 'coach'];
+const LEADER_ROLES = ['super_admin', 'troop_super', 'troop_leader', 'admin', 'group_leader', 'branch_leader', 'coach'];
 const LEADER_ITEMS: Item[] = [
   { icon: '📅', label: '行事曆', href: '/calendar' },
   { icon: '📢', label: '公告', href: '/notices' },
