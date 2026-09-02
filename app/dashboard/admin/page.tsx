@@ -2,11 +2,11 @@
 
 import Link from 'next/link';
 
+// 頂部只顯示需要領袖採取行動的項目，避免把資料統計誤當成待辦事項。
 const STATS = [
-  { icon: '👥', label: '活躍用戶', value: '45', note: '成員、家長及領袖', tone: 'blue' },
-  { icon: '⏳', label: '待處理', value: '6', note: '申請及借用', tone: 'rose' },
-  { icon: '🎯', label: '進行中活動', value: '12', note: '本月及未來活動', tone: 'emerald' },
-  { icon: '📢', label: '有效公告', value: '8', note: '通知類訊息', tone: 'amber' },
+  { icon: '👤', label: '帳戶申請', value: '2', note: '等候批核', tone: 'rose' },
+  { icon: '🎯', label: '活動待處理', value: '3', note: '報名／想考章回覆', tone: 'amber' },
+  { icon: '📦', label: '物資借用', value: '1', note: '等候批核', tone: 'orange' },
 ] as const;
 
 const MODULES = [
@@ -15,6 +15,7 @@ const MODULES = [
   { icon: '🎫', title: '報名管理', subtitle: '回覆 · 名額 · 付款', detail: '按活動查看報名名單', href: '/dashboard/admin/registrations', tone: 'violet' },
   { icon: '🤝', title: '會議管理', subtitle: '議程 · 紀錄 · 文件', detail: '領袖會議及相關附件', href: '/dashboard/meetings', tone: 'amber' },
   { icon: '📦', title: '物資管理', subtitle: '清單 · 借用 · 庫存', detail: '審批借用及追蹤歸還', href: '/dashboard/admin/equipment', tone: 'orange' },
+  { icon: '📷', title: '活動相簿', subtitle: '相片 · 分支權限', detail: '查看及管理新加入的活動相簿', href: '/dashboard/admin/albums', tone: 'violet' },
   { icon: '👤', title: '帳戶管理', subtitle: '成員 · 家長 · 權限', detail: '帳號、角色及支部資料', href: '/dashboard/admin/users', tone: 'slate' },
 ] as const;
 
@@ -67,7 +68,7 @@ export default function MockAdminCenter() {
             <h2 className="font-bold text-sm text-slate-800 m-0">管理項目</h2>
             <p className="text-[13px] text-slate-500 m-0 mt-1">點擊卡片直接進入管理頁面</p>
           </div>
-          <span className="text-[13px] font-bold text-slate-400">6 個模組</span>
+          <span className="text-[13px] font-bold text-slate-400">7 個模組</span>
         </div>
         <div className="grid grid-cols-2 lg:grid-cols-3 gap-2.5">
           {MODULES.map(module => (

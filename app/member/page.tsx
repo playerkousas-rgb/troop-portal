@@ -25,7 +25,7 @@ export default function Member(){
   const tools: ConsoleTool[] = [
     { id: 'attendance', icon: '📝', label: '出席紀錄', desc: '日常集會及旅團自辦活動的出席紀錄。', href: '/attendance' },
     { id: 'equipment', icon: '📦', label: '借用物資', desc: '查看可借數量並申請借用，待領袖批核。', href: '/equipment' },
-    { id: 'calendar', icon: '📅', label: '行事曆', desc: '旅團公開行事曆及集會時間。', href: '/calendar' },
+    { id: 'badges', icon: '🎖️', label: '想考的章', desc: '登記想考的章，讓領袖安排及跟進。', href: '/profile?tab=badges' },
   ];
 
   if(err)return <div className="bg-rose-50 border border-rose-200 rounded-2xl p-4"><p className="text-sm text-rose-700 font-bold m-0 whitespace-pre-wrap leading-relaxed">{err}</p></div>;
@@ -128,7 +128,7 @@ export default function Member(){
         </div>
       </Panel>
 
-      <ToolGroup icon="🧰" title="我的工具" subtitle="出席紀錄 · 借用物資 · 行事曆" tone="emerald" tools={tools} />
+      <ToolGroup icon="🧰" title="我的工具" subtitle="出席紀錄 · 借用物資 · 想考的章" tone="emerald" tools={tools} />
 
       {visiblePlugins.length > 0 && (
         <Panel icon="🧩" title="擴充元件" subtitle="旅團已啟用的 2／3 級元件" tone="violet" count={`${visiblePlugins.length} 個`} bodyClass="pt-3" defaultOpen={false}>

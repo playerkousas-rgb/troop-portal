@@ -134,11 +134,6 @@ export default function TopNav() {
                         <>
                           <div className="fixed inset-0 z-40" onClick={() => setShowMenu(false)} />
                           <div className="absolute right-0 top-full mt-1 bg-white rounded-xl border border-slate-200 shadow-xl py-1 z-50 min-w-[160px]">
-                            {user.role !== 'parent' && (
-                              <Link href="/equipment" className="flex items-center gap-2 px-4 py-2.5 text-base text-slate-700 hover:bg-slate-50 no-underline" onClick={() => setShowMenu(false)}>
-                                <span>📦</span> 借用物資
-                              </Link>
-                            )}
                             <Link href="/profile" className="flex items-center gap-2 px-4 py-2.5 text-base text-slate-700 hover:bg-slate-50 no-underline" onClick={() => setShowMenu(false)}>
                               <span>👤</span> 我的資料
                             </Link>
