@@ -1,5 +1,5 @@
 'use client';
-import { Role } from './model';
+import { Role, branches as BRANCH_DEFS } from './model';
 
 // ==================== 資料型態 ====================
 
@@ -7,8 +7,8 @@ export type Patrol = { id:string; branchId:string; name:string; short:string; le
 export type User = { id:string; name:string; email:string; role:Role; branchId?:string; memberId?:string; childMemberIds?:string[]; approved:boolean; techTest?:boolean };
 export type Member = { id:string; ymNumber:string; name:string; email?:string; branchId:string; patrolId?:string; patrolRole?:''|'leader'|'deputy'|'member'; specialRole?:string; age:number; dateOfBirth?:string; parentUserId?:string; emergencyContactName?:string; emergencyContactPhone?:string; active:boolean };
 export type Application = { id:string; type:'parent'|'leader'|'member'; name:string; email:string; role:Role; branchId?:string; ymNumbers?:string; status:'pending'|'approved'|'rejected'; createdAt:string; decidedAt?:string };
-export type EventItem = { id:string; title:string; date:string; location:string; scope:'troop'|'branch'; branchId?:string; kind:'activity'|'notice_troop_participation'; status:'draft'|'published'; source?:string; targetMemberIds:string[]; fee?:string; paymentUrl?:string; dutyPatrol?:string; calendarTag?:string; category?:'self'|'district' };
-export type Reply = { id:string; eventId:string; memberId:string; memberName?:string; branchId?:string; parentUserId?:string; type:'interested'|'registered'|'declined'; operatedBy:'member'|'parent'|'leader'|'admin'; paid?:boolean; cancelled?:boolean; updatedAt:string };
+export type EventItem = { id:string; title:string; date:string; location:string; scope:'troop'|'branch'; branchId?:string; kind:'activity'|'notice_troop_participation'; status:'draft'|'published'|'archived'; source?:string; targetMemberIds:string[]; fee?:string; paymentUrl?:string; dutyPatrol?:string; calendarTag?:string; category?:'self'|'district'; noticeUrl?:string; noticeFileName?:string; inputMode?:'form'|'upload'|'link'; lateRegistration?:boolean; albumUrl?:string };
+export type Reply = { id:string; eventId:string; memberId:string; memberName?:string; branchId?:string; parentUserId?:string; type:'interested'|'registered'|'declined'; operatedBy:'member'|'parent'|'leader'|'admin'; paid?:boolean; paymentConfirmed?:boolean; paymentConfirmedBy?:string; paymentConfirmedAt?:string; cancelled?:boolean; updatedAt:string };
 export type Bookmark = { id:string; title:string; source:string; circularKey?:string; region?:string; circularDate?:string; sourceUrl?:string; attachmentUrl?:string; paymentUrl?:string; officialDeadline?:string; internalDeadline?:string; mode:'informational'|'troop_participation'; activityType?:string; targetText?:string; eligibility?:string; fee?:string; branchTags:string[]; audienceTags?:string[]; status:'published'|'converted'; convertedEventId?:string; ownerUserId?:string; importedBy?:string };
 export type AnnouncementPdf = { id:string; name:string; url:string; updatedAt?:string; size?:string; visible?:boolean; branchTags?:string[]; audienceTags?:string[]; note?:string };
 export type RegularMeeting = { id:string; branchId:string; title:string; weekday:0|1|2|3|4|5|6; frequency?:string; startTime:string; endTime:string; location:string; enabled:boolean };
@@ -117,8 +117,16 @@ export function replyStatus(s:AppState, eventId:string, memberId:string){
 }
 
 export function visibleEventsForMember(s:AppState, member:Member){
-  return s.events.filter(e=>e.status==='published' && (e.scope==='troop' || e.branchId===member.branchId))
-    .filter(e=>replyStatus(s,e.id,member.id)?.type!=='declined');
+  return s.events.filter(e=>{
+    const mine = !!replyStatus(s, e.id, member.id);
+    const inScope = e.scope==='troop' || e.branchId===member.branchId;
+    // 已封存（過期通告）：只有自己報過名先睇到，方便查返紀錄
+    if (e.status==='archived') return mine;
+    if (e.status!=='published') return false;
+    return inScope || mine;
+  });
+  // 註：以前會隱藏「已婉拒」嘅活動，但咁樣改錯咗就搵唔返，
+  //     所以改為照樣顯示（狀態會寫住 ❌ 已婉拒），可以隨時改回覆。
 }
 
 export function isMeetingCancelled(s:AppState, branchId:string, date:string){
@@ -137,12 +145,50 @@ export function nextRegularMeetingDates(count=6){
 /** 計算摘要數字（控制台用） */
 export function computeStats(s:AppState){
   const published = s.events.filter(e=>e.status==='published');
+  const archived = s.events.filter(e=>e.status==='archived');
   return {
     users: s.users.length,
     pending: s.applications.filter(a=>a.status==='pending').length,
     activities: published.length,
     selfActivities: published.filter(e=>eventCategory(e)==='self').length,
     districtActivities: published.filter(e=>eventCategory(e)==='district').length,
+    archivedActivities: archived.length,
     notices: s.bookmarks.length,
   };
+}
+
+// ==================== 支部人數統計（使用者管理用） ====================
+
+export type BranchPeopleStat = {
+  branchId: string;
+  branchName: string;
+  leaders: number;
+  parents: number;
+  members: number;
+  total: number;
+};
+
+const LEADER_ROLE_SET = ['group_leader', 'branch_leader', 'coach'];
+
+/**
+ * 各支部「領袖／家長／成員」人數。
+ * 非管理員（一般領袖）只會取得自己支部的一格；管理員／超管取得全部支部。
+ */
+export function branchPeopleStats(
+  s: AppState,
+  opts: { role?: string; branchId?: string } = {}
+): BranchPeopleStat[] {
+  const seeAll = ['super_admin', 'troop_super', 'troop_leader', 'admin'].includes(String(opts.role || ''));
+  const scope = seeAll ? BRANCH_DEFS : BRANCH_DEFS.filter(b => b.id === opts.branchId);
+  return scope.map(b => {
+    const leaders = (s.users || []).filter(u => LEADER_ROLE_SET.includes(u.role) && u.branchId === b.id).length;
+    const members = (s.members || []).filter(m => m.branchId === b.id && m.active !== false).length;
+    // 家長歸入其子女所屬支部（一位家長在多個支部只算一次／支部）
+    const parents = (s.users || []).filter(u => {
+      if (u.role !== 'parent') return false;
+      const childIds = u.childMemberIds || [];
+      return (s.members || []).some(m => m.branchId === b.id && (childIds.includes(m.id) || m.parentUserId === u.id));
+    }).length;
+    return { branchId: b.id, branchName: b.name, leaders, parents, members, total: leaders + parents + members };
+  });
 }

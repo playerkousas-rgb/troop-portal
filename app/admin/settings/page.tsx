@@ -158,7 +158,7 @@ export default function Page() {
   const publicOn = !['false', '0', 'off', 'no'].includes(String(s.config.PUBLIC_VIEW || '').trim().toLowerCase());
   const plugins = s.plugins || [];
 
-  return <Auth roles={['super_admin', 'troop_super', 'admin']}><div className="max-w-3xl mx-auto space-y-4">
+  return <Auth roles={['super_admin', 'troop_super', 'troop_leader', 'admin']}><div className="max-w-3xl mx-auto space-y-4">
     <section className="bg-gradient-to-br from-slate-800 to-slate-600 text-white rounded-2xl px-5 py-5 shadow-lg">
       <h1 className="font-black text-2xl leading-tight m-0">⚙️ 系統設定</h1>
       <p className="text-base text-white/85 mt-1.5 mb-0 leading-relaxed">

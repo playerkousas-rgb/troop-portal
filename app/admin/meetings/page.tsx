@@ -4,6 +4,7 @@ import { AppState, loadStateSlice } from '@/lib/store';
 import { apiCreateMeeting, apiPublishMeeting, apiDeleteMeeting, apiUpdateMeeting, apiSaveConfig } from '@/lib/api';
 import { branches } from '@/lib/model';
 import { useConfirm, kv } from '@/components/ConfirmProvider';
+import Auth from '@/components/Auth';
 
 export default function MeetingsAdmin() {
   const [s, setS] = useState<AppState | null>(null);
@@ -72,6 +73,7 @@ export default function MeetingsAdmin() {
   if (!s) return <div className="card">載入中...</div>;
 
   return (
+    <Auth roles={['super_admin', 'troop_super', 'troop_leader', 'admin', 'group_leader', 'branch_leader', 'coach']}>
     <div className="stack">
       <section className="hero">
         <span className="badge gold">會議管理</span>
@@ -157,6 +159,7 @@ export default function MeetingsAdmin() {
         )}
       </section>
     </div>
+    </Auth>
   );
 }
 

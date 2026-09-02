@@ -7,32 +7,42 @@ import StatStrip from '@/components/ui/StatStrip';
 import { AppState, loadStateSlice, computeStats } from '@/lib/store';
 import { ROLE_LABEL } from '@/lib/model';
 import { getSession } from '@/lib/session';
+import { hasFeature } from '@/lib/permissions';
 
 /**
  * 管理中心 —— 統一為 6 張卡：
  *   支部管理・使用者管理（合併成員資料庫＋審核申請）・行事曆管理・
- *   活動管理（自行舉辦＋區地域總會活動）・物資管理・會議管理。
+ *   出席管理・活動管理（自行舉辦＋區地域總會活動）・物資管理・會議管理。
  * 系統設定改放右上小圖示（TopNav ⚙️）；操作紀錄經系統設定進入。
  */
-const FEATURES: { id: string; icon: string; title: string; text: string; href: string; tone: string }[] = [
-  { id: 'branches',  icon: '🏢', title: '支部管理',     text: '管理支部、小隊及啟用狀態。', href: '/admin/branches', tone: 'from-emerald-700 to-emerald-500' },
-  { id: 'users',     icon: '👥', title: '使用者管理',   text: '帳號、成員資料庫與審核申請（合併）。', href: '/admin/users', tone: 'from-brand-800 to-brand-500' },
-  { id: 'calendar',  icon: '📅', title: '行事曆管理',   text: '恆常集會、特別集會及取消；亦可在行事曆直接修改。', href: '/admin/calendar', tone: 'from-sky-700 to-sky-500' },
-  { id: 'events',    icon: '🎯', title: '活動管理',     text: '自行舉辦活動 及 區地域總會活動（原圖書館引入）。', href: '/admin/events', tone: 'from-violet-700 to-violet-500' },
-  { id: 'equipment', icon: '📦', title: '物資管理',     text: '物資清單、庫存調整、借用批核及歸還。', href: '/admin/equipment', tone: 'from-amber-700 to-amber-500' },
-  { id: 'meetings',  icon: '🤝', title: '會議管理',     text: '會議議程、紀錄及文件連結。', href: '/admin/meetings', tone: 'from-rose-700 to-rose-500' },
+// feature：對應後台 UserPermissions 的權限鍵。
+// 卡片顯示與否由「使用者管理 → 授權」決定（管理員／團長可逐個帳號開關），
+// 唔再 hardcode 角色 —— 例如可以單獨開「物資管理」畀某位教練員。
+const FEATURES: { id: string; icon: string; title: string; text: string; href: string; tone: string; feature: string }[] = [
+  { id: 'branches',  icon: '🏢', title: '支部管理',     text: '管理支部、小隊及啟用狀態。', href: '/admin/branches', tone: 'from-emerald-700 to-emerald-500', feature: 'branches' },
+  { id: 'users',     icon: '👥', title: '使用者管理',   text: '帳號、成員資料庫與審核申請（合併）。', href: '/admin/users', tone: 'from-brand-800 to-brand-500', feature: 'users' },
+  { id: 'calendar',  icon: '📅', title: '行事曆管理',   text: '恆常集會、特別集會及取消；亦可在行事曆直接修改。', href: '/admin/calendar', tone: 'from-sky-700 to-sky-500', feature: 'calendar' },
+  { id: 'attendance', icon: '📝', title: '出席管理',   text: '簽到／點名、出席紀錄及統計報表。', href: '/attendance', tone: 'from-teal-700 to-teal-500', feature: 'attendance' },
+  { id: 'events',    icon: '🎯', title: '活動管理',     text: '自行舉辦活動 及 區地域總會活動（原圖書館引入）。', href: '/admin/events', tone: 'from-violet-700 to-violet-500', feature: 'events' },
+  { id: 'equipment', icon: '📦', title: '物資管理',     text: '物資清單、庫存調整、借用批核及歸還。', href: '/admin/equipment', tone: 'from-amber-700 to-amber-500', feature: 'equipment' },
+  { id: 'meetings',  icon: '🤝', title: '會議管理',     text: '會議議程、紀錄及文件連結。', href: '/admin/meetings', tone: 'from-rose-700 to-rose-500', feature: 'meetings' },
 ];
 
 export default function Admin() {
   const [s, setS] = useState<AppState | null>(null);
   const [err, setErr] = useState('');
-  useEffect(() => { loadStateSlice(['users', 'applications', 'events', 'bookmarks']).then(setS).catch(e => setErr(e.message)) }, []);
+  useEffect(() => { loadStateSlice(['users', 'applications', 'events', 'bookmarks', 'userFeatures']).then(setS).catch(e => setErr(e.message)) }, []);
   const stats = s ? computeStats(s) : { users: 0, pending: 0, activities: 0, selfActivities: 0, districtActivities: 0, notices: 0 };
 
   const session = typeof window === 'undefined' ? null : getSession();
   const emptyData = !!s && !err && (s.users || []).length === 0;
+  const role = session?.role || '';
+  const visibleFeatures = FEATURES.filter(f => hasFeature(s?.userFeatures, f.feature, role));
+  const canUsers = hasFeature(s?.userFeatures, 'users', role);
+  const canAudit = hasFeature(s?.userFeatures, 'audit', role);
+  const canRegistrations = hasFeature(s?.userFeatures, 'registrations', role);
 
-  return <Auth roles={['super_admin', 'troop_super', 'admin', 'group_leader', 'branch_leader', 'coach']}><div className="max-w-5xl mx-auto space-y-4">
+  return <Auth roles={['super_admin', 'troop_super', 'troop_leader', 'admin', 'group_leader', 'branch_leader', 'coach']}><div className="max-w-5xl mx-auto space-y-4">
     <ConsoleHeader
       icon="🛡️"
       name={session?.name || '管理員'}
@@ -58,15 +68,15 @@ export default function Admin() {
     )}
 
     <StatStrip stats={[
-      { label: '用戶', value: stats.users, desc: '總登記人數', tone: 'blue', href: '/admin/users' },
-      { label: '待審批', value: stats.pending, desc: '等待審批申請', tone: 'red', href: '/admin/users#applications' },
+      { label: '用戶', value: stats.users, desc: '總登記人數', tone: 'blue', ...(canUsers ? { href: '/admin/users' } : {}) },
+      { label: '待審批', value: stats.pending, desc: '等待審批申請', tone: 'red', ...(canUsers ? { href: '/admin/users#applications' } : {}) },
       { label: '自行舉辦', value: stats.selfActivities, desc: '已發布活動', tone: 'green', href: '/admin/events' },
       { label: '區地域總會', value: stats.districtActivities, desc: '區／地域／總會活動', tone: 'violet', href: '/admin/events' },
     ]} />
 
-    {/* 6 張功能卡 */}
+    {/* 功能卡 */}
     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-      {FEATURES.map(f => (
+      {visibleFeatures.map(f => (
         <Link key={f.id} href={f.href} className="no-underline text-inherit block group">
           <div className="h-full bg-white rounded-2xl border border-slate-200 shadow-sm p-4 flex items-center gap-3.5 transition group-hover:border-brand-300 group-hover:shadow-md">
             <span className={`w-14 h-14 bg-gradient-to-br ${f.tone} text-white rounded-2xl flex items-center justify-center text-3xl flex-shrink-0 shadow`} aria-hidden>{f.icon}</span>
@@ -82,12 +92,16 @@ export default function Admin() {
 
     {/* 工具捷徑：活動統計（統一）・操作紀錄（含審核紀錄）・點名・通告 */}
     <div className="flex flex-wrap gap-2">
-      <Link href="/admin/registrations" className="no-underline text-sm font-bold text-slate-700 bg-white border border-slate-200 rounded-xl px-3.5 py-2.5 hover:border-brand-300 hover:shadow-sm transition">
-        📊 活動統計（自行舉辦＝區地域總會＝通告）
-      </Link>
-      <Link href="/admin/audit" className="no-underline text-sm font-bold text-slate-700 bg-white border border-slate-200 rounded-xl px-3.5 py-2.5 hover:border-brand-300 hover:shadow-sm transition">
-        📜 操作紀錄（含審核紀錄）
-      </Link>
+      {canRegistrations && (
+        <Link href="/admin/registrations" className="no-underline text-sm font-bold text-slate-700 bg-white border border-slate-200 rounded-xl px-3.5 py-2.5 hover:border-brand-300 hover:shadow-sm transition">
+          📊 活動統計（只計自行舉辦）
+        </Link>
+      )}
+      {canAudit && (
+        <Link href="/admin/audit" className="no-underline text-sm font-bold text-slate-700 bg-white border border-slate-200 rounded-xl px-3.5 py-2.5 hover:border-brand-300 hover:shadow-sm transition">
+          📜 操作紀錄（含審核紀錄）
+        </Link>
+      )}
       <Link href="/attendance" className="no-underline text-sm font-bold text-slate-700 bg-white border border-slate-200 rounded-xl px-3.5 py-2.5 hover:border-brand-300 hover:shadow-sm transition">
         📝 簽到／點名
       </Link>

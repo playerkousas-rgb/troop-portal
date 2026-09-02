@@ -21,7 +21,7 @@ const DEMO_ITEMS: Item[] = [
 ];
 
 // 領袖身份：底部 4 個按鈕同成員／家長唔同（行事曆 · 公告 · 點名 · 管理中心）
-const LEADER_ROLES = ['super_admin', 'troop_super', 'admin', 'group_leader', 'branch_leader', 'coach'];
+const LEADER_ROLES = ['super_admin', 'troop_super', 'troop_leader', 'admin', 'group_leader', 'branch_leader', 'coach'];
 const LEADER_ITEMS: Item[] = [
   { icon: '📅', label: '行事曆', href: '/calendar' },
   { icon: '📢', label: '公告', href: '/notices' },
@@ -85,7 +85,13 @@ export default function BottomNav() {
     ? (isDemo ? DEMO_LEADER_ITEMS : LEADER_ITEMS)
     : [
         ...(isDemo ? DEMO_ITEMS : REAL_ITEMS),
-        { icon: '👤', label: '我的', href: isDemo ? '/dashboard/profile' : loggedIn ? '/profile' : '/login' },
+        // 「我的」→ 改名做「主頁」，並且入返自己嘅儀表板（家長／成員空間），
+        // 唔再直接跳去個人設定（個人設定喺儀表板右上角）。
+        {
+          icon: '🏠',
+          label: loggedIn ? '主頁' : '登入',
+          href: isDemo ? '/dashboard' : loggedIn ? (role === 'parent' ? '/parent' : role === 'member' ? '/member' : '/profile') : '/login',
+        },
       ];
 
   return (

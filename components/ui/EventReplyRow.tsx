@@ -1,7 +1,12 @@
 'use client';
 
 export type ReplyActionType = 'interested' | 'registered' | 'declined';
-export type ReplyAction = { type: ReplyActionType; idle: string; active: string };
+/**
+ * lockedReason：有值代表「呢個掣存在，但你冇權撳」。
+ * 刻意唔隱藏個掣 —— 用戶要見到有呢個功能、同埋知道點解自己用唔到，
+ * 而唔係對住一個空白版面猜。
+ */
+export type ReplyAction = { type: ReplyActionType; idle: string; active: string; lockedReason?: string };
 
 const STATUS: Record<string, { text: string; cls: string }> = {
   registered: { text: '✅ 已報名參加', cls: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
@@ -50,6 +55,8 @@ export default function EventReplyRow({
   footer?: React.ReactNode;
 }) {
   const key = status || 'unresponded';
+  // 手機冇 hover，tooltip 睇唔到，所以鎖住嘅原因要喺畫面寫出嚟（同一原因只寫一次）
+  const lockedNote = actions.find(a => a.lockedReason)?.lockedReason;
   const st = STATUS[key] || STATUS.unresponded;
   const text = (labels && labels[key as 'registered']) || st.text;
 
@@ -98,20 +105,31 @@ export default function EventReplyRow({
 
       {actions.length > 0 && (
         <div className="flex gap-2 flex-wrap">
-          {actions.map(a => (
-            <button
-              key={a.type}
-              type="button"
-              disabled={loading}
-              onClick={() => onAct(a.type)}
-              className={`text-sm font-bold px-3.5 py-2.5 rounded-lg border transition cursor-pointer disabled:opacity-60 ${
-                key === a.type ? ACTIVE[a.type] : IDLE
-              }`}
-            >
-              {key === a.type ? a.active : a.idle}
-            </button>
-          ))}
+          {actions.map(a => {
+            const locked = !!a.lockedReason;
+            return (
+              <button
+                key={a.type}
+                type="button"
+                disabled={loading || locked}
+                title={a.lockedReason}
+                aria-label={locked ? `${a.idle}（${a.lockedReason}）` : a.idle}
+                onClick={() => { if (!locked) onAct(a.type); }}
+                className={`text-sm font-bold px-3.5 py-2.5 rounded-lg border transition disabled:opacity-60 ${
+                  locked
+                    ? 'bg-slate-100 text-slate-400 border-slate-200 border-dashed cursor-not-allowed'
+                    : `cursor-pointer ${key === a.type ? ACTIVE[a.type] : IDLE}`
+                }`}
+              >
+                {locked ? `🔒 ${a.idle}` : key === a.type ? a.active : a.idle}
+              </button>
+            );
+          })}
         </div>
+      )}
+
+      {lockedNote && (
+        <p className="text-sm text-slate-500 m-0 leading-relaxed">🔒 {lockedNote}</p>
       )}
 
       {footer && <div className="border-t border-slate-200/70 pt-2.5">{footer}</div>}

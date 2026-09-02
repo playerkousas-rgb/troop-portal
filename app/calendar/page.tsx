@@ -103,8 +103,8 @@ export default function Calendar() {
   if (!s) return <main className="max-w-4xl mx-auto px-4 py-8 pb-24 text-sm text-slate-600">載入中...</main>;
 
   const role = session?.role;
-  const isLeader = !!role && ['super_admin', 'troop_super', 'admin', 'group_leader', 'branch_leader', 'coach'].includes(role);
-  const canCancel = !!role && ['super_admin', 'troop_super', 'admin', 'group_leader', 'branch_leader'].includes(role);
+  const isLeader = !!role && ['super_admin', 'troop_super', 'troop_leader', 'admin', 'group_leader', 'branch_leader', 'coach'].includes(role);
+  const canCancel = !!role && ['super_admin', 'troop_super', 'troop_leader', 'admin', 'group_leader', 'branch_leader'].includes(role);
   const parent = role === 'parent' ? s.users.find(u => u.id === session.userId) : null;
   const children = parent ? (s.members || []).filter(m => (parent.childMemberIds || []).includes(m.id) || m.parentUserId === parent.id) : [];
 

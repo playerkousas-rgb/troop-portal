@@ -1,19 +1,21 @@
 'use client';
 import { useEffect, useState } from 'react';
-import { AppState, loadStateSlice } from '@/lib/store';
+import { AppState, loadStateSlice, branchPeopleStats } from '@/lib/store';
 import { apiToggleUser, apiCreateUser, apiUpdateUserRole, apiDeleteUser, apiGetUserFeatures, apiUpdateUserPermissions, apiBatchCreateUsers, apiBatchCreateMembers, apiDecideApplication, apiUpdateMember, apiLinkParent, apiDeleteMember } from '@/lib/api';
 import { ROLE_LABEL, branches, LEADER_ROLES } from '@/lib/model';
 import { checkEditPermission, assignableRoles } from '@/lib/permissions';
 import { getSession } from '@/lib/session';
 import type { Role } from '@/lib/model';
 import { useConfirm, kv } from '@/components/ConfirmProvider';
+import Auth from '@/components/Auth';
 
 const FEATURE_LABELS: Record<string,string> = {
   branches: '支部管理', members: '成員資料庫', applications: '審核 / 申請管理',
   events: '活動管理', registrations: '報名管理', attendance: '簽到／點名', attendance_all: '全旅點名（跨支部）', library_import: '區地域總會活動引入',
-  notices: '通告管理', users: '使用者管理', settings: '系統設定', meetings: '會議管理',
+  notices: '通告管理', users: '使用者管理', permissions: '授權其他人（限自己支部）', settings: '系統設定', meetings: '會議管理',
   equipment: '物資管理', plugins: '單位元件設定',
   audit: '操作紀錄', calendar: '行事曆管理',
+  photos: '活動相簿（預設關閉，涉及私隱）',
 };
 
 type BulkRow = {
@@ -452,6 +454,8 @@ export default function Page(){
   const myBranchId=session?.branchId||'';
   const myUserId=session?.userId||'';
   const assignable=assignableRoles(myRole);
+  const seeAllBranches=['super_admin','troop_super', 'troop_leader', 'admin'].includes(myRole);
+  const branchStats=branchPeopleStats(s,{role:myRole,branchId:myBranchId});
 
   const filtered=s.users.filter(u=>{
     if(filterRole!=='all'&&u.role!==filterRole)return false;
@@ -459,8 +463,44 @@ export default function Page(){
     return true;
   });
 
-  return <div className="stack">
+  return <Auth roles={['super_admin', 'troop_super', 'troop_leader', 'admin', 'group_leader', 'branch_leader']}><div className="stack">
     <section className="hero"><span className="badge gold">使用者管理</span><h1>👥 使用者管理</h1><p>帳號、成員資料庫與審核申請已合併喺一處，用下方分頁切換。上級可授權下級額外功能。</p></section>
+
+    {/* 支部人數統計：一眼睇晒自己支部（管理員／超管睇全部支部）的領袖／家長／成員人數 */}
+    <section className="bg-white rounded-2xl border border-slate-200 shadow-sm p-3">
+      <div className="flex items-center justify-between gap-2 flex-wrap mb-2">
+        <h3 className="m-0 text-base font-black text-slate-800">📊 支部人數統計</h3>
+        <span className="text-sm text-slate-500 font-semibold">{seeAllBranches ? '你可檢視全旅所有支部' : '只顯示你所屬支部'}</span>
+      </div>
+      {branchStats.length === 0 ? (
+        <p className="text-sm text-slate-500 m-0">未設定所屬支部，請聯絡管理員。</p>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+          {branchStats.map(b => (
+            <div key={b.branchId} className="rounded-xl border border-slate-200 bg-slate-50/60 p-3">
+              <div className="flex items-center justify-between gap-2">
+                <span className="font-black text-slate-800 text-sm">{b.branchName}</span>
+                <span className="text-sm font-bold text-slate-500">共 {b.total} 人</span>
+              </div>
+              <div className="grid grid-cols-3 gap-1.5 mt-2">
+                <div className="rounded-lg bg-violet-50 text-violet-700 text-center py-2">
+                  <div className="text-xl font-black leading-none">{b.leaders}</div>
+                  <div className="text-sm font-bold mt-1">👔 領袖</div>
+                </div>
+                <div className="rounded-lg bg-emerald-50 text-emerald-700 text-center py-2">
+                  <div className="text-xl font-black leading-none">{b.parents}</div>
+                  <div className="text-sm font-bold mt-1">👨‍👩‍👧 家長</div>
+                </div>
+                <div className="rounded-lg bg-blue-50 text-blue-700 text-center py-2">
+                  <div className="text-xl font-black leading-none">{b.members}</div>
+                  <div className="text-sm font-bold mt-1">🧒 成員</div>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
     {err&&<p className="badge red">{err}</p>}
     {ok&&<p className="badge green">{ok}</p>}
 
@@ -718,5 +758,5 @@ export default function Page(){
         </table>
       </section>}
     </>}
-  </div>;
+  </div></Auth>;
 }

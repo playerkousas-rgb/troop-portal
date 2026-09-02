@@ -88,10 +88,14 @@ function getProxyContext(request: NextRequest): NextResponse | ProxyContext {
         troopName: troop.name,
         envVarName,
         apiKeyFound: !!apiKey,
-        apiKeyPrefix: apiKey ? apiKey.substring(0, 6) + '...' : '(empty)',
-        apiKeyLength: apiKey.length,
-        allEnvKeys: Object.keys(process.env).filter(k => k.startsWith('TROOP_')),
-        webAppUrl: troop.webAppUrl,
+        // ⚠️ 安全：金鑰片段／長度／環境變數清單只喺本機開發環境先顯示，
+        //    正式部署唔會回傳，避免經公開 URL 洩漏後台金鑰資料。
+        ...(process.env.NODE_ENV !== 'production' ? {
+          apiKeyPrefix: apiKey ? apiKey.substring(0, 6) + '...' : '(empty)',
+          apiKeyLength: apiKey.length,
+          allEnvKeys: Object.keys(process.env).filter(k => k.startsWith('TROOP_')),
+          webAppUrl: troop.webAppUrl,
+        } : {}),
       }
     };
   }

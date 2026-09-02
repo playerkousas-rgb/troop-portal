@@ -4,6 +4,7 @@ import { AppState, loadStateSlice } from '@/lib/store';
 import { apiCreatePatrol, apiTogglePatrol, apiDeletePatrol } from '@/lib/api';
 import { useEffect, useState } from 'react';
 import { useConfirm, kv } from '@/components/ConfirmProvider';
+import Auth from '@/components/Auth';
 function branchHint(id:string){ if(id==='b1') return '小童軍預設沒有分隊。'; if(id==='b2') return '幼童軍按九種顏色分隊（紅、黃、藍、白、灰、綠、棕、黑、橙）。'; if(id==='b3') return '童軍按動物名稱小隊。'; return '此支部預設沒有分隊，如需要可自行新增。'; }
 export default function Page(){
   const [s,setS]=useState<AppState|null>(null);const [err,setErr]=useState('');
@@ -31,7 +32,7 @@ export default function Page(){
   }
   if(!s)return <div className="card">{err||'載入中...'}</div>;
   const ps=s.patrols.filter(p=>p.branchId===selected);
-  return <div className="stack"><section className="hero"><span className="badge gold">支部管理</span><h1>支部與小隊設定</h1><p>新增、啟用／停用及刪除各支部小隊。</p></section>
+  return <Auth roles={['super_admin', 'troop_super', 'troop_leader', 'admin', 'group_leader']}><div className="stack"><section className="hero"><span className="badge gold">支部管理</span><h1>支部與小隊設定</h1><p>新增、啟用／停用及刪除各支部小隊。</p></section>
     {err&&<p className="badge red">{err}</p>}
     <section className="grid">{branches.map(b=><button className={`card ${selected===b.id?'notice-mode active':''}`} key={b.id} onClick={()=>setSelected(b.id)} style={{textAlign:'left'}}><span className="badge blue">{b.id}</span><h3>{b.name}</h3><p className="muted">{branchHint(b.id)}</p></button>)}</section>
     <section className="grid-wide"><div className="card stack"><h2>{branches.find(b=>b.id===selected)?.name} · 小隊設定</h2><p className="muted">{branchHint(selected)}</p>
@@ -43,5 +44,5 @@ export default function Page(){
       <div className="grid"><input value={name} onChange={e=>setName(e.target.value)} placeholder="新增名稱，例如 RED / TIGER"/><input value={short} onChange={e=>setShort(e.target.value)} placeholder="簡稱"/></div>
       <button className="btn primary" disabled={loadingId==='add'} onClick={add}>{loadingId==='add'?'⏳ 處理寫入中...':'＋ 新增小隊'}</button></div>
       <div className="card"><h3>統計用途</h3><p className="muted">報名管理可按小隊統計參與、興趣及未回覆人數。</p></div></section>
-  </div>;
+  </div></Auth>;
 }

@@ -13,17 +13,20 @@ import { AppState, loadStateSlice, computeStats, replyStatus } from '@/lib/store
 import { apiSetReply } from '@/lib/api';
 import { getSession } from '@/lib/session';
 import { ROLE_LABEL } from '@/lib/model';
+import { hasFeature } from '@/lib/permissions';
 import { useConfirm, kv } from '@/components/ConfirmProvider';
 
 // 領袖常用功能：全部歸入一張大卡（可收合）
-const LEADER_TOOLS: ConsoleTool[] = [
-  { id: 'members', icon: '👥', label: '成員資料庫', desc: '查看及管理所屬支部成員。', href: '/admin/members' },
-  { id: 'events', icon: '🗓️', label: '活動管理', desc: '新增、發布及管理活動。', href: '/admin/events' },
-  { id: 'registrations', icon: '📊', label: '活動統計', desc: '自行舉辦／區地域總會活動統計及匯出。', href: '/admin/registrations' },
-  { id: 'equipment', icon: '📦', label: '物資借用管理', desc: '物資清單、批核借用、歸還回補庫存。', href: '/admin/equipment' },
-  { id: 'applications', icon: '✅', label: '審核申請', desc: '審核家長／成員申請。', href: '/admin/applications' },
-  { id: 'library', icon: '🗺️', label: '區地域總會活動', desc: '引入區／地域／總會活動（原圖書館）。', href: '/library/import' },
-  { id: 'calendar', icon: '📅', label: '行事曆', desc: '查看及管理行事曆。', href: '/calendar' },
+// feature：對應後台 UserPermissions 權限鍵。顯示與否由管理員／團長
+// 喺「使用者管理 → 授權」逐個帳號開關，唔再 hardcode 角色。
+const LEADER_TOOLS: (ConsoleTool & { feature: string })[] = [
+  { id: 'members', icon: '👥', label: '成員資料庫', desc: '查看及管理所屬支部成員。', href: '/admin/members', feature: 'members' },
+  { id: 'events', icon: '🗓️', label: '活動管理', desc: '新增、發布及管理活動。', href: '/admin/events', feature: 'events' },
+  { id: 'registrations', icon: '📊', label: '活動統計', desc: '自行舉辦／區地域總會活動統計及匯出。', href: '/admin/registrations', feature: 'registrations' },
+  { id: 'equipment', icon: '📦', label: '物資借用管理', desc: '物資清單、批核借用、歸還回補庫存。', href: '/admin/equipment', feature: 'equipment' },
+  { id: 'applications', icon: '✅', label: '審核申請', desc: '審核家長／成員申請。', href: '/admin/applications', feature: 'applications' },
+  { id: 'library', icon: '🗺️', label: '區地域總會活動', desc: '引入區／地域／總會活動（原圖書館）。', href: '/library/import', feature: 'library_import' },
+  { id: 'calendar', icon: '📅', label: '行事曆', desc: '查看及管理行事曆。', href: '/calendar', feature: 'calendar' },
 ];
 
 export default function Leader(){
@@ -31,10 +34,13 @@ export default function Leader(){
   const [loadingId,setLoadingId]=useState('');
   const { confirm } = useConfirm();
   // 按需載入：領袖摘要（computeStats 用到 users/applications/events/bookmarks）+ 活動回覆
-  useEffect(()=>{loadStateSlice(['events','plugins','pluginSettings','users','applications','bookmarks','replies']).then(setS).catch(e=>setErr(e.message))},[]);
+  useEffect(()=>{loadStateSlice(['events','plugins','pluginSettings','users','applications','bookmarks','replies','userFeatures']).then(setS).catch(e=>setErr(e.message))},[]);
   const stats=s?computeStats(s):{users:0,pending:0,activities:0,notices:0};
   const session = getSession();
   const myId = session?.userId || '';
+  const canEvents = hasFeature(s?.userFeatures, 'events', session?.role);
+  const canApplications = hasFeature(s?.userFeatures, 'applications', session?.role);
+  const canUsers = hasFeature(s?.userFeatures, 'users', session?.role);
 
   async function act(eid:string,type:'registered'|'declined'|'interested'){
     if(!myId)return;
@@ -49,7 +55,7 @@ export default function Leader(){
   const events = (s?.events || []).filter(e => e.status === 'published' && (e.scope === 'troop' || e.targetMemberIds.includes(myId) || e.branchId === session?.branchId));
   const plugins = (s?.plugins || []).filter(p => p.id !== 'troop_attendance');
 
-  return <Auth roles={['super_admin','admin','group_leader','branch_leader','coach']}><div className="max-w-5xl mx-auto space-y-4">
+  return <Auth roles={['super_admin','troop_super', 'troop_leader', 'admin','group_leader','branch_leader','coach']}><div className="max-w-5xl mx-auto space-y-4">
     <ConsoleHeader
       icon="🧭"
       name={session?.name || '領袖'}
@@ -70,10 +76,11 @@ export default function Leader(){
     )}
 
     <StatStrip stats={[
-      { label: '活動', value: stats.activities, desc: '已發布活動', tone: 'green', href: '/admin/events' },
-      { label: '待審批', value: stats.pending, desc: '等待審批申請', tone: 'red', href: '/admin/applications' },
+      // 冇權限嘅功能只顯示數字，唔畀連結（避免撳咗變「需要合適權限」）
+      { label: '活動', value: stats.activities, desc: '已發布活動', tone: 'green', ...(canEvents ? { href: '/admin/events' } : {}) },
+      { label: '待審批', value: stats.pending, desc: '等待審批申請', tone: 'red', ...(canApplications ? { href: '/admin/applications' } : {}) },
       { label: '通告', value: stats.notices, desc: '圖書館引入通告', tone: 'gold', href: '/notices' },
-      { label: '用戶', value: stats.users, desc: '總登記人數', tone: 'blue', href: '/admin/users' },
+      { label: '用戶', value: stats.users, desc: '總登記人數', tone: 'blue', ...(canUsers ? { href: '/admin/users' } : {}) },
     ]} />
 
     <Panel
@@ -111,7 +118,17 @@ export default function Leader(){
       </div>
     </Panel>
 
-    <ToolGroup icon="🧰" title="管理工具" subtitle="成員 · 活動 · 報名 · 物資 · 通告" tone="emerald" tools={LEADER_TOOLS} />
+    {/* ★ 未獲授權嘅工具照樣顯示（鎖住），唔會隱藏 —— 教練員／執委／管委要知道
+        系統有呢啲功能、同埋知道要搵團長授權，而唔係對住空白畫面以為系統壞咗。 */}
+    <ToolGroup
+      icon="🧰"
+      title="管理工具"
+      subtitle="成員 · 活動 · 報名 · 物資 · 通告"
+      tone="emerald"
+      tools={LEADER_TOOLS.map(t => hasFeature(s?.userFeatures, t.feature, session?.role)
+        ? t
+        : { ...t, lockedReason: '未獲授權，請聯絡所屬支部團長開啟此功能。' })}
+    />
 
     {plugins.length > 0 && (
       <Panel icon="🧩" title="擴充元件" subtitle="旅團已啟用的 2／3 級元件" tone="violet" count={`${plugins.length} 個`} bodyClass="pt-3" defaultOpen={false}>

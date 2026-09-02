@@ -12,6 +12,7 @@ const AUDIENCE_OPTIONS = ['全旅', '領袖', '成年成員', '小童軍', '幼�
 const ACTIVITY_TYPES = ['訓練班', '比賽', '服務', '工作坊', '活動', '其他'];
 
 import { Suspense } from 'react';
+import Auth from '@/components/Auth';
 function ImportInner(){
   const [s,setS]=useState<AppState|null>(null);
   const [err,setErr]=useState('');
@@ -19,7 +20,7 @@ function ImportInner(){
   const [loading,setLoading]=useState(false);
   const [editingId,setEditingId]=useState<string|null>(null);
   const session=getSession();
-  const canImport=session && ['super_admin','troop_super','admin','group_leader','branch_leader','coach'].includes(session.role);
+  const canImport=session && ['super_admin','troop_super', 'troop_leader', 'admin','group_leader','branch_leader','coach'].includes(session.role);
 
   // 讀取從圖書館帶入的 URL 參數
   const searchParams=useSearchParams();
@@ -150,7 +151,7 @@ function ImportInner(){
 
   if(!s)return <div className="card">{err||'載入中...'}</div>;
 
-  return <div className="stack">
+  return <Auth roles={['super_admin', 'troop_super', 'troop_leader', 'admin', 'group_leader', 'branch_leader', 'coach']}><div className="stack">
     <section className="hero">
       <span className="badge gold">區地域總會活動引入</span>
       <h1>🗺️ 引入區地域總會活動</h1>
@@ -270,7 +271,7 @@ function ImportInner(){
         </tr>)}</tbody>
       </table>
     </section>}
-  </div>;
+  </div></Auth>;
 }
 
 export default function Import(){

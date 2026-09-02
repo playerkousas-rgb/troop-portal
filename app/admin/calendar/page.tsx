@@ -5,6 +5,7 @@ import { apiToggleRegularMeeting, apiCreateRegularMeeting, apiCreateEvent, apiDe
 import { branches } from '@/lib/model';
 import { getSession } from '@/lib/session';
 import { useConfirm, kv } from '@/components/ConfirmProvider';
+import Auth from '@/components/Auth';
 const weekdays=['日','一','二','三','四','五','六'];
 
 export default function Page(){
@@ -171,7 +172,7 @@ export default function Page(){
 
   if(!s)return <div className="card">{err||'載入中...'}</div>;
 
-  return <div className="stack">
+  return <Auth roles={['super_admin', 'troop_super', 'troop_leader', 'admin', 'group_leader', 'branch_leader', 'coach']}><div className="stack">
     <section className="hero">
       <span className="badge gold">行事曆設定</span>
       <h1>行事曆管理</h1>
@@ -301,5 +302,5 @@ export default function Page(){
         <button className="btn primary" onClick={addSpecial}>加入行事曆</button>
       </section>
     )}
-  </div>;
+  </div></Auth>;
 }

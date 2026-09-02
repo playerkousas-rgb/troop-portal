@@ -34,7 +34,8 @@ export default function TopNav() {
   const home =
     user?.role === 'parent' ? '/parent' :
     user?.role === 'member' ? '/member' :
-    admin || user?.role === 'group_leader' || user?.role === 'branch_leader' || user?.role === 'coach' ? '/admin' :
+    admin ? '/admin' :
+    user?.role === 'group_leader' || user?.role === 'branch_leader' || user?.role === 'coach' ? '/leader' :
     '/calendar';
 
   const isMockPreview = pathname?.startsWith('/dashboard');

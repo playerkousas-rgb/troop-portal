@@ -2,11 +2,12 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import ConsoleHeader from '@/components/ui/ConsoleHeader';
-import ToolGroup, { ConsoleTool } from '@/components/ui/ToolGroup';
 import Panel from '@/components/ui/Panel';
 import EmptyState from '@/components/ui/EmptyState';
 import EventReplyRow from '@/components/ui/EventReplyRow';
-import { AppState, loadStateSlice, replyStatus } from '@/lib/store';
+import AlbumEmbed from '@/components/ui/AlbumEmbed';
+import { canViewAlbum } from '@/lib/album';
+import { AppState, loadStateSlice, replyStatus, eventCategory, visibleEventsForMember } from '@/lib/store';
 import { apiSetReply, apiTogglePaid } from '@/lib/api';
 import { getSession } from '@/lib/session';
 import { useConfirm, kv } from '@/components/ConfirmProvider';
@@ -18,12 +19,6 @@ export default function Parent(){
   // 按需載入：家長空間（replyStatus 用到 replies）
   useEffect(()=>{loadStateSlice(['users','members','events','replies']).then(setS).catch(e=>setErr(e.message))},[]);
   const session=getSession();
-
-  const tools: ConsoleTool[] = [
-    { id: 'attendance', icon: '📝', label: '子女出席紀錄', desc: '日常集會及旅團自辦活動的出席紀錄（點名與報名分開處理）。', href: '/attendance' },
-    { id: 'calendar', icon: '📅', label: '行事曆', desc: '旅團公開行事曆及集會時間。', href: '/calendar' },
-    { id: 'notices', icon: '📄', label: '通告', desc: '旅團通告及外間活動通告。', href: '/notices' },
-  ];
 
   if(err)return <div className="bg-rose-50 border border-rose-200 rounded-2xl p-4"><p className="text-sm text-rose-700 font-bold m-0 whitespace-pre-wrap leading-relaxed">{err}</p></div>;
   if(!s)return <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 text-sm text-slate-600">載入中...</div>;
@@ -78,7 +73,10 @@ export default function Parent(){
         />
       ) : (
         children.map(c => {
-          const events = s.events.filter(e => e.status === 'published' && e.targetMemberIds.includes(c.id));
+          // ★ 單一來源：家長睇到嘅 = 子女本人睇到嘅，完全同一套規則。
+          //   以後可見度規則點改，只需改 visibleEventsForMember 一個地方，兩邊自動同步，
+          //   唔會再出現「仔女見到但家長見唔到」（或者相反）嘅情況。
+          const events = visibleEventsForMember(s, c);
           return (
             <Panel
               key={c.id}
@@ -94,13 +92,22 @@ export default function Parent(){
                 ) : (
                   events.map(e => {
                     const r = replyStatus(s, e.id, c.id);
+                    // 區地域總會活動：領袖只係精選通告畀你睇，想報就自己按連結報名，
+                    // 旅團唔會代收報名／代收錢，所以唔會有回覆掣同付款格。
+                    const isDistrict = eventCategory(e) === 'district';
                     return (
                       <EventReplyRow
                         key={e.id}
                         event={e}
                         status={r?.type}
                         labels={{ registered: '✅ 狀態：已報名參加', declined: '❌ 狀態：已婉拒參加', interested: '❤️ 狀態：子女有興趣', unresponded: '⚠️ 狀態：尚未回覆' }}
-                        actions={[
+                        badges={[
+                          ...(isDistrict ? [{ text: '🗺️ 區地域總會通告（自行報名）', tone: 'violet' as const }] : []),
+                          ...(e.status === 'archived' ? [{ text: '🗂️ 已過期（紀錄保留）', tone: 'slate' as const }]
+                            : e.lateRegistration ? [{ text: '🔓 已重開報名', tone: 'blue' as const }] : []),
+                        ]}
+                        // 已封存＝報名已截止，只保留紀錄，唔再畀改
+                        actions={(e.status === 'archived' || isDistrict) ? [] : [
                           { type: 'interested', idle: '❤️ 有興趣', active: '【已標記】❤️ 有興趣' },
                           { type: 'registered', idle: '✅ 參加', active: '【已報名】✅ 參加' },
                           { type: 'declined', idle: '❌ 不參加', active: '【已婉拒】❌ 不參加' },
@@ -108,23 +115,54 @@ export default function Parent(){
                         loading={loadingId === e.id + c.id}
                         onAct={t => respond(e.id, c.id, t)}
                         footer={
+                          <>
+                          {/* 📷 活動相簿：唔理報唔報名都睇到（活動完咗之後相簿先最有價值） */}
+                          {e.albumUrl && canViewAlbum({ role: session?.role, userFeatures: s.userFeatures, ownBranchId: c.branchId, eventBranchId: e.branchId }) && (
+                            <div className="mb-2">
+                              <AlbumEmbed url={e.albumUrl} title={`${e.title}・活動相簿`} />
+                            </div>
+                          )}
+                          {isDistrict ? (
+                            <p className="text-sm text-slate-500 m-0 leading-relaxed">
+                              ℹ️ 此為區／地域／總會活動通告，旅團不代收報名及費用。有興趣請按上面的通告連結自行報名。
+                            </p>
+                          ) :
+                          // 💰 只有 tick 咗「參加」先出現付款格；未報名／婉拒／有興趣完全唔會顯示
                           r?.type === 'registered' ? (
-                            <div className="flex items-center justify-between gap-2 flex-wrap">
-                              <span className="text-sm text-slate-500 font-semibold">💰 付款（參加先需 tick）</span>
-                              <button
-                                type="button"
-                                disabled={loadingId === e.id + c.id + 'paid'}
-                                onClick={() => togglePaid(e.id, c.id)}
-                                className={`text-sm font-bold px-3.5 py-2.5 rounded-lg border transition cursor-pointer disabled:opacity-60 ${
-                                  r?.paid ? 'bg-emerald-700 text-white border-emerald-800 shadow-sm' : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300 hover:bg-slate-50'
+                            <div className="grid gap-2">
+                              <div className="flex items-center justify-between gap-2 flex-wrap">
+                                <span className="text-sm text-slate-500 font-semibold">💰 付款</span>
+                                <button
+                                  type="button"
+                                  disabled={loadingId === e.id + c.id + 'paid'}
+                                  onClick={() => togglePaid(e.id, c.id)}
+                                  className={`text-sm font-bold px-3.5 py-2.5 rounded-lg border transition cursor-pointer disabled:opacity-60 ${
+                                    r?.paid ? 'bg-emerald-700 text-white border-emerald-800 shadow-sm' : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300 hover:bg-slate-50'
+                                  }`}
+                                >
+                                  {r?.paid ? '✅ 已付款（點擊取消）' : '💰 標記已付款'}
+                                </button>
+                              </div>
+                              {/* 領袖核實收款狀態：領袖喺自己嗰邊 tick 咗，家長就會見到「已確認收款」 */}
+                              <div
+                                className={`flex items-center justify-between gap-2 flex-wrap rounded-lg border px-3 py-2 ${
+                                  r?.paymentConfirmed
+                                    ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
+                                    : 'bg-slate-50 border-slate-200 text-slate-600'
                                 }`}
                               >
-                                {r?.paid ? '✅ 已付款（點擊取消）' : '💰 標記已付款'}
-                              </button>
+                                <span className="text-sm font-bold">🧾 領袖收款確認</span>
+                                <span className="text-sm font-bold">
+                                  {r?.paymentConfirmed
+                                    ? `✅ 領袖已確認收款${r.paymentConfirmedAt ? `（${r.paymentConfirmedAt}）` : ''}`
+                                    : r?.paid
+                                    ? '⏳ 等待領袖核實'
+                                    : '—（先標記已付款）'}
+                                </span>
+                              </div>
                             </div>
-                          ) : (
-                            <p className="text-sm text-slate-500 m-0 leading-relaxed">ℹ️ 選「不參加」或「有興趣」不用 tick 付款。</p>
-                          )
+                          ) : null}
+                          </>
                         }
                       />
                     );
@@ -136,7 +174,30 @@ export default function Parent(){
         })
       )}
 
-      <ToolGroup icon="🧰" title="我的工具" subtitle="出席紀錄 · 行事曆 · 通告" tone="emerald" tools={tools} />
+      {/* 家長唔需要「我的工具」（行事曆／活動同底部按鈕重覆）→ 直接換成子女出席紀錄 */}
+      <Panel
+        icon="📝"
+        title="子女出席紀錄"
+        subtitle="日常集會及旅團自辦活動的出席情況"
+        tone="emerald"
+        count={`${children.length} 名子女`}
+      >
+        <div className="grid gap-2">
+          {children.map(c => (
+            <Link
+              key={c.id}
+              href={`/attendance?memberId=${c.id}`}
+              className="no-underline text-inherit rounded-xl border border-slate-200 bg-slate-50/60 px-3.5 py-3 flex items-center justify-between gap-2 hover:border-emerald-300 hover:bg-white transition"
+            >
+              <span className="min-w-0">
+                <span className="block font-bold text-slate-800">{c.name}</span>
+                <span className="block text-sm text-slate-500 font-semibold">{c.ymNumber} · 查看出席紀錄</span>
+              </span>
+              <span className="text-slate-300 font-black text-xl">→</span>
+            </Link>
+          ))}
+        </div>
+      </Panel>
 
       <Panel icon="🆘" title="家庭聯絡資料" subtitle="家長及子女資料" tone="rose" defaultOpen={false}>
         <div className="grid sm:grid-cols-2 gap-2">
@@ -159,7 +220,6 @@ export default function Parent(){
 
       <div className="flex gap-2 flex-wrap">
         <Link href="/profile" className="no-underline text-sm font-bold bg-white text-slate-700 border border-slate-200 px-3 py-2 rounded-xl hover:bg-slate-50 transition">修改個人資料 / 改密碼</Link>
-        <Link href="/calendar" className="no-underline text-sm font-bold bg-white text-slate-700 border border-slate-200 px-3 py-2 rounded-xl hover:bg-slate-50 transition">行事曆</Link>
       </div>
     </div>
   );

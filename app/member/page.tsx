@@ -6,8 +6,10 @@ import ToolGroup, { ConsoleTool } from '@/components/ui/ToolGroup';
 import Panel from '@/components/ui/Panel';
 import EmptyState from '@/components/ui/EmptyState';
 import EventReplyRow from '@/components/ui/EventReplyRow';
+import AlbumEmbed from '@/components/ui/AlbumEmbed';
+import { canViewAlbum } from '@/lib/album';
 import PluginIframeCard from '@/components/PluginCard';
-import { AppState, loadStateSlice, visibleEventsForMember, replyStatus } from '@/lib/store';
+import { AppState, loadStateSlice, visibleEventsForMember, replyStatus, eventCategory } from '@/lib/store';
 import { apiSetReply } from '@/lib/api';
 import { getSession } from '@/lib/session';
 import { useConfirm, kv } from '@/components/ConfirmProvider';
@@ -79,24 +81,46 @@ export default function Member(){
             events.map(e=>{
               const r=replyStatus(s,e.id,member.id);
               const isDuty = e.dutyPatrol && member.patrolId && s.patrols.find(p => p.id === member.patrolId)?.name === e.dutyPatrol;
-              const badges = [];
-              if (isDuty) badges.push({ text: '你的小隊值日', tone: 'violet' as const });
-              else if (e.dutyPatrol) badges.push({ text: `${e.dutyPatrol} 值日`, tone: 'slate' as const });
+              // 區地域總會活動＝純通告，想報自己去報，旅團唔代收報名
+              const isDistrict = eventCategory(e) === 'district';
+              const badges: { text: string; tone: 'violet' | 'slate' | 'blue' }[] = [];
+              if (isDistrict) badges.push({ text: '🗺️ 區地域總會通告（自行報名）', tone: 'violet' });
+              if (e.status === 'archived') badges.push({ text: '🗂️ 已過期（紀錄保留）', tone: 'slate' });
+              else if (e.lateRegistration) badges.push({ text: '🔓 已重開報名', tone: 'blue' });
+              if (isDuty) badges.push({ text: '你的小隊值日', tone: 'violet' });
+              else if (e.dutyPatrol) badges.push({ text: `${e.dutyPatrol} 值日`, tone: 'slate' });
               return (
                 <EventReplyRow
                   key={e.id}
                   event={e}
                   status={r?.type}
                   badges={badges}
-                  actions={[
-                    { type: 'interested', idle: '❤️ 有興趣', active: '【已點選】❤️ 有興趣' },
-                    ...(adult ? [
-                      { type: 'registered' as const, idle: '✅ 參加', active: '【已報名】✅ 參加' },
-                      { type: 'declined' as const, idle: '❌ 不參加', active: '【已婉拒】❌ 不參加' },
-                    ] : []),
+                  // ★ 未滿 18 歲：參加／不參加嘅掣照樣顯示，只係鎖住。
+                  //   咁樣成員睇到嘅版面同家長一樣（同一個活動、同一組功能），
+                  //   分別只在於「我冇權撳」，而唔係「呢個功能唔存在」。
+                  actions={(isDistrict || e.status === 'archived') ? [] : [
+                    { type: 'interested' as const, idle: '❤️ 有興趣', active: '【已點選】❤️ 有興趣' },
+                    { type: 'registered' as const, idle: '✅ 參加', active: '【已報名】✅ 參加',
+                      lockedReason: adult ? undefined : '未滿 18 歲，參加／不參加須由家長代為決定（家長登入回覆＝已簽署）。' },
+                    { type: 'declined' as const, idle: '❌ 不參加', active: '【已婉拒】❌ 不參加',
+                      lockedReason: adult ? undefined : '未滿 18 歲，參加／不參加須由家長代為決定（家長登入回覆＝已簽署）。' },
                   ]}
                   loading={!!loadingId && loadingId.startsWith(e.id)}
                   onAct={t => act(e.id, t)}
+                  footer={
+                    <>
+                    {e.albumUrl && canViewAlbum({ role: session?.role, userFeatures: s.userFeatures, ownBranchId: member.branchId, eventBranchId: e.branchId }) && (
+                      <div className="mb-2">
+                        <AlbumEmbed url={e.albumUrl} title={`${e.title}・活動相簿`} />
+                      </div>
+                    )}
+                    {isDistrict ? (
+                    <p className="text-sm text-slate-500 m-0 leading-relaxed">
+                      ℹ️ 此為區／地域／總會活動通告，旅團不代收報名及費用。有興趣請按上面的通告連結自行報名。
+                    </p>
+                  ) : null}
+                    </>
+                  }
                 />
               );
             })

@@ -29,12 +29,12 @@ import {
   weekdayLabel,
 } from '@/lib/attendance';
 
-const LEADER_ROLES: Role[] = ['super_admin', 'troop_super', 'admin', 'group_leader', 'branch_leader', 'coach'];
+const LEADER_ROLES: Role[] = ['super_admin', 'troop_super', 'troop_leader', 'admin', 'group_leader', 'branch_leader', 'coach'];
 
 function dashboardHref(role?: Role) {
   if (role === 'member') return '/member';
   if (role === 'parent') return '/parent';
-  if (role && ['super_admin', 'troop_super', 'admin'].includes(role)) return '/admin';
+  if (role && ['super_admin', 'troop_super', 'troop_leader', 'admin'].includes(role)) return '/admin';
   if (role && LEADER_ROLES.includes(role)) return '/leader';
   return '/';
 }
@@ -413,6 +413,13 @@ export default function AttendancePage() {
     }
   }
 
+  // 家長由「子女出席紀錄」入嚟：/attendance?memberId=xxx → 自動揀返嗰個子女
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const q = new URLSearchParams(window.location.search).get('memberId');
+    if (q) setChildId(q);
+  }, []);
+
   useEffect(() => {
     if (!session || !state) return;
     if (isMember) loadHistory({ memberId: session.memberId || session.userId });
@@ -454,7 +461,7 @@ export default function AttendancePage() {
   const todayLabel = todayISO();
 
   return (
-    <Auth roles={['super_admin', 'troop_super', 'admin', 'group_leader', 'branch_leader', 'coach', 'member', 'parent']}>
+    <Auth roles={['super_admin', 'troop_super', 'troop_leader', 'admin', 'group_leader', 'branch_leader', 'coach', 'member', 'parent']}>
       <div className="w-full px-3 sm:px-6 py-5 pb-32 space-y-5 attendance-page">
 
         {/* ═══ Hero ═══ */}

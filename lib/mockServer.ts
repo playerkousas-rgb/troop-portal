@@ -102,9 +102,13 @@ const seed: AppState = {
   users: [
     { id: 'u_admin', name: '陳堅強', email: 'admin@demo.scout', role: 'admin', approved: true },
     { id: 'u_super', name: '超級管理員', email: 'sheep@demo.scout', role: 'super_admin', approved: true },
-    { id: 'u_gl', name: '李偉國', email: 'gl@demo.scout', role: 'group_leader', approved: true },
+    { id: 'u_tl', name: '周旅長', email: 'tl@demo.scout', role: 'troop_leader', approved: true },
+    // 團長 = 某一個團／支部嘅負責人（李偉國 = 深資團 b4 團長）
+    { id: 'u_gl', name: '李偉國', email: 'gl@demo.scout', role: 'group_leader', branchId: 'b4', approved: true },
+    // 童軍團（b3）團長：佢邀請咗深資團團長 u_gl 幫手點名
+    { id: 'u_gl3', name: '陳志明', email: 'gl3@demo.scout', role: 'group_leader', branchId: 'b3', approved: true },
     { id: 'u_bl', name: '黃志遠', email: 'bl@demo.scout', role: 'branch_leader', branchId: 'b3', approved: true },
-    { id: 'u_coach', name: '何健', email: 'coach@demo.scout', role: 'coach', branchId: 'b3', approved: true },
+    { id: 'u_coach', name: '何健', email: 'coach@demo.scout', role: 'coach', approved: true }, // 教練員冇固定支部
     { id: 'u5', name: '王秀蘭', email: 'parent1@demo.scout', role: 'parent', childMemberIds: ['m01'], approved: true },
     { id: 'u9', name: '林國雄', email: 'parent2@demo.scout', role: 'parent', childMemberIds: ['m05', 'm10', 'm13'], approved: true },
     { id: 'u_m1', name: '陳大文', email: 'm01@demo.scout', role: 'member', branchId: 'b3', memberId: 'm01', approved: true },
@@ -113,10 +117,10 @@ const seed: AppState = {
     { id: 'u_m8', name: '周嘉欣', email: 'm08@demo.scout', role: 'member', branchId: 'b4', memberId: 'm08', approved: true },
   ],
   events: [
-    { id: 'e00', title: '八月童軍技能日', date: '2026-08-16', location: '旅團部', scope: 'branch', branchId: 'b3', kind: 'activity', status: 'published', source: '手動新增', targetMemberIds: ['m01', 'm02', 'm03', 'm04'], fee: '0' },
+    { id: 'e00', title: '八月童軍技能日', date: '2026-08-16', location: '旅團部', scope: 'branch', branchId: 'b3', kind: 'activity', status: 'published', source: '手動新增', targetMemberIds: ['m01', 'm02', 'm03', 'm04'], fee: '0' , albumUrl: 'https://drive.google.com/drive/folders/1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs' },
     { id: 'e01', title: '九月山徑健行', date: '2026-09-12', location: '大帽山', scope: 'branch', branchId: 'b3', kind: 'activity', status: 'published', source: '手動新增', targetMemberIds: ['m01', 'm02', 'm03', 'm04'], fee: '50', paymentUrl: 'https://pay.example.com/e01' },
     { id: 'e02', title: '童軍週末營(兩日一夜)', date: '2026-10-03', location: '青年會營地', scope: 'troop', kind: 'activity', status: 'published', source: '手動新增', targetMemberIds: ['m01', 'm02', 'm03', 'm04', 'm08', 'm09', 'm11', 'm12'], fee: '300', paymentUrl: 'https://pay.example.com/e02' },
-    { id: 'e03', title: '十一區運動會', date: '2026-10-01', location: '東區公園', scope: 'branch', branchId: 'b2', kind: 'activity', status: 'published', source: '圖書館轉入', targetMemberIds: ['m05', 'm06', 'm07'], fee: '80' },
+    { id: 'e03', title: '十一區運動會', date: '2026-10-01', location: '東區公園', scope: 'branch', branchId: 'b2', kind: 'activity', status: 'published', source: '圖書館轉入', targetMemberIds: [], fee: '80', noticeUrl: 'https://example.org/circular/district-sports-day.pdf' },
     { id: 'e04', title: '新領袖訓練班', date: '2026-11-08', location: '旅團會議室', scope: 'troop', kind: 'activity', status: 'draft', source: '手動新增', targetMemberIds: ['m04', 'm08', 'm09', 'm11', 'm12'] },
     { id: 'e05', title: '樂行社區服務日', date: '2026-09-20', location: '觀塘邨', scope: 'branch', branchId: 'b5', kind: 'activity', status: 'published', source: '手動新增', targetMemberIds: ['m09', 'm12'], fee: '0' },
     { id: 'e06', title: '深資遠征(兩日一夜)', date: '2026-10-10', location: '西貢麥理浩徑', scope: 'branch', branchId: 'b4', kind: 'activity', status: 'published', source: '手動新增', targetMemberIds: ['m08', 'm11'], fee: '250', paymentUrl: 'https://pay.example.com/e06' },
@@ -129,8 +133,6 @@ const seed: AppState = {
     { id: 'e01_m02', eventId: 'e01', memberId: 'm02', memberName: '王小名', branchId: 'b3', type: 'interested', operatedBy: 'member', updatedAt: '2026-08-22' },
     { id: 'e02_m01', eventId: 'e02', memberId: 'm01', memberName: '陳大文', branchId: 'b3', parentUserId: 'u5', type: 'registered', operatedBy: 'parent', paid: false, updatedAt: '2026-08-23' },
     { id: 'e02_m08', eventId: 'e02', memberId: 'm08', memberName: '周嘉欣', branchId: 'b4', type: 'interested', operatedBy: 'member', updatedAt: '2026-08-24' },
-    { id: 'e03_m05', eventId: 'e03', memberId: 'm05', memberName: '林小雨', branchId: 'b2', parentUserId: 'u9', type: 'registered', operatedBy: 'parent', paid: true, updatedAt: '2026-08-25' },
-    { id: 'e03_m06', eventId: 'e03', memberId: 'm06', memberName: '黃芷晴', branchId: 'b2', type: 'interested', operatedBy: 'parent', updatedAt: '2026-08-25' },
     { id: 'e06_m08', eventId: 'e06', memberId: 'm08', memberName: '周嘉欣', branchId: 'b4', type: 'registered', operatedBy: 'member', paid: false, updatedAt: '2026-08-26' },
     { id: 'e06_m11', eventId: 'e06', memberId: 'm11', memberName: '黃嘉怡', branchId: 'b4', type: 'interested', operatedBy: 'member', updatedAt: '2026-08-26' },
     { id: 'e07_m10', eventId: 'e07', memberId: 'm10', memberName: '鄭蓓蓓', branchId: 'b1', parentUserId: 'u9', type: 'registered', operatedBy: 'parent', updatedAt: '2026-08-27' },
@@ -264,22 +266,62 @@ const FEATURES: Record<string, string[]> = {
   super_admin: ['branches', 'members', 'applications', 'events', 'registrations', 'attendance', 'meetings', 'library_import', 'notices', 'users', 'permissions', 'settings', 'plugins', 'audit', 'calendar', 'equipment'],
   troop_super: ['branches', 'members', 'applications', 'events', 'registrations', 'attendance', 'meetings', 'library_import', 'notices', 'users', 'permissions', 'settings', 'plugins', 'audit', 'calendar', 'equipment'],
   admin: ['branches', 'members', 'applications', 'events', 'registrations', 'attendance', 'meetings', 'library_import', 'notices', 'users', 'permissions', 'settings', 'plugins', 'audit', 'calendar', 'equipment'],
-  group_leader: ['members', 'applications', 'events', 'registrations', 'attendance', 'meetings', 'library_import', 'notices', 'calendar', 'equipment'],
+  // 旅長：實際職級最高，權限同管理員（管理員 = 代旅長操作嘅「旅內電腦人」）
+  troop_leader: ['branches', 'members', 'applications', 'events', 'registrations', 'attendance', 'meetings', 'library_import', 'notices', 'users', 'permissions', 'settings', 'plugins', 'audit', 'calendar', 'equipment'],
+  group_leader: ['members', 'applications', 'events', 'registrations', 'attendance', 'meetings', 'library_import', 'notices', 'calendar', 'equipment', 'permissions'],
   branch_leader: ['members', 'applications', 'events', 'registrations', 'attendance', 'meetings', 'library_import', 'notices', 'calendar', 'equipment'],
-  coach: ['events', 'registrations', 'attendance', 'library_import', 'notices'],
+  // 教練員：冇固定支部，預設權限＝家長（即冇任何管理功能）。
+  // 想佢幫手就要團長逐項＋逐支部授權（見 USER_SCOPED_GRANTS）。
+  coach: [],
   parent: [],
   member: [],
 };
 
-// 個別授權（模擬 GS UserPermissions 表）：教練員何健獲授「全旅點名」
-const USER_FEATURE_OVERRIDES: Record<string, string[]> = {
-  u_coach: ['attendance_all'],
+/**
+ * 個別授權（模擬 GS UserPermissions 表）—— 每條 = 某人 + 某支部 + 某功能。
+ * 例：童軍團（b3）團長邀請深資團團長 u_gl 去幫手點名 → 佢喺 b3 淨係點到名。
+ * branchId '*' = 全旅通行。
+ */
+const USER_SCOPED_GRANTS: Record<string, { feature: string; branchId: string }[]> = {
+  // 教練員何健：獲童軍團（b3）團長授權，喺 b3 幫手點名（淨係點名）
+  u_coach: [{ feature: 'attendance', branchId: 'b3' }],
+  // 示範：童軍團（b3）已開通「活動相簿」，所以 b3 嘅人先睇到 e00 個相簿
+  u_gl3: [{ feature: 'photos', branchId: 'b3' }],
+  u_bl: [{ feature: 'photos', branchId: 'b3' }],
+  u_m1: [{ feature: 'photos', branchId: 'b3' }],
+  u5: [{ feature: 'photos', branchId: 'b3' }],
+  // 深資團團長李偉國：被童軍團團長邀請去幫手點名 → 喺 b3 淨係點到名，
+  // 佢喺自己嘅深資團（b4）先有齊團長權限。
+  u_gl: [{ feature: 'attendance', branchId: 'b3' }],
 };
 
+/** 攤平做「功能」清單（唔理支部）—— 淨係用嚟決定卡片顯示 */
 function featuresFor(userId: string, role: string) {
   const base = FEATURES[role] || [];
-  const extra = USER_FEATURE_OVERRIDES[userId] || [];
+  const extra = (USER_SCOPED_GRANTS[userId] || []).map(g => g.feature);
   return Array.from(new Set([...base, ...extra]));
+}
+
+function grantsFor(userId: string) {
+  return USER_SCOPED_GRANTS[userId] || [];
+}
+
+const TROOP_WIDE = ['super_admin', 'troop_super', 'troop_leader', 'admin'];
+
+/**
+ * 「旅團自選功能」：預設關閉，由團長自己決定開唔開，唔屬階級權限。
+ * 團長可以為自己支部開通（即使佢自己未有），否則冇人開得到。
+ */
+const OPT_IN_FEATURES = ['photos'];
+
+/** 某人喺某支部有冇某功能（支部範圍檢查） */
+function hasFeatureInBranch(userId: string, role: string, feature: string, branchId: string) {
+  if (TROOP_WIDE.includes(role)) return true;
+  const u = store.users.find(x => x.id === userId);
+  const own = (u as any)?.branchId || '';
+  // 教練員冇固定支部，唔會自動擁有任何支部嘅預設權限
+  if (role !== 'coach' && own && branchId === own && (FEATURES[role] || []).includes(feature)) return true;
+  return grantsFor(userId).some(g => g.feature === feature && (g.branchId === '*' || g.branchId === branchId));
 }
 
 function findUser(userId: string) {
@@ -290,9 +332,22 @@ export function buildMockState(userId: string): AppState {
   const user = findUser(userId);
   const role: Role = (user?.role as Role) || 'guest';
   const branchId = user?.branchId || '';
-  const admin = ['super_admin', 'troop_super', 'admin'].includes(role);
-  const leaderAll = role === 'group_leader';
-  const leaderBranch = role === 'branch_leader' || role === 'coach';
+  const admin = ['super_admin', 'troop_super', 'troop_leader', 'admin'].includes(role);
+  // ★ 可見範圍必須同寫入權限一致：
+  //   團長／支部領袖只管自己支部 → 亦只應該睇到自己支部嘅資料
+  //   （之前團長 leaderAll=true，寫唔到別團但睇得曬別團成員同家長電話）。
+  //   教練員冇固定支部 → 睇到嘅係「獲授權嘅支部」。
+  const leaderAll = false;
+  const leaderBranch = ['group_leader', 'branch_leader', 'coach'].includes(role);
+  // 教練員冇 branchId，用授權嚟決定佢睇到邊個支部
+  const grantedBranchIds = Array.from(new Set(
+    grantsFor(userId).map(g => g.branchId).filter(b => b && b !== '*')
+  ));
+  const wildcard = grantsFor(userId).some(g => g.branchId === '*');
+  const visibleBranches = wildcard
+    ? store.patrols.map(p => p.branchId)
+    : Array.from(new Set([...(branchId ? [branchId] : []), ...grantedBranchIds]));
+  const inScope = (b?: string) => !b || visibleBranches.includes(b);
   const isMember = role === 'member';
   const isParent = role === 'parent';
   const guest = !user;
@@ -311,29 +366,33 @@ export function buildMockState(userId: string): AppState {
 
   // 成員
   if (admin || leaderAll) out.members = [...store.members];
-  else if (leaderBranch) out.members = store.members.filter(m => m.branchId === branchId);
+  else if (leaderBranch) out.members = store.members.filter(m => inScope(m.branchId));
   else if (isMember) out.members = store.members.filter(m => m.id === user!.memberId);
   else if (isParent) out.members = store.members.filter(m => (user!.childMemberIds || []).includes(m.id));
 
   // 物資
   if (user) out.equipment = store.equipment;
   if (admin || leaderAll) out.equipmentLoans = [...store.equipmentLoans];
-  else if (leaderBranch) out.equipmentLoans = store.equipmentLoans.filter(l => !l.branchId || l.branchId === branchId || l.memberId === userId);
+  else if (leaderBranch) out.equipmentLoans = store.equipmentLoans.filter(l => inScope(l.branchId) || l.memberId === userId);
   else if (isMember) out.equipmentLoans = store.equipmentLoans.filter(l => l.memberId === userId || l.memberId === (user!.memberId || ''));
   else if (isParent) out.equipmentLoans = store.equipmentLoans.filter(l => (user!.childMemberIds || []).includes(l.memberId));
 
   // 使用者
   if (admin || leaderAll) out.users = [...store.users];
-  else if (leaderBranch) out.users = store.users.filter(u => u.branchId === branchId || !u.branchId);
+  else if (leaderBranch) out.users = store.users.filter(u => inScope(u.branchId));
   else if (isMember || isParent) out.users = store.users.filter(u => u.id === user!.id);
 
   // 活動
   const visibleEvents = (e: typeof store.events[number]) =>
     guest ? e.status === 'published'
       : admin || leaderAll ? true
-      : leaderBranch ? (e.scope === 'branch' ? e.branchId === branchId : e.status === 'published')
-      : isMember ? e.status === 'published' && (e.scope === 'troop' || e.branchId === memberBranch)
-      : isParent ? e.status === 'published' && (e.scope === 'troop' || (user!.childMemberIds || []).some(id => { const m = store.members.find(mm => mm.id === id); return m && m.branchId === e.branchId; }))
+      : leaderBranch ? (e.status !== 'archived' && (e.scope === 'branch' ? inScope(e.branchId) : e.status === 'published'))
+      // 成員／家長：睇到已發布活動；另外「已封存但自己曾經報過名」嘅活動亦要睇到，
+      // 否則佢哋會突然搵唔返自己報咗名／畀咗錢嗰個活動。
+      : isMember ? (e.status === 'published' && (e.scope === 'troop' || e.branchId === memberBranch))
+          || (e.status === 'archived' && store.replies.some(r => r.eventId === e.id && (r.memberId === user!.memberId || r.memberId === user!.id)))
+      : isParent ? (e.status === 'published' && (e.scope === 'troop' || (user!.childMemberIds || []).some(id => { const m = store.members.find(mm => mm.id === id); return m && m.branchId === e.branchId; })))
+          || (e.status === 'archived' && store.replies.some(r => r.eventId === e.id && (user!.childMemberIds || []).includes(r.memberId)))
       : false;
   out.events = store.events.filter(visibleEvents);
 
@@ -345,14 +404,15 @@ export function buildMockState(userId: string): AppState {
   else if (isParent) out.replies = store.replies.filter(r => (user!.childMemberIds || []).includes(r.memberId));
 
   // 分隊
-  if (admin || leaderAll || leaderBranch) out.patrols = leaderBranch ? store.patrols.filter(p => p.branchId === branchId) : [...store.patrols];
+  if (admin || leaderAll || leaderBranch) out.patrols = leaderBranch ? store.patrols.filter(p => inScope(p.branchId)) : [...store.patrols];
   else if (isMember) out.patrols = [...store.patrols];
 
-  // 申請
+  // 申請：團長／支部領袖睇自己支部嘅（教練員要有授權先）
   if (admin || leaderAll) out.applications = [...store.applications];
+  else if (leaderBranch) out.applications = store.applications.filter(a => inScope(a.branchId));
 
-  // 通告 / PDF
-  if (admin || leaderAll) {
+  // 通告 / PDF（領袖睇曬，包括未發布嘅草稿）
+  if (admin || leaderAll || leaderBranch) {
     out.bookmarks = [...store.bookmarks];
     out.announcementPdfs = [...store.announcementPdfs];
     out.announcements = [...store.announcements];
@@ -372,8 +432,8 @@ export function buildMockState(userId: string): AppState {
     out.regularMeetings = [...store.regularMeetings];
     out.cancelledMeetings = [...store.cancelledMeetings];
   } else if (leaderBranch) {
-    out.regularMeetings = store.regularMeetings.filter(r => r.branchId === branchId);
-    out.cancelledMeetings = store.cancelledMeetings.filter(c => c.branchId === branchId);
+    out.regularMeetings = store.regularMeetings.filter(r => inScope(r.branchId));
+    out.cancelledMeetings = store.cancelledMeetings.filter(c => inScope(c.branchId));
   } else {
     const bs = isMember ? [memberBranch] : isParent ? (user!.childMemberIds || []).map(id => store.members.find(m => m.id === id)?.branchId || '').filter(Boolean) : [];
     out.regularMeetings = store.regularMeetings.filter(r => bs.includes(r.branchId));
@@ -388,7 +448,7 @@ export function buildMockState(userId: string): AppState {
   }
 
   // 審計
-  if (['super_admin', 'troop_super', 'admin'].includes(role)) out.audits = [...store.audits];
+  if (['super_admin', 'troop_super', 'troop_leader', 'admin'].includes(role)) out.audits = [...store.audits];
 
   // 最新消息：登入後所有人都見到（最多 3 條）
   if (!guest) out.latestNews = [...store.latestNews];
@@ -454,10 +514,16 @@ function attFor(date: string, sessionType: string, branchId: string, eventId: st
 function attendanceBranchScope(p: Record<string, any>, requestedBranch: string): { branchId?: string; error?: string } {
   const user = findUser(String(p.userId || p.operatedBy || ''));
   const role = user?.role || 'guest';
-  if (['super_admin', 'troop_super', 'admin', 'group_leader'].includes(role)) return { branchId: requestedBranch || user?.branchId || '' };
-  if (['branch_leader', 'coach'].includes(role)) {
-    if (featuresFor(user!.id, role).includes('attendance_all')) return { branchId: requestedBranch || user?.branchId || '' };
-    return { branchId: user?.branchId || '' };
+  // 旅長／管理員／超管：全旅通行
+  if (TROOP_WIDE.includes(role)) return { branchId: requestedBranch || user?.branchId || '' };
+  // 團長／支部領袖／教練員：只限自己支部，或獲該支部授權（scoped grant）
+  if (['group_leader', 'branch_leader', 'coach'].includes(role)) {
+    const own = user?.branchId || '';
+    const target = requestedBranch || own;
+    if (!target) return { error: '未設定支部，請聯絡管理員。' };
+    if (hasFeatureInBranch(user!.id, role, 'attendance', target)) return { branchId: target };
+    if (featuresFor(user!.id, role).includes('attendance_all')) return { branchId: target };
+    return { error: `你未獲授權為該支部點名，請由該支部團長授權。` };
   }
   if (role === 'member') return { branchId: store.members.find(m => m.id === user?.memberId)?.branchId || '' };
   if (role === 'parent') {
@@ -503,6 +569,13 @@ function handleSaveAttendance(p: Record<string, any>) {
   const date = String(p.date || '');
   const sessionType = p.sessionType === 'activity' ? 'activity' : 'meeting';
   const eventId = String(p.eventId || '');
+  // ★ 寫入（點名）同讀取（查自己出席紀錄）唔可以共用同一個 scope 檢查：
+  //   家長／成員讀得自己嗰支部嘅紀錄，但絕對唔可以寫。
+  const writer = findUser(String(p.operatedBy || p.userId || ''));
+  const wRole = String((writer as any)?.role || '');
+  if (!['super_admin', 'troop_super', 'troop_leader', 'admin', 'group_leader', 'branch_leader', 'coach'].includes(wRole)) {
+    return { success: false, error: '只有領袖可以點名。' };
+  }
   const scope = attendanceBranchScope(p, String(p.branchId || ''));
   if (scope.error) return { success: false, error: scope.error };
   const branchId = scope.branchId;
@@ -676,6 +749,101 @@ function logAudit(userId: string, action: string, entity: string, entityId: stri
   if (store.audits.length > 300) store.audits = store.audits.slice(0, 300);
 }
 
+
+/**
+ * 判斷活動係咪「區地域總會活動」。
+ * 必須同 lib/store.ts 的 eventCategory 邏輯一致：
+ * 新資料睇 category；舊資料要按 kind / source 推斷（例如 source='圖書館轉入'）。
+ */
+function isDistrictEvent(e: { kind?: string; source?: string; category?: string } | null | undefined): boolean {
+  if (!e) return false;
+  if (e.category === 'district') return true;
+  if (e.category === 'self') return false;
+  if (e.kind === 'notice_troop_participation') return true;
+  return /圖書館|地域|區會|區地域|總會/.test(e.source || '');
+}
+
+
+/**
+ * ★ 伺服器端角色驗證（同 GS 端 ACTION_REQUIRED_FEATURE_ 一致）
+ *
+ * 點解要有：前端隱藏咗個掣，只係「唔畀你撩到」，但攻擊者可以直接用
+ * curl / F12 重放個 request，完全繞過 UI。所以高危動作必須喺後台再驗一次身份。
+ */
+const MOCK_ACTION_FEATURE: Record<string, string> = {
+  createUser: 'users', deleteUser: 'users', toggleUser: 'users',
+  updateUserRole: 'users', updateUserField: 'users',
+  batchCreateUsers: 'users', batchCreateMembers: 'members',
+  // 授權：團長喺自己支部就可以授權（唔需要 users＝帳號管理權），
+  // 但 handleGrantFeature 會再檢查「只可授自己支部」同「唔可以授出自己都冇嘅功能」。
+  grantFeature: 'permissions', revokeFeature: 'permissions', updateUserPermissions: 'permissions',
+  createMember: 'members', updateMember: 'members', deleteMember: 'members', linkParent: 'members',
+  decideApplication: 'applications',
+  createPatrol: 'branches', togglePatrol: 'branches', deletePatrol: 'branches',
+  createEvent: 'events', updateEvent: 'events', deleteEvent: 'events',
+  archiveEvent: 'events', reopenEvent: 'events',
+  togglePaid: 'registrations', confirmPayment: 'registrations',
+  updateConfig: 'settings', updateSettings: 'settings',
+  saveConfig: 'settings', savePluginSetting: 'plugins', togglePluginStatus: 'plugins',
+  publishEvent: 'events', restoreEvent: 'events',
+  createMeeting: 'meetings', updateMeeting: 'meetings', deleteMeeting: 'meetings', publishMeeting: 'meetings',
+  createRegularMeeting: 'calendar', updateRegularMeeting: 'calendar',
+  deleteRegularMeeting: 'calendar', toggleRegularMeeting: 'calendar', toggleMeetingCancel: 'calendar',
+  createEquipment: 'equipment', updateEquipment: 'equipment', deleteEquipment: 'equipment',
+  adjustEquipmentQty: 'equipment', decideEquipmentLoan: 'equipment', returnEquipmentLoan: 'equipment',
+};
+
+function checkMockPermission(action: string, p: Record<string, any>): { success: false; error: string } | null {
+  const needed = MOCK_ACTION_FEATURE[action];
+  if (!needed) return null;
+  const operator = store.users.find(u => u.id === String(p.operatedBy || ''));
+  if (!operator) {
+    return { success: false, error: '未能確認操作者身份，請重新登入。' };
+  }
+  const role = String((operator as any).role || '');
+  if (TROOP_WIDE.includes(role)) return null;
+
+  // ★ 支部範圍檢查：唔單止睇「有冇呢個功能」，仲要睇「喺邊個支部有」。
+  //   深資團團長就算喺自己團有 members 權限，都唔可以攞去改童軍團嘅成員，
+  //   除非童軍團團長specifically授咗權。
+  const target = resolveTargetBranch(action, p) || String((operator as any).branchId || '');
+  if (!hasFeatureInBranch(operator.id, role, needed, target)) {
+    const own = String((operator as any).branchId || '');
+    if (target && own && target !== own) {
+      return { success: false, error: `權限不足：你未獲授權管理該支部的「${needed}」。請由該支部團長授權。` };
+    }
+    return { success: false, error: `權限不足：此操作需要「${needed}」權限。` };
+  }
+  return null;
+}
+
+/** 由 request 參數推斷今次操作嘅目標支部（用嚟做跨支部檢查） */
+function resolveTargetBranch(action: string, p: Record<string, any>): string {
+  if (p.branchId) return String(p.branchId);
+  const mem = store.members.find(m => m.id === String(p.memberId || ''));
+  if (mem) return String(mem.branchId || '');
+  const usr = store.users.find(u => u.id === String(p.userId || ''));
+  if (usr) return String((usr as any).branchId || '');
+  const ev = store.events.find(e => e.id === String(p.eventId || ''));
+  if (ev) return String((ev as any).branchId || '');
+  const pt = store.patrols.find(x => x.id === String(p.patrolId || ''));
+  if (pt) return String((pt as any).branchId || '');
+  return '';
+}
+
+
+/**
+ * 相簿功能預設關閉（相片涉及小朋友私隱）。
+ * 前端會鎖住個欄位，但 request 可以繞過 UI，所以後台要再驗一次。
+ */
+function albumAllowed(operatedBy: string, url: string): string {
+  if (!url) return '';
+  const u = store.users.find(x => x.id === operatedBy);
+  const role = String((u as any)?.role || '');
+  if (!featuresFor(operatedBy, role).includes('photos')) return '';
+  return url;
+}
+
 function handleMutate(action: string, p: Record<string, any>) {
   const ob = String(p.operatedBy || '');
   const findIdx = (arr: any[], idField: string, id: string) => arr.findIndex(x => x[idField] === id);
@@ -836,14 +1004,51 @@ function handleMutate(action: string, p: Record<string, any>) {
     case 'updatePassword': return S(ob);
     case 'updateUserPermissions':
     case 'grantFeature':
-    case 'revokeFeature': return S(ob);
+    case 'revokeFeature': {
+      // ★ 授權只可以開自己支部 —— 童軍團團長邀請人幫手，只可以邀請入童軍團，
+      //   唔可以順手幫深資團開權限。
+      const actor = findUser(ob);
+      const actorRole = String((actor as any)?.role || '');
+      const actorBranch = String((actor as any)?.branchId || '');
+      let scope = String(p.branchId || '');
+      if (!TROOP_WIDE.includes(actorRole)) {
+        if (!scope) scope = actorBranch;
+        if (scope !== actorBranch) {
+          return { success: false, error: '你只可以授權自己支部的權限，其他支部須由該支部團長授權。' };
+        }
+        // 唔可以授出自己都冇嘅功能。
+        // 例外：OPT_IN_FEATURES 屬「旅團自選功能」（唔係階級權限），
+        // 團長可以為自己支部開通，否則會出現「冇人開得到」嘅死結。
+        const feat = String(p.feature || '');
+        if (feat && !OPT_IN_FEATURES.includes(feat) && !hasFeatureInBranch(ob, actorRole, feat, actorBranch)) {
+          return { success: false, error: '你沒有權限授權此功能給他人。' };
+        }
+        if (OPT_IN_FEATURES.includes(feat) && !['group_leader', 'branch_leader'].includes(actorRole)) {
+          return { success: false, error: '只有團長／支部領袖或管理員可以開通此功能。' };
+        }
+      } else if (!scope) {
+        scope = '*';
+      }
+      const tid = String(p.targetUserId || p.userId || '');
+      if (tid && p.feature) {
+        const list = USER_SCOPED_GRANTS[tid] || (USER_SCOPED_GRANTS[tid] = []);
+        const feat = String(p.feature);
+        const idx = list.findIndex(g => g.feature === feat && g.branchId === scope);
+        if (action === 'revokeFeature' || p.granted === false) {
+          if (idx >= 0) list.splice(idx, 1);
+        } else if (idx < 0) {
+          list.push({ feature: feat, branchId: scope });
+        }
+      }
+      return S(ob);
+    }
     case 'getUserFeatures': {
       const tu = findUser(String(p.targetUserId || ''));
       const role = tu?.role || 'member';
       const defaults = FEATURES[role] || [];
       const overrides: Record<string, boolean> = {};
-      (USER_FEATURE_OVERRIDES[tu?.id || ''] || []).forEach(f => { overrides[f] = true; });
-      const allFeatures = ['branches', 'members', 'applications', 'events', 'registrations', 'attendance', 'attendance_all', 'library_import', 'notices', 'users', 'settings', 'meetings', 'equipment', 'plugins', 'audit', 'calendar'];
+      grantsFor(tu?.id || '').forEach(g => { overrides[g.feature] = true; });
+      const allFeatures = ['branches', 'members', 'applications', 'events', 'registrations', 'attendance', 'attendance_all', 'library_import', 'notices', 'users', 'permissions', 'settings', 'meetings', 'equipment', 'plugins', 'audit', 'calendar', 'photos'];
       return {
         success: true,
         role,
@@ -874,6 +1079,9 @@ function handleMutate(action: string, p: Record<string, any>) {
         category, status: p.status || 'draft', source,
         targetMemberIds: [], fee: String(p.fee || ''), paymentUrl: String(p.paymentUrl || ''),
         dutyPatrol: String(p.dutyPatrol || ''), calendarTag: String(p.calendarTag || ''),
+        noticeUrl: String(p.noticeUrl || ''), noticeFileName: String(p.noticeFileName || ''),
+        albumUrl: albumAllowed(ob, String(p.albumUrl || '')),
+        inputMode: (p.inputMode || 'form') as any,
       });
       logAudit(ob, 'createEvent', '活動', id, String(p.title || ''));
       return S(ob);
@@ -881,7 +1089,10 @@ function handleMutate(action: string, p: Record<string, any>) {
     case 'updateEvent': {
       const i = findIdx(store.events, 'id', String(p.eventId || ''));
       if (i >= 0) {
-        Object.assign(store.events[i], Object.fromEntries(Object.entries(p).filter(([k]) => !['action', 'operatedBy', 'eventId'].includes(k))));
+        const patch = Object.fromEntries(Object.entries(p).filter(([k]) => !['action', 'operatedBy', 'eventId'].includes(k)));
+        // 相簿功能未開通就唔准寫入 albumUrl（繞過 UI 都唔得）
+        if ('albumUrl' in patch) patch.albumUrl = albumAllowed(ob, String(patch.albumUrl || ''));
+        Object.assign(store.events[i], patch);
         if (p.category === 'district') store.events[i].kind = 'notice_troop_participation';
         if (p.category === 'self') store.events[i].kind = 'activity';
         logAudit(ob, 'updateEvent', '活動', String(p.eventId || ''), String(p.title || store.events[i].title || ''));
@@ -890,8 +1101,62 @@ function handleMutate(action: string, p: Record<string, any>) {
     }
     case 'publishEvent': { const i = findIdx(store.events, 'id', String(p.eventId || '')); if (i >= 0) { store.events[i].status = 'published'; logAudit(ob, 'publishEvent', '活動', String(p.eventId || ''), store.events[i].title || ''); } return S(ob); }
     case 'deleteEvent': store.events = store.events.filter(e => e.id !== p.eventId); store.replies = store.replies.filter(r => r.eventId !== p.eventId); logAudit(ob, 'deleteEvent', '活動', String(p.eventId || ''), String(p.title || '')); return S(ob);
+    /** 過期處理：自行舉辦 → 封存成「過期通告」；區地域總會（外部）→ 直接刪除 */
+    case 'archiveEvent': {
+      const i = findIdx(store.events, 'id', String(p.eventId || ''));
+      if (i >= 0) {
+        const ev = store.events[i];
+        const isDistrict = isDistrictEvent(ev);
+        const replyCount = store.replies.filter(r => r.eventId === ev.id).length;
+        if (isDistrict) {
+          store.events = store.events.filter(e => e.id !== ev.id);
+          store.replies = store.replies.filter(r => r.eventId !== ev.id);
+          logAudit(ob, 'deleteExpiredEvent', '活動', ev.id, `${ev.title}（外部通告，過期直接刪除，連帶 ${replyCount} 筆回覆）`);
+        } else {
+          // ★ 只改狀態，報名／付款紀錄一律保留（家長／成員仍可查返自己嗰筆）
+          ev.status = 'archived' as any;
+          logAudit(ob, 'archiveEvent', '活動', ev.id, `${ev.title}（放入過期通告，保留 ${replyCount} 筆報名紀錄）`);
+        }
+      }
+      return S(ob);
+    }
+    /** 重開報名：過期／已封存嘅活動重新開放（遲咗報但領袖想畀佢報） */
+    case 'reopenEvent': {
+      const i = findIdx(store.events, 'id', String(p.eventId || ''));
+      if (i >= 0) {
+        store.events[i].status = 'published';
+        store.events[i].lateRegistration = true as any;
+        logAudit(ob, 'reopenEvent', '活動', store.events[i].id, `${store.events[i].title}（重開報名／容許遲交）`);
+      }
+      return S(ob);
+    }
+    case 'restoreEvent': {
+      const i = findIdx(store.events, 'id', String(p.eventId || ''));
+      if (i >= 0) { store.events[i].status = 'published'; logAudit(ob, 'restoreEvent', '活動', store.events[i].id, store.events[i].title || ''); }
+      return S(ob);
+    }
     // 報名
     case 'setReply': {
+      // 區地域總會活動＝純通告，旅團唔代收報名（想報自己去報）→ 唔接受回覆
+      const tgtEv = store.events.find(e => e.id === p.eventId);
+      if (tgtEv && isDistrictEvent(tgtEv)) {
+        return { success: false, error: '區地域總會活動為通告性質，旅團不代收報名，請按通告連結自行報名。' };
+      }
+      // ★ 18 歲以下：參加／不參加必須由家長代做（同 GS handleSetReply_ 一致）
+      //   前端個掣鎖咗，但後台一樣要擋，因為個 request 可以繞過 UI 直接發。
+      if (p.type === 'registered' || p.type === 'declined') {
+        const tgtMem = store.members.find(m => m.id === p.memberId);
+        const age = Number(tgtMem?.age);
+        if (tgtMem && Number.isFinite(age) && age < 18) {
+          const op = store.users.find(u => u.id === String(p.operatedBy || ''));
+          const opRole = String((op as any)?.role || '');
+          const isParentOrLeader = opRole === 'parent' || opRole === 'admin' || opRole === 'super_admin'
+            || opRole === 'group_leader' || opRole === 'branch_leader' || opRole === 'coach';
+          if (!isParentOrLeader) {
+            return { success: false, error: '18歲以下成員需由家長代為操作參加 / 不參加' };
+          }
+        }
+      }
       const replyId = `${p.eventId}_${p.memberId}`;
       const m = store.members.find(x => x.id === p.memberId);
       const i = findIdx(store.replies, 'id', replyId);
@@ -900,7 +1165,32 @@ function handleMutate(action: string, p: Record<string, any>) {
       return S(ob);
     }
     case 'cancelReply': { const i = findIdx(store.replies, 'id', `${p.eventId}_${p.memberId}`); if (i >= 0) store.replies[i].cancelled = !store.replies[i].cancelled; return S(ob); }
-    case 'togglePaid': { const i = findIdx(store.replies, 'id', `${p.eventId}_${p.memberId}`); if (i >= 0) store.replies[i].paid = !store.replies[i].paid; return S(ob); }
+    case 'togglePaid': {
+      const payEv = store.events.find(e => e.id === p.eventId);
+      if (payEv && isDistrictEvent(payEv)) {
+        return { success: false, error: '區地域總會活動不經旅團收費，無法標記付款。' };
+      }
+      const i = findIdx(store.replies, 'id', `${p.eventId}_${p.memberId}`);
+      if (i >= 0) {
+        store.replies[i].paid = !store.replies[i].paid;
+        // 家長取消「已付款」→ 領袖核實同時失效
+        if (!store.replies[i].paid) { store.replies[i].paymentConfirmed = false; store.replies[i].paymentConfirmedBy = ''; store.replies[i].paymentConfirmedAt = ''; }
+      }
+      return S(ob);
+    }
+    /** 領袖核實收款（家長端會睇到「領袖已確認收款」） */
+    case 'confirmPayment': {
+      const i = findIdx(store.replies, 'id', `${p.eventId}_${p.memberId}`);
+      if (i >= 0) {
+        const on = String(p.confirmed) !== 'false';
+        store.replies[i].paymentConfirmed = on;
+        store.replies[i].paymentConfirmedBy = on ? ob : '';
+        store.replies[i].paymentConfirmedAt = on ? new Date().toISOString().slice(0, 10) : '';
+        if (on) store.replies[i].paid = true;
+        logAudit(ob, 'confirmPayment', '報名', String(p.eventId || ''), `${p.memberId} confirmed=${on}`);
+      }
+      return S(ob);
+    }
     // 申請
     case 'decideApplication': {
       const i = findIdx(store.applications, 'id', String(p.applicationId || ''));
@@ -1048,6 +1338,10 @@ export function handleMockRequest(action: string, params: Record<string, any> = 
     persist();
     return { success: true, message: '演示資料已重設。', state: buildMockState('') };
   }
+
+  // ★ 寫入之前先驗身份（UI 隱藏唔等於安全）
+  const denied = checkMockPermission(action, p);
+  if (denied) return denied;
 
   // 其餘一律視為寫入
   isWrite = true;
