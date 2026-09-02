@@ -5,6 +5,7 @@ import ConsoleHeader from '@/components/ui/ConsoleHeader';
 import Panel from '@/components/ui/Panel';
 import EmptyState from '@/components/ui/EmptyState';
 import EventReplyRow from '@/components/ui/EventReplyRow';
+import AlbumEmbed from '@/components/ui/AlbumEmbed';
 import { AppState, loadStateSlice, replyStatus, eventCategory, visibleEventsForMember } from '@/lib/store';
 import { apiSetReply, apiTogglePaid } from '@/lib/api';
 import { getSession } from '@/lib/session';
@@ -113,7 +114,14 @@ export default function Parent(){
                         loading={loadingId === e.id + c.id}
                         onAct={t => respond(e.id, c.id, t)}
                         footer={
-                          isDistrict ? (
+                          <>
+                          {/* 📷 活動相簿：唔理報唔報名都睇到（活動完咗之後相簿先最有價值） */}
+                          {e.albumUrl && (
+                            <div className="mb-2">
+                              <AlbumEmbed url={e.albumUrl} title={`${e.title}・活動相簿`} />
+                            </div>
+                          )}
+                          {isDistrict ? (
                             <p className="text-sm text-slate-500 m-0 leading-relaxed">
                               ℹ️ 此為區／地域／總會活動通告，旅團不代收報名及費用。有興趣請按上面的通告連結自行報名。
                             </p>
@@ -152,7 +160,8 @@ export default function Parent(){
                                 </span>
                               </div>
                             </div>
-                          ) : null
+                          ) : null}
+                          </>
                         }
                       />
                     );

@@ -117,7 +117,7 @@ const seed: AppState = {
     { id: 'u_m8', name: '周嘉欣', email: 'm08@demo.scout', role: 'member', branchId: 'b4', memberId: 'm08', approved: true },
   ],
   events: [
-    { id: 'e00', title: '八月童軍技能日', date: '2026-08-16', location: '旅團部', scope: 'branch', branchId: 'b3', kind: 'activity', status: 'published', source: '手動新增', targetMemberIds: ['m01', 'm02', 'm03', 'm04'], fee: '0' },
+    { id: 'e00', title: '八月童軍技能日', date: '2026-08-16', location: '旅團部', scope: 'branch', branchId: 'b3', kind: 'activity', status: 'published', source: '手動新增', targetMemberIds: ['m01', 'm02', 'm03', 'm04'], fee: '0' , albumUrl: 'https://drive.google.com/drive/folders/1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs' },
     { id: 'e01', title: '九月山徑健行', date: '2026-09-12', location: '大帽山', scope: 'branch', branchId: 'b3', kind: 'activity', status: 'published', source: '手動新增', targetMemberIds: ['m01', 'm02', 'm03', 'm04'], fee: '50', paymentUrl: 'https://pay.example.com/e01' },
     { id: 'e02', title: '童軍週末營(兩日一夜)', date: '2026-10-03', location: '青年會營地', scope: 'troop', kind: 'activity', status: 'published', source: '手動新增', targetMemberIds: ['m01', 'm02', 'm03', 'm04', 'm08', 'm09', 'm11', 'm12'], fee: '300', paymentUrl: 'https://pay.example.com/e02' },
     { id: 'e03', title: '十一區運動會', date: '2026-10-01', location: '東區公園', scope: 'branch', branchId: 'b2', kind: 'activity', status: 'published', source: '圖書館轉入', targetMemberIds: [], fee: '80', noticeUrl: 'https://example.org/circular/district-sports-day.pdf' },
@@ -1051,6 +1051,7 @@ function handleMutate(action: string, p: Record<string, any>) {
         targetMemberIds: [], fee: String(p.fee || ''), paymentUrl: String(p.paymentUrl || ''),
         dutyPatrol: String(p.dutyPatrol || ''), calendarTag: String(p.calendarTag || ''),
         noticeUrl: String(p.noticeUrl || ''), noticeFileName: String(p.noticeFileName || ''),
+        albumUrl: String(p.albumUrl || ''),
         inputMode: (p.inputMode || 'form') as any,
       });
       logAudit(ob, 'createEvent', '活動', id, String(p.title || ''));

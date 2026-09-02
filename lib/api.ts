@@ -287,13 +287,13 @@ export function apiUpdateMember(p: Record<string, string>) {
 
 // ==================== 活動 / 報名 ====================
 
-export function apiCreateEvent(p: { title: string; scope?: string; branchId?: string; date?: string; location?: string; kind?: string; status?: string; source?: string; fee?: string; paymentUrl?: string; dutyPatrol?: string; targetMemberIds?: string; category?: string; calendarTag?: string; noticeUrl?: string; noticeFileName?: string; inputMode?: string }) {
+export function apiCreateEvent(p: { title: string; scope?: string; branchId?: string; date?: string; location?: string; kind?: string; status?: string; source?: string; fee?: string; paymentUrl?: string; dutyPatrol?: string; targetMemberIds?: string; category?: string; calendarTag?: string; noticeUrl?: string; noticeFileName?: string; albumUrl?: string; inputMode?: string }) {
   return apiMutate('createEvent', p as any);
 }
 export function apiPublishEvent(eventId: string) {
   return apiMutate('publishEvent', { eventId });
 }
-export function apiUpdateEvent(p: { eventId: string; title?: string; date?: string; location?: string; scope?: string; branchId?: string; fee?: string; paymentUrl?: string; dutyPatrol?: string; status?: string; category?: string; calendarTag?: string; noticeUrl?: string; noticeFileName?: string; inputMode?: string }) {
+export function apiUpdateEvent(p: { eventId: string; title?: string; date?: string; location?: string; scope?: string; branchId?: string; fee?: string; paymentUrl?: string; dutyPatrol?: string; status?: string; category?: string; calendarTag?: string; noticeUrl?: string; noticeFileName?: string; albumUrl?: string; inputMode?: string }) {
   return apiMutate('updateEvent', p as any);
 }
 export function apiDeleteEvent(eventId: string) {

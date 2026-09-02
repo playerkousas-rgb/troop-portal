@@ -6,6 +6,7 @@ import ToolGroup, { ConsoleTool } from '@/components/ui/ToolGroup';
 import Panel from '@/components/ui/Panel';
 import EmptyState from '@/components/ui/EmptyState';
 import EventReplyRow from '@/components/ui/EventReplyRow';
+import AlbumEmbed from '@/components/ui/AlbumEmbed';
 import PluginIframeCard from '@/components/PluginCard';
 import { AppState, loadStateSlice, visibleEventsForMember, replyStatus, eventCategory } from '@/lib/store';
 import { apiSetReply } from '@/lib/api';
@@ -105,11 +106,20 @@ export default function Member(){
                   ]}
                   loading={!!loadingId && loadingId.startsWith(e.id)}
                   onAct={t => act(e.id, t)}
-                  footer={isDistrict ? (
+                  footer={
+                    <>
+                    {e.albumUrl && (
+                      <div className="mb-2">
+                        <AlbumEmbed url={e.albumUrl} title={`${e.title}・活動相簿`} />
+                      </div>
+                    )}
+                    {isDistrict ? (
                     <p className="text-sm text-slate-500 m-0 leading-relaxed">
                       ℹ️ 此為區／地域／總會活動通告，旅團不代收報名及費用。有興趣請按上面的通告連結自行報名。
                     </p>
-                  ) : undefined}
+                  ) : null}
+                    </>
+                  }
                 />
               );
             })

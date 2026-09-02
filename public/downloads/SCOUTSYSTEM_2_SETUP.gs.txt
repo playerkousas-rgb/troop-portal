@@ -266,7 +266,7 @@ function getInitialSheets_() {
       ['meetingId', 'title', 'type', 'date', 'startTime', 'endTime', 'location', 'targetRoles', 'branchId', 'url', 'status', 'calendarTag', 'createdBy', 'createdAt', 'note']
     ],
     Events: [
-      ['eventId', 'title', 'scope', 'branchId', 'date', 'location', 'kind', 'status', 'source', 'category', 'calendarTag', 'fee', 'paymentUrl', 'dutyPatrol', 'noticeUrl', 'noticeFileName', 'inputMode', 'lateRegistration', 'targetMemberIds', 'createdBy', 'createdAt', 'note']
+      ['eventId', 'title', 'scope', 'branchId', 'date', 'location', 'kind', 'status', 'source', 'category', 'calendarTag', 'fee', 'paymentUrl', 'dutyPatrol', 'noticeUrl', 'noticeFileName', 'albumUrl', 'inputMode', 'lateRegistration', 'targetMemberIds', 'createdBy', 'createdAt', 'note']
     ],
     EventReplies: [
       ['replyId', 'eventId', 'memberId', 'memberName', 'branchId', 'parentUserId', 'type', 'operatedBy', 'paid', 'paymentConfirmed', 'paymentConfirmedBy', 'paymentConfirmedAt', 'cancelled', 'createdAt', 'updatedAt', 'notes']
@@ -859,6 +859,7 @@ function mapEvents_() {
       fee: getField_(e, 'fee') || '',
       paymentUrl: getField_(e, 'paymentUrl') || '', dutyPatrol: getField_(e, 'dutyPatrol') || '',
       noticeUrl: getField_(e, 'noticeUrl') || '', noticeFileName: getField_(e, 'noticeFileName') || '',
+      albumUrl: getField_(e, 'albumUrl') || '',
       inputMode: getField_(e, 'inputMode') || 'form',
       lateRegistration: parseBool_(getField_(e, 'lateRegistration')),
       targetMemberIds: targets
@@ -2731,7 +2732,7 @@ function handleCreateEvent_(p) {
     status: p.status || 'draft', source: source, category: category,
     calendarTag: p.calendarTag || '', fee: p.fee || '',
     paymentUrl: p.paymentUrl || '', dutyPatrol: p.dutyPatrol || '',
-    noticeUrl: p.noticeUrl || '', noticeFileName: p.noticeFileName || '', inputMode: p.inputMode || 'form',
+    noticeUrl: p.noticeUrl || '', noticeFileName: p.noticeFileName || '', albumUrl: p.albumUrl || '', inputMode: p.inputMode || 'form',
     targetMemberIds: targets, createdBy: p.operatedBy || '', createdAt: now_(), note: p.note || ''
   });
   writeAudit_(p.operatedBy || 'system', 'createEvent', 'Events', id, p.title || '');
@@ -2745,7 +2746,7 @@ function handlePublishEvent_(p) {
 }
 
 function handleUpdateEvent_(p) {
-  var fields = ['title', 'scope', 'branchId', 'date', 'location', 'kind', 'status', 'source', 'category', 'calendarTag', 'fee', 'paymentUrl', 'dutyPatrol', 'noticeUrl', 'noticeFileName', 'inputMode', 'targetMemberIds', 'note'];
+  var fields = ['title', 'scope', 'branchId', 'date', 'location', 'kind', 'status', 'source', 'category', 'calendarTag', 'fee', 'paymentUrl', 'dutyPatrol', 'noticeUrl', 'noticeFileName', 'albumUrl', 'inputMode', 'targetMemberIds', 'note'];
   var changed = [];
   fields.forEach(function (f) {
     if (p[f] !== undefined && p[f] !== null) {
