@@ -15,6 +15,7 @@ const FEATURE_LABELS: Record<string,string> = {
   notices: '通告管理', users: '使用者管理', permissions: '授權其他人（限自己支部）', settings: '系統設定', meetings: '會議管理',
   equipment: '物資管理', plugins: '單位元件設定',
   audit: '操作紀錄', calendar: '行事曆管理',
+  photos: '活動相簿（預設關閉，涉及私隱）',
 };
 
 type BulkRow = {

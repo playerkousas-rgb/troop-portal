@@ -1499,7 +1499,25 @@ function visibleBranchesFor_(userId, role, ownBranchId) {
   return out;
 }
 
+
+/**
+ * 相簿預設關閉（相片涉及小朋友私隱）→ 冇 photos 權限就唔准寫 albumUrl。
+ * 前端已鎖住個欄位，但 request 可以繞過 UI，所以後台再驗一次。
+ */
+function albumAllowed_(operatedBy, url) {
+  if (!url) return '';
+  var users = readTable_('Users');
+  var actor = users.filter(function (u) { return getField_(u, 'userId') === operatedBy; })[0];
+  if (!actor) return '';
+  var role = String(getField_(actor, 'role') || '').toLowerCase();
+  if (getUserFeatures_(operatedBy, role).indexOf('photos') < 0) return '';
+  return url;
+}
+
 var TROOP_WIDE_ROLES_ = ['super_admin', 'troop_super', 'troop_leader', 'admin'];
+
+/** 旅團自選功能：預設關閉，團長可為自己支部開通（唔屬階級權限） */
+var OPT_IN_FEATURES_ = ['photos'];
 
 /**
  * 某人喺某支部有冇某項功能。
@@ -1564,10 +1582,15 @@ function handleGrantFeature_(p) {
       if (grantBranch !== opBranch) {
         return { success: false, error: '你只可以授權自己支部的權限，其他支部須由該支部團長授權。' };
       }
-      // 亦唔可以授出自己都冇嘅功能
+      // 亦唔可以授出自己都冇嘅功能。
+      // 例外：OPT_IN_FEATURES_ 屬「旅團自選功能」，團長可以為自己支部開通。
       var opFeatures = getUserFeatures_(operatedBy, opRole, opBranch);
-      if (opFeatures.indexOf(feature) < 0) {
+      if (OPT_IN_FEATURES_.indexOf(feature) < 0 && opFeatures.indexOf(feature) < 0) {
         return { success: false, error: '你沒有權限授權此功能給他人。' };
+      }
+      if (OPT_IN_FEATURES_.indexOf(feature) >= 0 &&
+          ['group_leader', 'branch_leader'].indexOf(opRole) < 0) {
+        return { success: false, error: '只有團長／支部領袖或管理員可以開通此功能。' };
       }
     } else if (!grantBranch) {
       grantBranch = '*'; // 全旅級角色預設授全旅
@@ -1657,7 +1680,7 @@ function handleGetUserFeatures_(p) {
   });
   
   // 必須涵蓋前端「授權」畫面所有選項，否則管理員 tick 咗都唔會生效
-  var allFeatures = ['branches','members','applications','events','registrations','attendance','attendance_all','library_import','notices','users','permissions','settings','audit','calendar','equipment','meetings','plugins'];
+  var allFeatures = ['branches','members','applications','events','registrations','attendance','attendance_all','library_import','notices','users','permissions','settings','audit','calendar','equipment','meetings','plugins','photos'];
   var result = allFeatures.map(function(f) {
     var isDefault = defaults.indexOf(f) >= 0;
     var overridden = overrides[f] !== undefined;
@@ -2732,7 +2755,8 @@ function handleCreateEvent_(p) {
     status: p.status || 'draft', source: source, category: category,
     calendarTag: p.calendarTag || '', fee: p.fee || '',
     paymentUrl: p.paymentUrl || '', dutyPatrol: p.dutyPatrol || '',
-    noticeUrl: p.noticeUrl || '', noticeFileName: p.noticeFileName || '', albumUrl: p.albumUrl || '', inputMode: p.inputMode || 'form',
+    noticeUrl: p.noticeUrl || '', noticeFileName: p.noticeFileName || '',
+    albumUrl: albumAllowed_(p.operatedBy || '', p.albumUrl || ''), inputMode: p.inputMode || 'form',
     targetMemberIds: targets, createdBy: p.operatedBy || '', createdAt: now_(), note: p.note || ''
   });
   writeAudit_(p.operatedBy || 'system', 'createEvent', 'Events', id, p.title || '');
@@ -2750,7 +2774,10 @@ function handleUpdateEvent_(p) {
   var changed = [];
   fields.forEach(function (f) {
     if (p[f] !== undefined && p[f] !== null) {
-      updateCellByName_('Events', 'eventId', p.eventId, f, p[f]);
+      var val = p[f];
+      // 相簿功能未開通就唔准寫入（繞過 UI 都唔得）
+      if (f === 'albumUrl') val = albumAllowed_(p.operatedBy || '', val);
+      updateCellByName_('Events', 'eventId', p.eventId, f, val);
       changed.push(f);
     }
   });

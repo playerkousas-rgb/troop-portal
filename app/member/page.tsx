@@ -7,6 +7,7 @@ import Panel from '@/components/ui/Panel';
 import EmptyState from '@/components/ui/EmptyState';
 import EventReplyRow from '@/components/ui/EventReplyRow';
 import AlbumEmbed from '@/components/ui/AlbumEmbed';
+import { canViewAlbum } from '@/lib/album';
 import PluginIframeCard from '@/components/PluginCard';
 import { AppState, loadStateSlice, visibleEventsForMember, replyStatus, eventCategory } from '@/lib/store';
 import { apiSetReply } from '@/lib/api';
@@ -108,7 +109,7 @@ export default function Member(){
                   onAct={t => act(e.id, t)}
                   footer={
                     <>
-                    {e.albumUrl && (
+                    {e.albumUrl && canViewAlbum({ role: session?.role, userFeatures: s.userFeatures, ownBranchId: member.branchId, eventBranchId: e.branchId }) && (
                       <div className="mb-2">
                         <AlbumEmbed url={e.albumUrl} title={`${e.title}・活動相簿`} />
                       </div>

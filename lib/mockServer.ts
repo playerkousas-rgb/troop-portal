@@ -285,6 +285,11 @@ const FEATURES: Record<string, string[]> = {
 const USER_SCOPED_GRANTS: Record<string, { feature: string; branchId: string }[]> = {
   // 教練員何健：獲童軍團（b3）團長授權，喺 b3 幫手點名（淨係點名）
   u_coach: [{ feature: 'attendance', branchId: 'b3' }],
+  // 示範：童軍團（b3）已開通「活動相簿」，所以 b3 嘅人先睇到 e00 個相簿
+  u_gl3: [{ feature: 'photos', branchId: 'b3' }],
+  u_bl: [{ feature: 'photos', branchId: 'b3' }],
+  u_m1: [{ feature: 'photos', branchId: 'b3' }],
+  u5: [{ feature: 'photos', branchId: 'b3' }],
   // 深資團團長李偉國：被童軍團團長邀請去幫手點名 → 喺 b3 淨係點到名，
   // 佢喺自己嘅深資團（b4）先有齊團長權限。
   u_gl: [{ feature: 'attendance', branchId: 'b3' }],
@@ -302,6 +307,12 @@ function grantsFor(userId: string) {
 }
 
 const TROOP_WIDE = ['super_admin', 'troop_super', 'troop_leader', 'admin'];
+
+/**
+ * 「旅團自選功能」：預設關閉，由團長自己決定開唔開，唔屬階級權限。
+ * 團長可以為自己支部開通（即使佢自己未有），否則冇人開得到。
+ */
+const OPT_IN_FEATURES = ['photos'];
 
 /** 某人喺某支部有冇某功能（支部範圍檢查） */
 function hasFeatureInBranch(userId: string, role: string, feature: string, branchId: string) {
@@ -820,6 +831,19 @@ function resolveTargetBranch(action: string, p: Record<string, any>): string {
   return '';
 }
 
+
+/**
+ * 相簿功能預設關閉（相片涉及小朋友私隱）。
+ * 前端會鎖住個欄位，但 request 可以繞過 UI，所以後台要再驗一次。
+ */
+function albumAllowed(operatedBy: string, url: string): string {
+  if (!url) return '';
+  const u = store.users.find(x => x.id === operatedBy);
+  const role = String((u as any)?.role || '');
+  if (!featuresFor(operatedBy, role).includes('photos')) return '';
+  return url;
+}
+
 function handleMutate(action: string, p: Record<string, any>) {
   const ob = String(p.operatedBy || '');
   const findIdx = (arr: any[], idField: string, id: string) => arr.findIndex(x => x[idField] === id);
@@ -992,10 +1016,15 @@ function handleMutate(action: string, p: Record<string, any>) {
         if (scope !== actorBranch) {
           return { success: false, error: '你只可以授權自己支部的權限，其他支部須由該支部團長授權。' };
         }
-        // 唔可以授出自己都冇嘅功能
+        // 唔可以授出自己都冇嘅功能。
+        // 例外：OPT_IN_FEATURES 屬「旅團自選功能」（唔係階級權限），
+        // 團長可以為自己支部開通，否則會出現「冇人開得到」嘅死結。
         const feat = String(p.feature || '');
-        if (feat && !hasFeatureInBranch(ob, actorRole, feat, actorBranch)) {
+        if (feat && !OPT_IN_FEATURES.includes(feat) && !hasFeatureInBranch(ob, actorRole, feat, actorBranch)) {
           return { success: false, error: '你沒有權限授權此功能給他人。' };
+        }
+        if (OPT_IN_FEATURES.includes(feat) && !['group_leader', 'branch_leader'].includes(actorRole)) {
+          return { success: false, error: '只有團長／支部領袖或管理員可以開通此功能。' };
         }
       } else if (!scope) {
         scope = '*';
@@ -1019,7 +1048,7 @@ function handleMutate(action: string, p: Record<string, any>) {
       const defaults = FEATURES[role] || [];
       const overrides: Record<string, boolean> = {};
       grantsFor(tu?.id || '').forEach(g => { overrides[g.feature] = true; });
-      const allFeatures = ['branches', 'members', 'applications', 'events', 'registrations', 'attendance', 'attendance_all', 'library_import', 'notices', 'users', 'permissions', 'settings', 'meetings', 'equipment', 'plugins', 'audit', 'calendar'];
+      const allFeatures = ['branches', 'members', 'applications', 'events', 'registrations', 'attendance', 'attendance_all', 'library_import', 'notices', 'users', 'permissions', 'settings', 'meetings', 'equipment', 'plugins', 'audit', 'calendar', 'photos'];
       return {
         success: true,
         role,
@@ -1051,7 +1080,7 @@ function handleMutate(action: string, p: Record<string, any>) {
         targetMemberIds: [], fee: String(p.fee || ''), paymentUrl: String(p.paymentUrl || ''),
         dutyPatrol: String(p.dutyPatrol || ''), calendarTag: String(p.calendarTag || ''),
         noticeUrl: String(p.noticeUrl || ''), noticeFileName: String(p.noticeFileName || ''),
-        albumUrl: String(p.albumUrl || ''),
+        albumUrl: albumAllowed(ob, String(p.albumUrl || '')),
         inputMode: (p.inputMode || 'form') as any,
       });
       logAudit(ob, 'createEvent', '活動', id, String(p.title || ''));
@@ -1060,7 +1089,10 @@ function handleMutate(action: string, p: Record<string, any>) {
     case 'updateEvent': {
       const i = findIdx(store.events, 'id', String(p.eventId || ''));
       if (i >= 0) {
-        Object.assign(store.events[i], Object.fromEntries(Object.entries(p).filter(([k]) => !['action', 'operatedBy', 'eventId'].includes(k))));
+        const patch = Object.fromEntries(Object.entries(p).filter(([k]) => !['action', 'operatedBy', 'eventId'].includes(k)));
+        // 相簿功能未開通就唔准寫入 albumUrl（繞過 UI 都唔得）
+        if ('albumUrl' in patch) patch.albumUrl = albumAllowed(ob, String(patch.albumUrl || ''));
+        Object.assign(store.events[i], patch);
         if (p.category === 'district') store.events[i].kind = 'notice_troop_participation';
         if (p.category === 'self') store.events[i].kind = 'activity';
         logAudit(ob, 'updateEvent', '活動', String(p.eventId || ''), String(p.title || store.events[i].title || ''));

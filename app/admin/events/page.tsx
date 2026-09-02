@@ -8,6 +8,8 @@ import Link from 'next/link';
 import { useConfirm, kv } from '@/components/ConfirmProvider';
 import { resolveAlbum } from '@/lib/album';
 import AlbumEmbed from '@/components/ui/AlbumEmbed';
+import { hasFeature } from '@/lib/permissions';
+import { getSession } from '@/lib/session';
 import Auth from '@/components/Auth';
 
 /**
@@ -78,6 +80,8 @@ export default function Page() {
   const [msg, setMsg] = useState('');
   const [editing, setEditing] = useState<string | null>(null);
   const [tab, setTab] = useState<'self' | 'district' | 'archived'>('self');
+  // 📷 活動相簿：預設關閉（涉及小朋友私隱），要團長／管理員喺使用者管理開通
+  const photosOn = hasFeature(s?.userFeatures, 'photos', getSession()?.role);
 
   // 新增表單（共用欄位）
   const [showAdd, setShowAdd] = useState(false);
@@ -401,8 +405,18 @@ export default function Page() {
           <label>值日小隊<input value={dutyPatrol} onChange={e => setDutyPatrol(e.target.value)} placeholder="例如：TIGER" /></label>
           <label>行事曆標籤 🏷️<input value={calendarTag} onChange={e => setCalendarTag(e.target.value)} placeholder="例如：露營／服務／訓練" /></label>
           <label>📷 活動相簿連結
-            <input value={albumUrl} onChange={e => setAlbumUrl(e.target.value)} placeholder="活動後補：Google Drive 資料夾連結" />
-            <AlbumHint url={albumUrl} />
+            <input
+              value={albumUrl}
+              onChange={e => setAlbumUrl(e.target.value)}
+              disabled={!photosOn}
+              placeholder={photosOn ? '活動後補：Google Drive 資料夾連結' : '🔒 功能未開通'}
+            />
+            {photosOn
+              ? <AlbumHint url={albumUrl} />
+              : <span className="text-sm text-slate-500" style={{ display: 'block', marginTop: 4 }}>
+                  🔒 「活動相簿」預設關閉（相片涉及小朋友私隱）。要用請團長／管理員喺
+                  「使用者管理 → 權限」開啟；開通後同支部所有人都睇到，其他支部要該支部團長另行授權。
+                </span>}
           </label>
         </>}
         <label>範圍<select value={scope} onChange={e => setScope(e.target.value as any)}><option value="troop">全旅</option><option value="branch">支部</option></select></label>
@@ -448,8 +462,17 @@ export default function Page() {
             <label>通告連結<input value={editNoticeUrl} onChange={e => setEditNoticeUrl(e.target.value)} placeholder="https://..." /></label>
             {editCategory === 'self' && (
               <label>📷 活動相簿連結
-                <input value={editAlbumUrl} onChange={e => setEditAlbumUrl(e.target.value)} placeholder="貼上 Google Drive 資料夾 / 相簿連結" />
-                <AlbumHint url={editAlbumUrl} />
+                <input
+                  value={editAlbumUrl}
+                  onChange={e => setEditAlbumUrl(e.target.value)}
+                  disabled={!photosOn}
+                  placeholder={photosOn ? '貼上 Google Drive 資料夾 / 相簿連結' : '🔒 功能未開通'}
+                />
+                {photosOn
+                  ? <AlbumHint url={editAlbumUrl} />
+                  : <span className="text-sm text-slate-500" style={{ display: 'block', marginTop: 4 }}>
+                      🔒 「活動相簿」未開通，請團長／管理員喺「使用者管理 → 權限」開啟。
+                    </span>}
               </label>
             )}
             <label>收款連結<input value={editPaymentUrl} onChange={e => setEditPaymentUrl(e.target.value)} /></label>
@@ -465,7 +488,10 @@ export default function Page() {
             {e.calendarTag && <p className="muted" style={{ margin: 0 }}>🏷️ 行事曆標籤：{e.calendarTag}</p>}
             {e.noticeFileName && <p className="muted" style={{ margin: 0 }}>📄 通告檔案：{e.noticeFileName}</p>}
             {e.noticeUrl && <p style={{ margin: 0 }}><a href={e.noticeUrl} target="_blank" rel="noopener noreferrer">🔗 開啟通告連結</a></p>}
-            {e.albumUrl && <AlbumEmbed url={e.albumUrl} title={`${e.title}・活動相簿`} />}
+            {e.albumUrl && (photosOn
+              ? <AlbumEmbed url={e.albumUrl} title={`${e.title}・活動相簿`} />
+              : <p className="text-sm text-slate-500 m-0">🔒 已設定活動相簿，但「活動相簿」功能未開通 —— 請團長／管理員喺使用者管理開啟後先睇到。</p>
+            )}
             {e.paymentUrl && <p className="muted" style={{ color: '#b06000', margin: 0 }}>💳 已設收款連結</p>}
             {e.dutyPatrol && <p className="muted" style={{ color: 'purple', margin: 0 }}>🪖 值日：{e.dutyPatrol}</p>}
             {cat === 'district'

@@ -119,3 +119,32 @@ export function resolveAlbum(rawUrl: string): AlbumInfo | null {
     hint: '系統未認得呢個平台。如果內嵌後一片空白，代表對方網站唔准內嵌，請改用「新分頁開啟」或轉用 Google Drive 資料夾。',
   };
 }
+
+/**
+ * 相簿可見權限。
+ *
+ * 設計（按旅團要求）：
+ *  - 預設完全關閉 —— 相涉及小朋友私隱，唔應該有旅團「唔為意就開咗」。
+ *  - 團長自己決定開唔開；開咗之後，該支部所有人（領袖／家長／成員）都睇到。
+ *  - 其他支部想睇 → 要由該支部團長授權（同點名幫手同一套 scoped grant 機制）。
+ *  - 冇開／冇授權：領袖仍然見到有「活動相簿」呢個欄位存在（鎖住），
+ *    但撳唔到亦睇唔到相；家長／成員完全唔會見到。
+ */
+export function canViewAlbum(opts: {
+  role?: string;
+  userFeatures?: string[];
+  ownBranchId?: string;
+  eventBranchId?: string;
+}): boolean {
+  const { role = '', userFeatures = [], ownBranchId = '', eventBranchId = '' } = opts;
+  // 全旅級：旅長／管理員／超管
+  if (['super_admin', 'troop_super', 'troop_leader', 'admin'].includes(role)) {
+    return userFeatures.includes('photos');
+  }
+  // 功能未開通 → 一律睇唔到
+  if (!userFeatures.includes('photos')) return false;
+  // 開通咗：淨係睇到自己支部（或獲授權支部）嘅活動相簿
+  // 全旅活動（冇 branchId）當作自己支部嘅嘢處理
+  if (!eventBranchId) return true;
+  return !ownBranchId || eventBranchId === ownBranchId;
+}

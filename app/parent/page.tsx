@@ -6,6 +6,7 @@ import Panel from '@/components/ui/Panel';
 import EmptyState from '@/components/ui/EmptyState';
 import EventReplyRow from '@/components/ui/EventReplyRow';
 import AlbumEmbed from '@/components/ui/AlbumEmbed';
+import { canViewAlbum } from '@/lib/album';
 import { AppState, loadStateSlice, replyStatus, eventCategory, visibleEventsForMember } from '@/lib/store';
 import { apiSetReply, apiTogglePaid } from '@/lib/api';
 import { getSession } from '@/lib/session';
@@ -116,7 +117,7 @@ export default function Parent(){
                         footer={
                           <>
                           {/* 📷 活動相簿：唔理報唔報名都睇到（活動完咗之後相簿先最有價值） */}
-                          {e.albumUrl && (
+                          {e.albumUrl && canViewAlbum({ role: session?.role, userFeatures: s.userFeatures, ownBranchId: c.branchId, eventBranchId: e.branchId }) && (
                             <div className="mb-2">
                               <AlbumEmbed url={e.albumUrl} title={`${e.title}・活動相簿`} />
                             </div>
