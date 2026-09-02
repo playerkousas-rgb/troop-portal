@@ -216,7 +216,7 @@ export default function Notices() {
               <div className="flex items-start gap-2">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1.5 flex-wrap">
-                    <span className="text-sm bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded font-bold">📢</span>
+                    <span className="text-lg bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded font-bold">📢</span>
                     <span className="font-bold text-sm">{a.title}</span>
                   </div>
                   <p className="text-sm text-slate-600 mt-1.5 m-0 leading-relaxed whitespace-pre-wrap">{a.message}</p>

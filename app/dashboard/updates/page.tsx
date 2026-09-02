@@ -15,7 +15,7 @@ export default function UpdatesPage() {
   return (
     <main className="max-w-2xl mx-auto px-4 py-4 pb-24 space-y-4">
       <div className="flex items-center gap-2">
-        <span className="w-8 h-8 bg-brand-600 text-white rounded-xl flex items-center justify-center text-sm">📢</span>
+        <span className="w-8 h-8 bg-brand-600 text-white rounded-xl flex items-center justify-center text-lg">📢</span>
         <h1 className="font-bold text-lg m-0">更新公告</h1>
       </div>
       <p className="text-[13px] text-slate-500 m-0 -mt-2 leading-relaxed">
