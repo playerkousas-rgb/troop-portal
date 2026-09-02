@@ -21,8 +21,8 @@ export default function AlbumsPage() {
     <main className="max-w-5xl mx-auto px-4 py-4 pb-24 space-y-4">
       <div>
         <Link href="/dashboard/admin" className="text-[13px] font-bold text-slate-500 no-underline">← 返回管理中心</Link>
-        <h1 className="font-black text-xl text-slate-900 m-0 mt-1">📷 活動相簿</h1>
-        <p className="text-[13px] text-slate-500 m-0 mt-1">集中查看已加入活動的相簿；相簿連結仍由活動管理設定。</p>
+        <h1 className="font-black text-xl text-slate-900 m-0 mt-1">📷 相簿管理</h1>
+        <p className="text-[13px] text-slate-500 m-0 mt-1">加入及管理活動相簿連結；成員及家長會從下方「相簿」直接開啟連結。</p>
       </div>
       <section className="bg-white border border-violet-200 rounded-2xl p-4 space-y-3">
         <h2 className="font-bold text-sm m-0">＋ 加入活動相簿連結</h2>

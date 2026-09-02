@@ -9,14 +9,14 @@ type Item = { icon: string; label: string; href: string };
 // 順序對照 UI 參考：📅 行事曆 · 📢 最新消息 · 🎯 活動 · 👤 我的
 const REAL_ITEMS: Item[] = [
   { icon: '📅', label: '行事曆', href: '/calendar' },
-  { icon: '📢', label: '最新消息', href: '/notices' },
+  { icon: '📷', label: '相簿', href: '/albums' },
   { icon: '🎯', label: '活動', href: '/activities' },
 ];
 
 // /dashboard/** 模擬展示樹：維持原有 demo 連結，唔影響展示頁
 const DEMO_ITEMS: Item[] = [
   { icon: '📅', label: '行事曆', href: '/dashboard/calendar' },
-  { icon: '📢', label: '最新消息', href: '/dashboard/notices' },
+  { icon: '📷', label: '相簿', href: '/albums' },
   { icon: '🎯', label: '活動', href: '/dashboard/activities' },
 ];
 
@@ -24,13 +24,13 @@ const DEMO_ITEMS: Item[] = [
 const LEADER_ROLES = ['super_admin', 'troop_super', 'troop_leader', 'admin', 'group_leader', 'branch_leader', 'coach'];
 const LEADER_ITEMS: Item[] = [
   { icon: '📅', label: '行事曆', href: '/calendar' },
-  { icon: '📢', label: '最新消息', href: '/notices' },
+  { icon: '📷', label: '相簿', href: '/albums' },
   { icon: '📝', label: '點名', href: '/attendance' },
   { icon: '🔧', label: '管理中心', href: '/admin' },
 ];
 const DEMO_LEADER_ITEMS: Item[] = [
   { icon: '📅', label: '行事曆', href: '/dashboard/calendar' },
-  { icon: '📢', label: '最新消息', href: '/dashboard/notices' },
+  { icon: '📷', label: '相簿', href: '/albums' },
   { icon: '📝', label: '點名', href: '/dashboard/attendance' },
   { icon: '🔧', label: '管理中心', href: '/dashboard/admin' },
 ];

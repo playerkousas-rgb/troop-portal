@@ -100,9 +100,6 @@ export default function MockAdminCenter() {
         <Link href="/dashboard/admin/members" className="no-underline text-inherit bg-white border border-slate-200 rounded-xl px-3 py-2.5 hover:border-brand-300 transition">
           <div className="text-sm">🏢</div><div className="font-bold text-[13px] mt-1">支部及小隊</div><div className="text-[13px] text-slate-500">成員分組</div>
         </Link>
-        <Link href="/dashboard/notices" className="no-underline text-inherit bg-white border border-slate-200 rounded-xl px-3 py-2.5 hover:border-brand-300 transition">
-          <div className="text-sm">📢</div><div className="font-bold text-[13px] mt-1">最新消息管理</div><div className="text-[13px] text-slate-500">最新消息／通知</div>
-        </Link>
       </section>
     </main>
   );
