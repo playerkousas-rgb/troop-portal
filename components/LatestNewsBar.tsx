@@ -12,7 +12,8 @@ const HIDDEN_PATHS = ['/', '/login', '/setup', '/onboard', '/apply', '/downloads
 
 /**
  * 最新消息 BAR —— 登入後顯示在最上方（TopNav 之下）。
- * ★ 領袖直接點條 BAR 加入（最多 3 條）；領袖亦可刪除。與「公告」不同。
+ * ★ 領袖直接點條 BAR 加入（最多 3 條）；領袖亦可刪除。
+ * ★ 舊版「公告」已經完全併入呢條 BAR —— 全 APP 再冇公告嘅獨立管理／觀看頁。
  */
 export default function LatestNewsBar() {
   const pathname = usePathname();

@@ -1292,10 +1292,14 @@ function buildDashboardCore_(userId, loadPdfs) {
   } else if (role === 'member') {
     // 成員：只看自己（含 emergencyContact，1.0 邏輯）
     var member = allMembers.filter(function (m) { return m.id === user.memberId || m.id === userId; })[0];
-    // Try to find parent and get emergency contact
+    // ★ 緊急聯絡資料：一旦連結咗家長帳戶，緊急聯絡人就直接係嗰位家長
+    //   （唔使領袖再手動抄一次，家長改咗資料成員嗰邊即刻跟住變）。
+    //   除咗抄個名，亦要把家長帳戶本身回傳畀前端，前端先顯示到家長 email。
+    var linkedParent = null;
     if (member && member.parentUserId) {
       var parentUser = allUsers.filter(function(u){return u.id===member.parentUserId;})[0];
       if (parentUser) {
+        linkedParent = parentUser;
         member.emergencyContactName = parentUser.name || member.emergencyContactName || '';
       }
     } else if (member && !member.parentUserId) {
@@ -1307,9 +1311,15 @@ function buildDashboardCore_(userId, loadPdfs) {
         if (childYms.indexOf(memberYm) >= 0) {
           member.parentUserId = parents[pi].id;
           member.emergencyContactName = parents[pi].name || '';
+          linkedParent = parents[pi];
           break;
         }
       }
+    }
+    if (linkedParent) {
+      state.users = [user, { id: linkedParent.id, name: linkedParent.name, email: linkedParent.email,
+        role: 'parent', branchId: linkedParent.branchId || '', childMemberIds: linkedParent.childMemberIds || [],
+        approved: linkedParent.approved }];
     }
     if (member) {
       var isSemiLeader = (member.specialRole && member.specialRole !== '') || (state.userFeatures && state.userFeatures.length > 0);
@@ -1422,8 +1432,9 @@ var FEATURE_DEFAULTS = {
   'super_admin': ['branches','members','applications','events','registrations','attendance','meetings','library_import','notices','users','permissions','settings','plugins','audit','calendar','equipment'],
   // 旅長：實際職級最高，權限同管理員（管理員 = 代旅長操作嘅旅內電腦人）
   'troop_leader': ['branches','members','applications','events','registrations','attendance','meetings','library_import','notices','users','permissions','settings','plugins','audit','calendar','equipment'],
-  // 團長：自己支部全部
-  'group_leader': ['members','applications','events','registrations','attendance','meetings','library_import','notices','calendar','equipment','permissions'],
+  // 團長：自己支部全部（包括支部管理 branches 及使用者管理 users —— 但只限自己支部內的事，
+  // 可見範圍由 buildDashboardCore_ 按 branchId 過濾）
+  'group_leader': ['branches','members','applications','events','registrations','attendance','meetings','library_import','notices','users','calendar','equipment','permissions'],
   // 支部領袖：自己支部
   'branch_leader': ['members','applications','events','registrations','attendance','meetings','library_import','notices','calendar','equipment'],
   // 教練員：冇固定支部，預設權限＝家長（即冇任何管理功能）。
@@ -2741,14 +2752,14 @@ function handleCreateEvent_(p) {
     if (scope === 'troop') targets = members.map(function (m) { return getField_(m, 'memberId'); }).join(',');
     else if (p.branchId) targets = members.filter(function (m) { return getField_(m, 'branchId') === p.branchId; }).map(function (m) { return getField_(m, 'memberId'); }).join(',');
   }
-  // 活動分類：自行舉辦（self）／區地域總會活動（district）
+  // 活動分類：旅團活動（self）／區地域總會活動（district）
   var category = p.category === 'district' ? 'district' : (p.category === 'self' ? 'self' : '');
   if (!category) {
     var src = String(p.source || '');
     category = (p.kind === 'notice_troop_participation' || /圖書館|地域|區會|區地域|總會/.test(src)) ? 'district' : 'self';
   }
   var kind = p.kind || (category === 'district' ? 'notice_troop_participation' : 'activity');
-  var source = p.source || (category === 'district' ? '區地域總會活動' : '自行舉辦');
+  var source = p.source || (category === 'district' ? '區地域總會活動' : '旅團活動');
   appendRowByHeaders_('Events', {
     eventId: id, title: p.title || '', scope: scope, branchId: p.branchId || '',
     date: p.date || '', location: p.location || '', kind: kind,
@@ -2781,7 +2792,7 @@ function handleUpdateEvent_(p) {
       changed.push(f);
     }
   });
-  // 分類變更時同步 kind（自行舉辦=activity；區地域總會=notice_troop_participation）
+  // 分類變更時同步 kind（旅團活動=activity；區地域總會=notice_troop_participation）
   if (p.category !== undefined && p.category !== null) {
     updateCellByName_('Events', 'eventId', p.eventId, 'kind', p.category === 'district' ? 'notice_troop_participation' : 'activity');
   }
@@ -2801,7 +2812,7 @@ function handleDeleteEvent_(p) {
 
 /**
  * 過期通告處理：
- *   自行舉辦（self）→ status = archived（放入「過期通告」，日後可查回／還原）
+ *   旅團活動（self）→ status = archived（放入「過期通告」，日後可查回／還原）
  *   區地域總會（district，外部通告）→ 直接刪除
  */
 function handleArchiveEvent_(p) {
@@ -4732,7 +4743,7 @@ function handleGetAttendanceMatrix_(p) {
   return { success: true, headers: headers, columns: columns, rows: outRows, branchId: branchId, sessionType: sessionType };
 }
 
-/** 後補／補改：列出可點名場次（過期／即將的恆常集會日 + 旅團自辦活動），由新至舊 */
+/** 後補／補改：列出可點名場次（過期／即將的恆常集會日 + 旅團活動），由新至舊 */
 function handleGetAttendanceSessions_(p) {
   ensureAttendanceSheet_();
   var caller = resolveAttendanceCaller_(p);

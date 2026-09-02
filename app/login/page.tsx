@@ -239,7 +239,7 @@ export default function Login() {
         <p className="text-sm text-slate-700 m-0">
           未有帳號? <Link href="/apply" className="font-bold text-brand-700 underline underline-offset-4">申請加入</Link>
         </p>
-        <p className="text-sm text-slate-500 m-0">公開行事曆／公告／活動毋須登入都可以睇。</p>
+        <p className="text-sm text-slate-500 m-0">公開行事曆／通告／活動毋須登入都可以睇。</p>
       </div>
 
       {/* ── 進階／除錯（收合） ── */}

@@ -160,9 +160,14 @@ export default function Page(){
       window.history.replaceState(null, '', window.location.pathname);
       setTimeout(()=>previewBulk(),0);
     }
-    if (s && typeof window !== 'undefined' && window.location.hash === '#applications') {
-      setTab('applications');
-      window.history.replaceState(null, '', window.location.pathname);
+    // 上方統計「待審批」等入口用 ?tab=applications 直接跳入對應分頁（舊 #applications 亦繼續支援）
+    if (s && typeof window !== 'undefined') {
+      const qTab = new URLSearchParams(window.location.search).get('tab');
+      if (qTab === 'accounts' || qTab === 'members' || qTab === 'applications') setTab(qTab);
+      else if (window.location.hash === '#applications') {
+        setTab('applications');
+        window.history.replaceState(null, '', window.location.pathname);
+      }
     }
   },[s]);
 
@@ -457,14 +462,34 @@ export default function Page(){
   const seeAllBranches=['super_admin','troop_super', 'troop_leader', 'admin'].includes(myRole);
   const branchStats=branchPeopleStats(s,{role:myRole,branchId:myBranchId});
 
-  const filtered=s.users.filter(u=>{
+  // ★ 團長／支部領袖：使用者管理只管自己支部嘅事。
+  //   後台切片已經按支部過濾，前端再過濾一次做保險（唔會因為後台舊版而漏咗）。
+  const branchScoped = ['group_leader','branch_leader'].includes(myRole) && !!myBranchId;
+  const inMyBranch = (m: { branchId?: string }) => !branchScoped || m.branchId === myBranchId;
+  const scopedMembers = s.members.filter(inMyBranch);
+  const scopedUsers = s.users.filter(u => {
+    if (!branchScoped) return true;
+    if (u.id === myUserId) return true;
+    if (u.branchId === myBranchId) return true;
+    // 家長歸入子女所屬支部；成員帳號跟成員紀錄
+    const childIds = u.childMemberIds || [];
+    return scopedMembers.some(m => childIds.includes(m.id) || m.parentUserId === u.id || m.id === u.memberId);
+  });
+  const scopedApplications = s.applications.filter(a => !branchScoped || !a.branchId || a.branchId === myBranchId);
+
+  const filtered=scopedUsers.filter(u=>{
     if(filterRole!=='all'&&u.role!==filterRole)return false;
     if(search&&!u.name.toLowerCase().includes(search.toLowerCase())&&!u.email.toLowerCase().includes(search.toLowerCase()))return false;
     return true;
   });
 
   return <Auth roles={['super_admin', 'troop_super', 'troop_leader', 'admin', 'group_leader', 'branch_leader']}><div className="stack">
-    <section className="hero"><span className="badge gold">使用者管理</span><h1>👥 使用者管理</h1><p>帳號、成員資料庫與審核申請已合併喺一處，用下方分頁切換。上級可授權下級額外功能。</p></section>
+    <section className="hero"><span className="badge gold">使用者管理</span><h1>👥 使用者管理</h1>
+      <p>帳號、成員資料庫與審核申請已合併喺一處，用下方分頁切換。上級可授權下級額外功能。</p>
+      {branchScoped && <p className="badge blue" style={{ marginTop: 6 }}>
+        🏢 你是{ROLE_LABEL[myRole as Role]}：只會顯示及管理「{branches.find(b=>b.id===myBranchId)?.name || myBranchId}」支部內的帳號、成員及申請。
+      </p>}
+    </section>
 
     {/* 支部人數統計：一眼睇晒自己支部（管理員／超管睇全部支部）的領袖／家長／成員人數 */}
     <section className="bg-white rounded-2xl border border-slate-200 shadow-sm p-3">
@@ -506,9 +531,9 @@ export default function Page(){
 
     {/* 分頁：帳號 / 成員資料 / 申請審核 */}
     <div className="row" style={{ gap: 6, flexWrap: 'wrap' }}>
-      <button type="button" className={`btn ${tab==='accounts'?'primary':''}`} onClick={()=>setTab('accounts')}>👤 帳號（{s.users.length}）</button>
-      <button type="button" className={`btn ${tab==='members'?'primary':''}`} onClick={()=>setTab('members')}>👥 成員資料（{s.members.length}）</button>
-      <button type="button" className={`btn ${tab==='applications'?'primary':''}`} onClick={()=>setTab('applications')}>✅ 申請審核（{s.applications.filter(a=>a.status==='pending').length}）</button>
+      <button type="button" className={`btn ${tab==='accounts'?'primary':''}`} onClick={()=>setTab('accounts')}>👤 帳號（{scopedUsers.length}）</button>
+      <button type="button" className={`btn ${tab==='members'?'primary':''}`} onClick={()=>setTab('members')}>👥 成員資料（{scopedMembers.length}）</button>
+      <button type="button" className={`btn ${tab==='applications'?'primary':''}`} onClick={()=>setTab('applications')}>✅ 申請審核（{scopedApplications.filter(a=>a.status==='pending').length}）</button>
     </div>
 
     {tab==='accounts'&&<>
@@ -660,7 +685,7 @@ export default function Page(){
         <p className="muted">深資、樂行童軍具備特別身份者，可由支部領袖授予特定的管理權限。</p>
         <table className="table responsive">
           <thead><tr><th>姓名</th><th>YMIS</th><th>支部</th><th>特別身份</th><th>操作</th></tr></thead>
-          <tbody>{s.members.filter(m => (m.branchId === 'b4' || m.branchId === 'b5') && m.specialRole).map(m => (
+          <tbody>{scopedMembers.filter(m => (m.branchId === 'b4' || m.branchId === 'b5') && m.specialRole).map(m => (
             <tr key={m.id}>
               <td data-label="姓名">{m.name}</td>
               <td data-label="YMIS">{m.ymNumber}</td>
@@ -671,7 +696,7 @@ export default function Page(){
               </td>
             </tr>
           ))}
-          {s.members.filter(m => (m.branchId === 'b4' || m.branchId === 'b5') && m.specialRole).length === 0 && <tr><td colSpan={5} className="muted" style={{textAlign:'center'}}>暫無具備特別身份的成員。</td></tr>}
+          {scopedMembers.filter(m => (m.branchId === 'b4' || m.branchId === 'b5') && m.specialRole).length === 0 && <tr><td colSpan={5} className="muted" style={{textAlign:'center'}}>暫無具備特別身份的成員。</td></tr>}
           </tbody>
         </table>
       </section>
@@ -703,7 +728,7 @@ export default function Page(){
       </div>
       <table className="table responsive">
         <thead><tr><th>姓名</th><th>YMIS</th><th>支部</th><th>小隊</th><th>年齡</th><th>家長連結</th><th>操作</th></tr></thead>
-        <tbody>{s.members.map(m=>{
+        <tbody>{scopedMembers.map(m=>{
           const p=s.patrols.find(x=>x.id===m.patrolId);
           return <tr key={m.id}>
             <td data-label="姓名">{m.name}</td>
@@ -716,16 +741,16 @@ export default function Page(){
           </tr>;
         })}</tbody>
       </table>
-      {s.members.length===0&&<p className="muted">尚無成員。</p>}
+      {scopedMembers.length===0&&<p className="muted">尚無成員。</p>}
     </section>}
 
     {/* ── 申請審核（合併自審核申請管理）── */}
     {tab==='applications'&&<>
       <section className="card">
-        <h3>待審批申請（{s.applications.filter(a=>a.status==='pending').length}）</h3>
+        <h3>待審批申請（{scopedApplications.filter(a=>a.status==='pending').length}）</h3>
         <table className="table responsive">
           <thead><tr><th>姓名</th><th>類型</th><th>身份</th><th>支部</th><th>YMIS</th><th>Email</th><th>狀態</th><th>操作</th></tr></thead>
-          <tbody>{s.applications.filter(a=>a.status==='pending').map(a=>
+          <tbody>{scopedApplications.filter(a=>a.status==='pending').map(a=>
             <tr key={a.id}>
               <td data-label="姓名">{a.name}</td>
               <td data-label="類型">{a.type}</td>
@@ -742,13 +767,13 @@ export default function Page(){
               </td>
             </tr>)}</tbody>
         </table>
-        {s.applications.filter(a=>a.status==='pending').length===0&&<p className="muted">沒有待審批申請。</p>}
+        {scopedApplications.filter(a=>a.status==='pending').length===0&&<p className="muted">沒有待審批申請。</p>}
       </section>
-      {s.applications.filter(a=>a.status!=='pending').length>0&&<section className="card">
+      {scopedApplications.filter(a=>a.status!=='pending').length>0&&<section className="card">
         <h3>已處理</h3>
         <table className="table responsive">
           <thead><tr><th>姓名</th><th>身份</th><th>結果</th><th>處理時間</th></tr></thead>
-          <tbody>{s.applications.filter(a=>a.status!=='pending').map(a=>
+          <tbody>{scopedApplications.filter(a=>a.status!=='pending').map(a=>
             <tr key={a.id}>
               <td data-label="姓名">{a.name}</td>
               <td data-label="身份">{ROLE_LABEL[a.role]||a.role}</td>

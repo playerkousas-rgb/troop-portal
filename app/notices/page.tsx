@@ -2,25 +2,24 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { AppState, loadStateSlice, Bookmark } from '@/lib/store';
-import { apiSaveConfig, apiUpdateBookmark, apiDeleteBookmark, apiUpdatePdfTags,
-  apiGetAnnouncements, apiAddAnnouncement, apiUpdateAnnouncement, apiDeleteAnnouncement } from '@/lib/api';
+import { apiSaveConfig, apiUpdateBookmark, apiDeleteBookmark, apiUpdatePdfTags } from '@/lib/api';
 import { getSession } from '@/lib/session';
 import { branches, publicViewEnabled } from '@/lib/model';
 import PublicLocked from '@/components/ui/PublicLocked';
 import { useConfirm, kv } from '@/components/ConfirmProvider';
 
 /* ═══════════════════════════════════════════════════
-   公告 / 通告 —— MOCK 乾淨版式 + 真實後台
-   ★ 領袖直接喺本頁發佈／編輯／刪除公告，唔使跳去管理工具。
-   （公告=提示類訊息；通告=圖書館引入/旅團通告；PDF=日常文件）
+   通告 —— 活動通告文件 + 日常通告 PDF
+   ★「公告」已經改成最上方嘅「最新消息」BAR（領袖直接喺條 BAR 加），
+     所以本頁再冇公告嘅管理／觀看位置。
+   ★ 通告＝活動：內部（旅團活動）／外部（區地域總會活動），
+     活動本身喺「活動管理」處理，本頁淨係管通告文件同標籤。
    ═══════════════════════════════════════════════════ */
 
 const ACTIVITY_TYPES = ['訓練班', '比賽', '服務', '工作坊', '活動', '其他'];
 const AUDIENCE_OPTIONS = ['全旅', '領袖', '成年成員', '小童軍', '幼童軍', '童軍', '深資童軍', '樂行童軍', '家長'];
 const BRANCH_NAME: Record<string, string> = { b1: '小童軍', b2: '幼童軍', b3: '童軍', b4: '深資', b5: '樂行' };
 
-type Ann = { id: string; title: string; message: string; scope: string; branchId: string; createdAt: string };
-const emptyAnn: Ann = { id: '', title: '', message: '', scope: 'troop', branchId: '', createdAt: '' };
 const emptyBm = { id: '', title: '', activityType: '', branches: [] as string[], audience: [] as string[], mode: 'informational' as 'informational' | 'troop_participation', internalDeadline: '' };
 
 const inputCls = 'flex-1 rounded-lg border border-slate-200 px-2.5 py-2 text-sm min-w-0';
@@ -28,14 +27,10 @@ const labelCls = 'flex items-center gap-2 text-sm font-bold text-slate-600';
 
 export default function Notices() {
   const [s, setS] = useState<AppState | null>(null);
-  const [anns, setAnns] = useState<any[] | null>(null);
   const [err, setErr] = useState(''); const [ok, setOk] = useState('');
   const [folderId, setFolderId] = useState('');
   const [loading, setLoading] = useState(false);
 
-  // 公告 form
-  const [form, setForm] = useState<Ann | null>(null);
-  const [formErr, setFormErr] = useState('');
   // 通告 inline edit
   const [editingId, setEditingId] = useState<string | null>(null);
   const [bm, setBm] = useState(emptyBm);
@@ -50,62 +45,16 @@ export default function Notices() {
 
   useEffect(() => {
     loadStateSlice(['bookmarks', 'announcementPdfs', 'config']).then(st => { setS(st); setFolderId(st.config.ANNOUNCEMENT_FOLDER_ID || ''); }).catch(e => setErr(e.message));
-    apiGetAnnouncements().then(res => { if (res.success) setAnns((res.data || []).slice().sort((a: any, b: any) => String(b.createdAt || '').localeCompare(String(a.createdAt || '')))); }).catch(() => setAnns([]));
   }, []);
 
   async function reload() {
     try {
       const st = await loadStateSlice(['bookmarks', 'announcementPdfs', 'config']);
       setS(st);
-      const res = await apiGetAnnouncements();
-      if (res.success) setAnns((res.data || []).slice().sort((a: any, b: any) => String(b.createdAt || '').localeCompare(String(a.createdAt || ''))));
     } catch (e: any) { setErr(e.message) }
   }
 
-  /* ── 公告：發佈／編輯／刪除（真實後台） ── */
-  async function saveAnn() {
-    if (!form) return;
-    if (!form.title.trim()) { setFormErr('請填寫公告標題。'); return; }
-    if (!form.message.trim()) { setFormErr('請填寫公告內容。'); return; }
-    const ok = await confirm({
-      title: form.id ? '確認更新公告' : '確認發佈公告',
-      message: kv([
-        ['標題', form.title.trim()],
-        ['內容', form.message.trim()],
-        ['對象', form.scope === 'troop' ? '全旅' : BRANCH_NAME[form.branchId] || form.branchId || '指定支部'],
-      ]),
-      confirmLabel: form.id ? '確認更新' : '確認發佈',
-    });
-    if (!ok) return;
-    setLoading(true); setErr('');
-    try {
-      const p = { title: form.title.trim(), message: form.message.trim(), scope: form.scope, branchId: form.scope === 'troop' ? '' : form.branchId };
-      if (form.id) {
-        await apiUpdateAnnouncement({ announcementId: form.id, ...p });
-        setOk('✅ 已更新公告「' + form.title.trim() + '」');
-      } else {
-        await apiAddAnnouncement(p);
-        setOk('✅ 已發佈公告「' + form.title.trim() + '」');
-      }
-      setForm(null);
-      await reload();
-    } catch (e: any) { setErr(e.message) } finally { setLoading(false) }
-  }
-
-  async function delAnn(id: string, title: string) {
-    const ok = await confirm({ title: '確認刪除公告', message: kv([['公告', title]]), confirmLabel: '確認刪除', danger: true });
-    if (!ok) return;
-    setLoading(true); setErr('');
-    try { await apiDeleteAnnouncement(id); setOk(`🗑 已刪除公告「${title}」`); await reload(); }
-    catch (e: any) { setErr(e.message) } finally { setLoading(false) }
-  }
-
-  function annTarget(a: any) {
-    if (a.scope === 'troop') return '全旅';
-    return BRANCH_NAME[a.branchId] || a.branchId || '指定支部';
-  }
-
-  /* ── 通告（圖書館引入／旅團通告）── */
+  /* ── 通告（活動通告文件）── */
   function startEdit(b: Bookmark) {
     setEditingId(b.id);
     setBm({ id: b.id, title: b.title || '', activityType: b.activityType || '', branches: b.branchTags || [], audience: b.audienceTags || [], mode: b.mode, internalDeadline: b.internalDeadline || '' });
@@ -142,7 +91,7 @@ export default function Notices() {
 
   /* ── PDF ── */
   async function saveFolder() {
-    const ok = await confirm({ title: '確認儲存公告 Drive 資料夾', message: kv([['ANNOUNCEMENT_FOLDER_ID', folderId]]), confirmLabel: '確認儲存' });
+    const ok = await confirm({ title: '確認儲存通告 Drive 資料夾', message: kv([['ANNOUNCEMENT_FOLDER_ID', folderId]]), confirmLabel: '確認儲存' });
     if (!ok) return;
     setErr(''); setOk(''); try { const f = await apiSaveConfig('ANNOUNCEMENT_FOLDER_ID', folderId); setS(f); setOk('✅ 已儲存') } catch (e: any) { setErr(e.message) }
   }
@@ -188,58 +137,32 @@ export default function Notices() {
 
       {/* Header + 直接發佈入口 */}
       <div className="flex items-center justify-between gap-2 flex-wrap">
-        <h1 className="font-bold text-xl m-0">📢 公告 / 通告</h1>
+        <h1 className="font-bold text-xl m-0">📄 通告文件</h1>
         <div className="flex gap-1.5 items-center flex-wrap">
           {isLeader && (
             <>
-              <button onClick={() => { setFormErr(''); setOk(''); setForm({ ...emptyAnn }); }}
-                className="text-sm px-3 py-1.5 rounded-lg font-bold bg-brand-600 text-white border-0 cursor-pointer hover:bg-brand-700 transition">+ 發佈公告</button>
               <Link href="/notices/upload" className="no-underline text-sm px-3 py-1.5 rounded-lg font-bold bg-white border border-slate-200 text-slate-600 hover:border-slate-300 transition">📄 上傳通告</Link>
-              <Link href="/library/import" className="no-underline text-sm px-3 py-1.5 rounded-lg font-bold bg-white border border-slate-200 text-slate-600 hover:border-slate-300 transition">🗺️ 區地域總會活動引入</Link>
+              <Link href="/admin/events?tab=district" className="no-underline text-sm px-3 py-1.5 rounded-lg font-bold bg-white border border-slate-200 text-slate-600 hover:border-slate-300 transition">🗺️ 區地域總會活動</Link>
             </>
           )}
         </div>
       </div>
       <p className="text-sm text-slate-500 m-0 -mt-2 leading-relaxed">
-        公告＝提示類訊息，例如「活動因天氣取消」「請家長交團費」。通告＝區地域總會活動（原圖書館引入）嘅活動通告；日常公告 PDF 喺下面。
+        通告＝活動：內部（🏠 旅團活動）同外部（🗺️ 區地域總會活動）都喺「🎯 活動」入面回覆及管理，
+        本頁只放通告文件同標籤。提示類訊息（例如「活動因天氣取消」）已經改為最上方嘅
+        <b>📣 最新消息</b>，領袖直接喺條 BAR 加入。
       </p>
 
       {ok && <div className="text-sm font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-xl px-3 py-2">{ok}</div>}
       {err && <div className="text-sm font-bold bg-rose-50 text-rose-700 border border-rose-200 rounded-xl px-3 py-2 whitespace-pre-wrap">{err}</div>}
 
-      {/* ═════ 公告（提示類訊息）═════ */}
-      <section className="space-y-2">
-        {(anns || []).length === 0
-          ? <p className="text-center text-sm text-slate-500 py-6 bg-white rounded-2xl border border-slate-200">暫無公告{isLeader ? '，按「+ 發佈公告」直接喺度發佈。' : '。'}</p>
-          : (anns || []).map((a: any) => (
-            <div key={a.announcementId || a.id} className="rounded-2xl border p-3.5 bg-white border-slate-200">
-              <div className="flex items-start gap-2">
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    <span className="text-lg bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded font-bold">📢</span>
-                    <span className="font-bold text-sm">{a.title}</span>
-                  </div>
-                  <p className="text-sm text-slate-600 mt-1.5 m-0 leading-relaxed whitespace-pre-wrap">{a.message}</p>
-                  <div className="text-sm text-slate-500 mt-1.5">{a.createdAt || ''} · 對象：{annTarget(a)}</div>
-                </div>
-                {isLeader && (
-                  <div className="flex gap-1 flex-shrink-0">
-                    <button onClick={() => { setFormErr(''); setOk(''); setForm({ id: a.announcementId || a.id, title: a.title || '', message: a.message || '', scope: a.scope || 'troop', branchId: a.branchId || '', createdAt: '' }); }} className="text-sm text-slate-600 px-1.5 py-0.5 rounded hover:bg-slate-100 border-0 bg-transparent cursor-pointer" title="編輯">✏️</button>
-                    <button onClick={() => delAnn(a.announcementId || a.id, a.title)} className="text-sm text-rose-600 px-1.5 py-0.5 rounded hover:bg-rose-50 border-0 bg-transparent cursor-pointer" title="刪除">🗑</button>
-                  </div>
-                )}
-              </div>
-            </div>
-          ))}
-      </section>
-
-      {/* ═════ 通告（圖書館引入／旅團通告）═════ */}
+      {/* ═════ 活動通告（內部／外部）═════ */}
       <section className="bg-white rounded-2xl border border-slate-200 p-4 space-y-3">
         <div className="flex items-center justify-between">
           <h2 className="font-bold text-base m-0">通告（{s.bookmarks.length}）</h2>
         </div>
         {s.bookmarks.length === 0 ? (
-          <p className="text-sm text-slate-500 m-0 py-4 text-center">暫無通告，領袖由通告圖書館引入後會顯示在這裡。</p>
+          <p className="text-sm text-slate-500 m-0 py-4 text-center">暫無通告，領袖引入區地域總會活動或上傳通告後會顯示在這裡。</p>
         ) : (
           <div className="space-y-2">
             {s.bookmarks.map(b => editingId === b.id ? (
@@ -309,11 +232,11 @@ export default function Notices() {
         )}
       </section>
 
-      {/* ═════ 日常公告 PDF ═════ */}
+      {/* ═════ 日常通告 PDF ═════ */}
       <section className="bg-white rounded-2xl border border-slate-200 p-4 space-y-3">
-        <h2 className="font-bold text-base m-0">日常公告 PDF</h2>
+        <h2 className="font-bold text-base m-0">日常通告 PDF</h2>
         {pdfs.length === 0 ? (
-          <p className="text-sm text-slate-500 m-0 py-4 text-center">暫無公告 PDF，上傳後會顯示在這裡。</p>
+          <p className="text-sm text-slate-500 m-0 py-4 text-center">暫無通告 PDF，上傳後會顯示在這裡。</p>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             {pdfs.map(pdf => (
@@ -375,29 +298,6 @@ export default function Notices() {
         </section>
       )}
 
-      {/* ═════ 公告表單（inline modal）═════ */}
-      {form && (
-        <div className="fixed inset-0 z-50 bg-black/30 flex items-end sm:items-center justify-center p-0 sm:p-4">
-          <div className="bg-white w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl p-4 space-y-3 max-h-[90vh] overflow-y-auto">
-            <h3 className="font-bold text-base m-0">{form.id ? '✏️ 編輯公告' : '📢 發佈公告'}</h3>
-            <label className={labelCls}>標題<input className={inputCls} value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} placeholder="例如：9月20日露營因天氣取消" /></label>
-            <label className="flex flex-col gap-1 text-sm font-bold text-slate-600">內容
-              <textarea rows={4} className="rounded-lg border border-slate-200 px-2.5 py-2 text-sm" value={form.message} onChange={e => setForm({ ...form, message: e.target.value })} placeholder="寫清楚發生咩事、成員／家長要做咩、限期" />
-            </label>
-            <label className={labelCls}>對象
-              <select className={inputCls} value={form.scope === 'troop' ? 'troop' : form.branchId} onChange={e => { const v = e.target.value; setForm({ ...form, scope: v === 'troop' ? 'troop' : 'branch', branchId: v === 'troop' ? '' : v }); }}>
-                <option value="troop">全旅</option>
-                {Object.entries(BRANCH_NAME).map(([id, name]) => <option key={id} value={id}>{name}</option>)}
-              </select>
-            </label>
-            {formErr && <p className="text-sm font-bold text-rose-700 bg-rose-50 rounded-lg px-2.5 py-2 m-0">{formErr}</p>}
-            <div className="flex gap-2 pt-1">
-              <button onClick={saveAnn} disabled={loading} className="flex-1 text-sm font-bold bg-brand-600 text-white py-2.5 rounded-xl border-0 cursor-pointer disabled:opacity-60">{loading ? '儲存中…' : form.id ? '儲存' : '發佈'}</button>
-              <button onClick={() => { setForm(null); setFormErr(''); }} className="flex-1 text-sm font-bold bg-slate-100 text-slate-600 py-2.5 rounded-xl border-0 cursor-pointer">取消</button>
-            </div>
-          </div>
-        </div>
-      )}
     </main>
   );
 }

@@ -12,7 +12,7 @@ import { hasFeature } from '@/lib/permissions';
 /**
  * 管理中心 —— 統一為 6 張卡：
  *   支部管理・使用者管理（合併成員資料庫＋審核申請）・行事曆管理・
- *   出席管理・活動管理（自行舉辦＋區地域總會活動）・物資管理・會議管理。
+ *   出席管理・活動管理（旅團活動＋區地域總會活動）・物資管理・會議管理。
  * 系統設定改放右上小圖示（TopNav ⚙️）；操作紀錄經系統設定進入。
  */
 // feature：對應後台 UserPermissions 的權限鍵。
@@ -23,7 +23,7 @@ const FEATURES: { id: string; icon: string; title: string; text: string; href: s
   { id: 'users',     icon: '👥', title: '使用者管理',   text: '帳號、成員資料庫與審核申請（合併）。', href: '/admin/users', tone: 'from-brand-800 to-brand-500', feature: 'users' },
   { id: 'calendar',  icon: '📅', title: '行事曆管理',   text: '恆常集會、特別集會及取消；亦可在行事曆直接修改。', href: '/admin/calendar', tone: 'from-sky-700 to-sky-500', feature: 'calendar' },
   { id: 'attendance', icon: '📝', title: '出席管理',   text: '簽到／點名、出席紀錄及統計報表。', href: '/attendance', tone: 'from-teal-700 to-teal-500', feature: 'attendance' },
-  { id: 'events',    icon: '🎯', title: '活動管理',     text: '自行舉辦活動 及 區地域總會活動（原圖書館引入）。', href: '/admin/events', tone: 'from-violet-700 to-violet-500', feature: 'events' },
+  { id: 'events',    icon: '🎯', title: '活動管理',     text: '旅團活動（內部）及 區地域總會活動（外部）。', href: '/admin/events', tone: 'from-violet-700 to-violet-500', feature: 'events' },
   { id: 'equipment', icon: '📦', title: '物資管理',     text: '物資清單、庫存調整、借用批核及歸還。', href: '/admin/equipment', tone: 'from-amber-700 to-amber-500', feature: 'equipment' },
   { id: 'meetings',  icon: '🤝', title: '會議管理',     text: '會議議程、紀錄及文件連結。', href: '/admin/meetings', tone: 'from-rose-700 to-rose-500', feature: 'meetings' },
 ];
@@ -39,6 +39,8 @@ export default function Admin() {
   const role = session?.role || '';
   const visibleFeatures = FEATURES.filter(f => hasFeature(s?.userFeatures, f.feature, role));
   const canUsers = hasFeature(s?.userFeatures, 'users', role);
+  const canApplications = hasFeature(s?.userFeatures, 'applications', role);
+  const canEvents = hasFeature(s?.userFeatures, 'events', role);
   const canAudit = hasFeature(s?.userFeatures, 'audit', role);
   const canRegistrations = hasFeature(s?.userFeatures, 'registrations', role);
 
@@ -67,11 +69,16 @@ export default function Admin() {
       </section>
     )}
 
+    {/* 排列：先活動（內部 → 外部），再人（待審批 → 用戶）。
+        每格都直接跳去對應嘅管理頁；冇權限嘅格唔顯示（見到數字但入唔到＝冇用）。 */}
     <StatStrip stats={[
-      { label: '用戶', value: stats.users, desc: '總登記人數', tone: 'blue', ...(canUsers ? { href: '/admin/users' } : {}) },
-      { label: '待審批', value: stats.pending, desc: '等待審批申請', tone: 'red', ...(canUsers ? { href: '/admin/users#applications' } : {}) },
-      { label: '自行舉辦', value: stats.selfActivities, desc: '已發布活動', tone: 'green', href: '/admin/events' },
-      { label: '區地域總會', value: stats.districtActivities, desc: '區／地域／總會活動', tone: 'violet', href: '/admin/events' },
+      { label: '旅團活動', value: stats.selfActivities, desc: '內部·已發布', tone: 'green', ...(canEvents ? { href: '/admin/events?tab=self' } : {}) },
+      { label: '區地域總會', value: stats.districtActivities, desc: '外部·已發布', tone: 'violet', ...(canEvents ? { href: '/admin/events?tab=district' } : {}) },
+      ...(canApplications || canUsers ? [{
+        label: '待審批', value: stats.pending, desc: '帳號 / 成員申請', tone: 'red' as const,
+        href: canUsers ? '/admin/users?tab=applications' : '/admin/applications',
+      }] : []),
+      ...(canUsers ? [{ label: '用戶', value: stats.users, desc: '總登記人數', tone: 'blue' as const, href: '/admin/users' }] : []),
     ]} />
 
     {/* 功能卡 */}
@@ -94,7 +101,7 @@ export default function Admin() {
     <div className="flex flex-wrap gap-2">
       {canRegistrations && (
         <Link href="/admin/registrations" className="no-underline text-sm font-bold text-slate-700 bg-white border border-slate-200 rounded-xl px-3.5 py-2.5 hover:border-brand-300 hover:shadow-sm transition">
-          📊 活動統計（只計自行舉辦）
+          📊 活動統計（只計旅團活動）
         </Link>
       )}
       {canAudit && (
@@ -106,7 +113,7 @@ export default function Admin() {
         📝 簽到／點名
       </Link>
       <Link href="/notices" className="no-underline text-sm font-bold text-slate-700 bg-white border border-slate-200 rounded-xl px-3.5 py-2.5 hover:border-brand-300 hover:shadow-sm transition">
-        📢 通告管理
+        📄 通告文件（PDF）
       </Link>
     </div>
   </div></Auth>;

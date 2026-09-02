@@ -11,7 +11,7 @@ const FRIENDLY_LABELS: Record<string, string> = {
   TROOP_NAME: '旅團名稱',
   ADMIN_EMAIL: '主要管理員 Email',
   ADMIN_DEFAULT_PASSWORD: '預設管理員密碼',
-  ANNOUNCEMENT_FOLDER_ID: '公告 PDF Drive 資料夾 ID',
+  ANNOUNCEMENT_FOLDER_ID: '通告 PDF Drive 資料夾 ID',
   MEETINGS_FOLDER_ID: '會議文件 Drive 資料夾 ID',
   REGISTRY_URL: '元件市場 Registry URL',
   STAFF_TOKEN: '首次登入 STAFF_TOKEN',
@@ -185,7 +185,7 @@ export default function Page() {
     {/* 2. 公開瀏覽（清晰開關） */}
     <section className="card stack">
       <h3 className="m-0">🌐 公開瀏覽</h3>
-      <p className="muted m-0">開放：未登入都可以睇公開行事曆／公告／活動。關閉：必須登入先睇到。</p>
+      <p className="muted m-0">開放：未登入都可以睇公開行事曆／通告／活動。關閉：必須登入先睇到。</p>
       <BigSwitch
         on={publicOn}
         busy={busy === 'PUBLIC_VIEW'}
@@ -237,7 +237,7 @@ export default function Page() {
       {/* Drive 資料夾設定（也可在本身頁面設定，如會議管理） */}
       <div style={{ borderTop: '1px solid var(--line)', paddingTop: 14 }}>
         <h3 className="m-0">🗂 Drive 資料夾設定</h3>
-        <p className="muted m-0">亦可在本身頁面設定（例如會議管理、公告頁）。資料夾需設為「知道連結的人都可檢視」。修改後按「儲存」才寫入。</p>
+        <p className="muted m-0">亦可在本身頁面設定（例如會議管理、通告頁）。資料夾需設為「知道連結的人都可檢視」。修改後按「儲存」才寫入。</p>
         <div className="grid">
           {folderIds.map(f => (
             <label key={f.key}>

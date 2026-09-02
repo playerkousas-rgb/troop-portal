@@ -61,15 +61,20 @@ export type AppState = { patrols:Patrol[]; users:User[]; members:Member[]; appli
 
 // ==================== 活動兩大分類（統一命名） ====================
 
-/** 活動分類：自行舉辦（原旅團自辦）／區地域總會活動（原圖書館引入） */
+/** 活動分類：旅團活動（旅團自己舉辦）／區地域總會活動（外部引入） */
 export type EventCategory = 'self' | 'district';
 export const EVENT_CATEGORY_LABEL: Record<EventCategory, string> = {
-  self: '自行舉辦',
+  self: '旅團活動',
   district: '區地域總會活動',
+};
+/** 活動分類 icon（全 APP 統一） */
+export const EVENT_CATEGORY_ICON: Record<EventCategory, string> = {
+  self: '🏠',
+  district: '🗺️',
 };
 
 /**
- * 判斷活動屬於「自行舉辦」還是「區地域總會活動」。
+ * 判斷活動屬於「旅團活動」還是「區地域總會活動」。
  * 新資料直接讀 category 欄位；舊資料按 kind / source 推斷。
  */
 export function eventCategory(e: { kind?: string; source?: string; category?: string } | null | undefined): EventCategory {
@@ -144,18 +149,123 @@ export function nextRegularMeetingDates(count=6){
 
 /** 計算摘要數字（控制台用） */
 export function computeStats(s:AppState){
-  const published = s.events.filter(e=>e.status==='published');
-  const archived = s.events.filter(e=>e.status==='archived');
+  // 切片載入時未請求嘅欄位可能係 undefined，全部做防禦（唔好因為一個統計數字炸咗成頁）
+  const published = (s.events||[]).filter(e=>e.status==='published');
+  const archived = (s.events||[]).filter(e=>e.status==='archived');
   return {
-    users: s.users.length,
-    pending: s.applications.filter(a=>a.status==='pending').length,
+    users: (s.users||[]).length,
+    pending: (s.applications||[]).filter(a=>a.status==='pending').length,
     activities: published.length,
     selfActivities: published.filter(e=>eventCategory(e)==='self').length,
     districtActivities: published.filter(e=>eventCategory(e)==='district').length,
     archivedActivities: archived.length,
-    notices: s.bookmarks.length,
+    notices: (s.bookmarks||[]).length,
   };
 }
+
+// ==================== 家長／成員上方統計 ====================
+
+/** 有冇需要俾錢（"免費"／"0"／空白 = 唔使俾） */
+export function eventNeedsPayment(e: { fee?: string }): boolean {
+  const fee = String(e.fee || '').trim();
+  if (!fee) return false;
+  if (/^(免費|free|0|\$0|-)$/i.test(fee)) return false;
+  return true;
+}
+
+export type PersonActivityStats = {
+  /** 進行中（已發布、未封存）的旅團活動數 */
+  ongoing: number;
+  /** 已報名參加（人次；家長會合計所有子女） */
+  registered: number;
+  /** 只表達咗「有興趣」，未算報名 */
+  interested: number;
+  /** 已婉拒 */
+  declined: number;
+  /** 尚未回覆 */
+  unresponded: number;
+  /** 已報名但仍未標記付款（只計有費用的活動） */
+  unpaid: number;
+  /** 外部：區／地域／總會活動（自行報名，不計狀態） */
+  district: number;
+};
+
+/**
+ * 家長／成員控制台上方統計。
+ *
+ * 「進行中活動」以活動計（家長有兩名子女報同一個活動只算一個活動），
+ * 「報名／未回覆／未付款」以人次計（家長要知道係邊個仔女未搞掂）。
+ */
+export function personActivityStats(s: AppState, members: Member[]): PersonActivityStats {
+  const troopEventIds = new Set<string>();
+  const districtEventIds = new Set<string>();
+  let registered = 0, interested = 0, declined = 0, unresponded = 0, unpaid = 0;
+
+  for (const m of members) {
+    for (const e of visibleEventsForMember(s, m)) {
+      if (e.status === 'archived') continue;           // 過期通告唔算「進行中」
+      if (eventCategory(e) === 'district') { districtEventIds.add(e.id); continue; }
+      troopEventIds.add(e.id);
+      const r = replyStatus(s, e.id, m.id);
+      if (!r || r.cancelled) { unresponded++; continue; }
+      if (r.type === 'registered') {
+        registered++;
+        if (eventNeedsPayment(e) && !r.paid) unpaid++;
+      } else if (r.type === 'interested') interested++;
+      else if (r.type === 'declined') declined++;
+    }
+  }
+
+  return {
+    ongoing: troopEventIds.size,
+    registered, interested, declined, unresponded, unpaid,
+    district: districtEventIds.size,
+  };
+}
+
+// ==================== 緊急聯絡資料 ====================
+
+export type EmergencyContact = {
+  name: string;
+  phone: string;
+  email: string;
+  /** 資料來源：連結咗家長帳戶就直接用家長資料 */
+  source: 'parent' | 'manual' | 'none';
+  parentName?: string;
+};
+
+/**
+ * 成員的緊急聯絡資料。
+ *
+ * ★ 規則：成員一旦連結咗家長帳戶（Members.parentUserId 或 Users.childMemberIds），
+ *   緊急聯絡人就直接係嗰位家長 —— 唔使領袖再手動抄一次，亦唔會出現
+ *   「家長改咗電話，但成員嗰邊仲係舊資料」。冇連結先用手動填嘅欄位。
+ */
+export function emergencyContactFor(s: AppState, member: Member): EmergencyContact {
+  const parent = (s.users || []).find(u =>
+    u.role === 'parent' && (u.id === member.parentUserId || (u.childMemberIds || []).includes(member.id))
+  );
+  if (parent) {
+    return {
+      name: parent.name,
+      // 家長帳戶本身冇獨立電話欄，沿用成員資料上登記的聯絡電話
+      phone: member.emergencyContactPhone || '',
+      email: parent.email || '',
+      source: 'parent',
+      parentName: parent.name,
+    };
+  }
+  if (member.emergencyContactName || member.emergencyContactPhone) {
+    return {
+      name: member.emergencyContactName || '',
+      phone: member.emergencyContactPhone || '',
+      email: '',
+      source: 'manual',
+    };
+  }
+  return { name: '', phone: '', email: '', source: 'none' };
+}
+
 
 // ==================== 支部人數統計（使用者管理用） ====================
 

@@ -14,12 +14,12 @@ import Auth from '@/components/Auth';
 
 /**
  * 活動管理
- * ─ 自行舉辦（旅團自己搞）：3 種加入方法
+ * ─ 旅團活動（旅團自己舉辦）：3 種加入方法
  *     1️⃣ 純在 APP 打入資料　2️⃣ 上載通告（.docx / .txt 自動讀資料）　3️⃣ 加入通告連結
- * ─ 區地域總會活動（原圖書館引入）：2 種加入方法
- *     1️⃣ 圖書館引入　2️⃣ 貼上通告連結
+ * ─ 區地域總會活動（外部）：2 種加入方法
+ *     1️⃣ 通告圖書館引入　2️⃣ 貼上通告連結
  *   區地域總會活動唔做統計，領袖只係精選啱嘅通告畀成員睇，想報就報。
- * ─ 過期通告：一鍵處理過期活動 —— 自行舉辦封存到「過期通告」（可查回）；
+ * ─ 過期通告：一鍵處理過期活動 —— 旅團活動封存到「過期通告」（可查回）；
  *   外部（區地域總會）通告直接刪除。
  */
 
@@ -35,7 +35,7 @@ const SELF_MODES: { id: SelfMode; label: string; desc: string }[] = [
 ];
 
 const DISTRICT_MODES: { id: DistrictMode; label: string; desc: string }[] = [
-  { id: 'library', label: '1️⃣ 圖書館引入', desc: '由童軍通告圖書館挑選通告帶入。' },
+  { id: 'library', label: '1️⃣ 通告圖書館引入', desc: '由童軍通告圖書館挑選通告帶入。' },
   { id: 'link', label: '2️⃣ 貼上通告連結', desc: '直接貼上通告連結，成員自行決定報唔報。' },
 ];
 
@@ -109,6 +109,14 @@ export default function Page() {
 
   useEffect(() => { loadStateSlice(['events', 'replies']).then(setS).catch(e => setErr(e.message)) }, []);
 
+  // 上方統計／領袖工具卡用 ?tab=self|district|archived 直接跳入對應分頁，
+  // 唔會再出現「撳咗區地域總會，但打開仍然係旅團活動」。
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const t = new URLSearchParams(window.location.search).get('tab');
+    if (t === 'self' || t === 'district' || t === 'archived') setTab(t);
+  }, []);
+
   const category: 'self' | 'district' = tab === 'district' ? 'district' : 'self';
   const inputMode: string = tab === 'district' ? districtMode : selfMode;
   const needsLink = (tab === 'district' && districtMode === 'link') || (tab === 'self' && selfMode === 'link');
@@ -161,7 +169,7 @@ export default function Page() {
       title: '確認新增活動（草稿）',
       message: kv([
         ['活動標題', title],
-        ['分類', category === 'district' ? '區地域總會活動（不做統計）' : '自行舉辦'],
+        ['分類', category === 'district' ? '區地域總會活動（不做統計）' : '旅團活動'],
         ['加入方法', modeLabel || ''],
         ['日期', date],
         ['通告連結', noticeUrl],
@@ -205,7 +213,7 @@ export default function Page() {
       title: '確認儲存活動修改',
       message: kv([
         ['活動標題', editTitle],
-        ['分類', editCategory === 'district' ? '區地域總會活動' : '自行舉辦'],
+        ['分類', editCategory === 'district' ? '區地域總會活動' : '旅團活動'],
         ['日期', editDate],
         ['通告連結', editNoticeUrl],
         ['活動相簿', editAlbumUrl || '（無）'],
@@ -235,7 +243,7 @@ export default function Page() {
     try { const f = await apiPublishEvent(id); setS(f) } catch (e: any) { setErr(e.message) }
   }
 
-  /** 過期處理：自行舉辦 → 過期通告；區地域總會（外部）→ 直接刪除 */
+  /** 過期處理：旅團活動 → 過期通告；區地域總會（外部）→ 直接刪除 */
   async function expire(id: string) {
     const e = s?.events.find(x => x.id === id);
     if (!e) return;
@@ -249,7 +257,7 @@ export default function Page() {
         ...(district ? [] : [['已報名', `${c.registered} 人（其中 ${c.paid} 人已付款）`] as [string, string]]),
         ['處理方式', district
           ? '外部（區地域總會）通告 → 直接刪除（純通告，冇報名及付款紀錄）'
-          : '自行舉辦 → 移入「過期通告」；報名及付款紀錄全部保留，隨時可查回或還原'],
+          : '旅團活動 → 移入「過期通告」；報名及付款紀錄全部保留，隨時可查回或還原'],
       ]),
       confirmLabel: district ? '確認刪除' : '確認移入過期通告',
       danger: district,
@@ -311,22 +319,20 @@ export default function Page() {
       <span className="badge gold">活動管理</span>
       <h1>🎯 活動管理</h1>
       <p>
-        <b>自行舉辦</b>有 3 種加入方法（APP 打字／上載通告／通告連結）；
-        <b>區地域總會活動</b>有 2 種（圖書館引入／貼上通告連結，<b>不做統計</b>，成員想報就報）。
+        <b>旅團活動</b>有 3 種加入方法（APP 打字／上載通告／通告連結）；
+        <b>區地域總會活動</b>有 2 種（通告圖書館引入／貼上通告連結，<b>不做統計</b>，成員想報就報）。
       </p>
       <div className="row" style={{ marginTop: 6, flexWrap: 'wrap' }}>
-        <Link href="/admin/registrations" className="btn gold">📊 活動統計（只計自行舉辦）→</Link>
-        <a className="btn" href={LIBRARY_URL} target="_blank" rel="noopener noreferrer">📚 童軍通告圖書館</a>
-        <Link href="/library/import" className="btn">🗺️ 圖書館引入頁</Link>
+        <Link href="/admin/registrations" className="btn gold">📊 活動統計（只計旅團活動）→</Link>
       </div>
     </section>
 
     {err && <p className="badge red">{err}</p>}
     {msg && <p className="badge green">{msg}</p>}
 
-    {/* 分頁：自行舉辦 / 區地域總會 / 過期通告 */}
+    {/* 分頁：旅團活動 / 區地域總會 / 過期通告（可由上方統計用 ?tab= 直接跳入） */}
     <div className="row" style={{ gap: 6, flexWrap: 'wrap' }}>
-      <button type="button" className={`btn ${tab === 'self' ? 'primary' : ''}`} onClick={() => { setTab('self'); setShowAdd(false); }}>🏠 自行舉辦（{selfEvents.length}）</button>
+      <button type="button" className={`btn ${tab === 'self' ? 'primary' : ''}`} onClick={() => { setTab('self'); setShowAdd(false); }}>🏠 旅團活動（{selfEvents.length}）</button>
       <button type="button" className={`btn ${tab === 'district' ? 'primary' : ''}`} onClick={() => { setTab('district'); setShowAdd(false); }}>🗺️ 區地域總會活動（{districtEvents.length}）</button>
       <button type="button" className={`btn ${tab === 'archived' ? 'primary' : ''}`} onClick={() => { setTab('archived'); setShowAdd(false); }}>🗂️ 過期通告（{archived.length}）</button>
     </div>
@@ -337,12 +343,12 @@ export default function Page() {
 
     {tab !== 'archived' && (
       <button className="btn primary" onClick={() => setShowAdd(!showAdd)}>
-        {showAdd ? '取消' : tab === 'district' ? '＋ 加入區地域總會活動' : '＋ 新增自行舉辦活動'}
+        {showAdd ? '取消' : tab === 'district' ? '＋ 加入區地域總會活動' : '＋ 新增旅團活動'}
       </button>
     )}
 
     {showAdd && tab !== 'archived' && <section className="card stack">
-      <h3>{tab === 'district' ? '加入區地域總會活動' : '新增自行舉辦活動'}</h3>
+      <h3>{tab === 'district' ? '加入區地域總會活動' : '新增旅團活動'}</h3>
 
       {/* 加入方法揀選 */}
       <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 8 }}>
@@ -363,7 +369,7 @@ export default function Page() {
         })}
       </div>
 
-      {/* 方法 2（自行舉辦）：上載通告 */}
+      {/* 方法 2（旅團活動）：上載通告 */}
       {tab === 'self' && selfMode === 'upload' && (
         <div className="card stack" style={{ background: '#f8fafc' }}>
           <label>上載通告檔案（.docx / .txt）
@@ -374,7 +380,7 @@ export default function Page() {
         </div>
       )}
 
-      {/* 方法：通告連結（自行舉辦 3 / 區地域總會 2） */}
+      {/* 方法：通告連結（旅團活動 3 / 區地域總會 2） */}
       {needsLink && (
         <label>通告連結 *
           <input value={noticeUrl} onChange={e => setNoticeUrl(e.target.value)} placeholder="https://... （PDF／Google Drive／報名表格）" />
@@ -387,7 +393,6 @@ export default function Page() {
           <p className="muted" style={{ margin: 0 }}>喺圖書館揀好通告後，用「引入」帶入資料；或者喺下面自行填寫標題／連結。</p>
           <div className="row" style={{ flexWrap: 'wrap' }}>
             <a className="btn primary" href={LIBRARY_URL} target="_blank" rel="noopener noreferrer">📚 打開通告圖書館</a>
-            <Link className="btn" href="/library/import">🗺️ 前往圖書館引入頁</Link>
           </div>
           <label>通告連結（可選）
             <input value={noticeUrl} onChange={e => setNoticeUrl(e.target.value)} placeholder="https://..." />
@@ -432,7 +437,7 @@ export default function Page() {
 
     {list.length === 0 && (
       <section className="card"><p className="muted" style={{ margin: 0 }}>
-        {tab === 'archived' ? '未有過期通告。自行舉辦的活動過期後放入這裡，隨時可以查回。' : '暫無活動，用上面的按鈕加入。'}
+        {tab === 'archived' ? '未有過期通告。旅團活動過期後放入這裡，隨時可以查回。' : '暫無活動，用上面的按鈕加入。'}
       </p></section>
     )}
 
@@ -453,7 +458,7 @@ export default function Page() {
         {isEdit ? (
           <div className="stack" style={{ gap: 6 }}>
             <label>分類<select value={editCategory} onChange={e => setEditCategory(e.target.value as any)}>
-              <option value="self">🏠 自行舉辦</option>
+              <option value="self">🏠 旅團活動</option>
               <option value="district">🗺️ 區地域總會活動（不做統計）</option>
             </select></label>
             <label>日期<input type="date" value={editDate} onChange={e => setEditDate(e.target.value)} /></label>

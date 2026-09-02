@@ -26,14 +26,6 @@ const ACTIVITIES = [
   { id: 'a3', title: '總區領袖訓練', date: '9月28日', type: 'external' as const, registered: 5, interested: 2, pending: 8, declined: 1, paid: 5, deadline: '已過期', expired: true },
 ];
 
-// 通告（活動頁用 — 家長/成員只看最新，領袖看全部含過期）
-const NOTICES_ACTIVITY = [
-  { id: 'n1', title: '旅團露營報名', date: '9月20-21日', type: 'internal' as const, deadline: '9月15日', expired: false, source: '旅團自辦' },
-  { id: 'n2', title: '區運會報名', date: '10月5日', type: 'internal' as const, deadline: '9月28日', expired: false, source: '旅團自辦' },
-  { id: 'n3', title: '總區領袖訓練課程', date: '9月28日', type: 'external' as const, deadline: '已過期', expired: true, source: '圖書館引入' },
-  { id: 'n4', title: '世界思緒日活動', date: '10月18日', type: 'external' as const, deadline: '10月10日', expired: false, source: '圖書館引入' },
-];
-
 // 成員統計
 const BRANCH_STATS = [
   { id: 'b1', name: '小童軍', members: 8, patrols: 0 },
@@ -84,7 +76,7 @@ export default function DashboardPage() {
             { href: '/dashboard/notices', label: '📢 最新消息' },
             { href: '/dashboard/activities', label: '🎯 活動' },
             { href: '/dashboard/profile', label: '👤 我的' },
-            { href: '/dashboard/updates', label: '🆕 更新公告' },
+            { href: '/dashboard/updates', label: '🆕 系統更新' },
             { href: '/dashboard/templates', label: '📂 模板下載' },
             { href: '/dashboard/admin', label: '🛠 管理中心' },
           ].map(l => (
@@ -111,6 +103,27 @@ export default function DashboardPage() {
       {/* ═══════════════════════════════════════════
           家長/成員 — 我的監察
           ═══════════════════════════════════════════ */}
+      {/* 家長／成員上方統計（同真實 /member、/parent 一致）：
+          有幾多個活動進行中、自己／子女報咗未、有冇未付款，
+          以及外部（區地域總會）另外有幾多個活動可以自己去報。 */}
+      {isParentOrMember && (
+        <section className="bg-white rounded-2xl border border-slate-200 shadow-sm p-3 grid grid-cols-2 sm:grid-cols-5 gap-2.5">
+          {[
+            { label: '進行中活動', value: 3, desc: '旅團活動', cls: 'bg-blue-50 text-blue-700' },
+            { label: '已報名', value: 2, desc: role === 'parent' ? '子女人次' : '確定參加', cls: 'bg-emerald-50 text-emerald-700' },
+            { label: '未回覆', value: 1, desc: '等你決定', cls: 'bg-rose-50 text-rose-700' },
+            { label: '未付款', value: 1, desc: '已報名待付', cls: 'bg-amber-50 text-amber-700' },
+            { label: '區地域總會', value: 2, desc: '外部活動·自行報名', cls: 'bg-violet-50 text-violet-700' },
+          ].map(st => (
+            <div key={st.label} className={`rounded-xl px-3 py-3.5 text-center ${st.cls}`}>
+              <div className="text-2xl font-black leading-none">{st.value}</div>
+              <div className="text-[13px] font-bold mt-1.5">{st.label}</div>
+              <div className="text-[13px] text-slate-500 mt-0.5">{st.desc}</div>
+            </div>
+          ))}
+        </section>
+      )}
+
       {isParentOrMember && (
         <section className="bg-gradient-to-br from-brand-600 to-brand-800 text-white rounded-2xl p-4 shadow-lg">
           <div className="flex items-center justify-between mb-3">
@@ -174,7 +187,32 @@ export default function DashboardPage() {
       )}
 
       {/* ═══════════════════════════════════════════
-          領袖 — 申請卡片（取代原統計摘要）
+          領袖 — 上方統計（同真實 /admin、/leader 一致）
+          排列：先活動（內部 → 外部），再人（待審批 → 用戶）；
+          每格都直接跳去對應嘅管理頁。公告已改為最上方最新消息，
+          所以統計唔會再有「公告 / 通告」呢一格。
+          ═══════════════════════════════════════════ */}
+      {isLeader && (
+        <section className="bg-white rounded-2xl border border-slate-200 shadow-sm p-3 grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+          {[
+            { label: '旅團活動', value: 2, desc: '內部·已發布', cls: 'bg-emerald-50 text-emerald-700', href: '/dashboard/activities?tab=self' },
+            { label: '區地域總會', value: 1, desc: '外部·已發布', cls: 'bg-violet-50 text-violet-700', href: '/dashboard/activities?tab=district' },
+            { label: '待審批', value: 2, desc: '帳號 / 成員申請', cls: 'bg-rose-50 text-rose-700', href: '/dashboard/admin/applications' },
+            { label: '用戶', value: 86, desc: '總登記人數', cls: 'bg-blue-50 text-blue-700', href: '/dashboard/admin/users' },
+          ].map(st => (
+            <Link key={st.label} href={st.href} className="no-underline text-inherit block">
+              <div className={`h-full rounded-xl px-3 py-3.5 text-center ${st.cls}`}>
+                <div className="text-2xl font-black leading-none">{st.value}</div>
+                <div className="text-[13px] font-bold mt-1.5">{st.label}</div>
+                <div className="text-[13px] text-slate-500 mt-0.5">{st.desc}</div>
+              </div>
+            </Link>
+          ))}
+        </section>
+      )}
+
+      {/* ═══════════════════════════════════════════
+          領袖 — 申請卡片
           ═══════════════════════════════════════════ */}
       {isLeader && (
         <section className="bg-white rounded-2xl border border-slate-200 p-4">
@@ -221,7 +259,7 @@ export default function DashboardPage() {
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2">
                       <span className={`text-[13px] px-1.5 py-0.5 rounded font-bold ${a.type === 'internal' ? 'bg-blue-100 text-blue-700' : 'bg-violet-100 text-violet-700'}`}>
-                        {a.type === 'internal' ? '🏠 內部' : '📚 外部'}
+                        {a.type === 'internal' ? '🏠 旅團活動' : '🗺️ 區地域總會'}
                       </span>
                       <span className="font-bold text-xs">{a.title}</span>
                     </div>

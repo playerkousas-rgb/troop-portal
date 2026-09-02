@@ -299,7 +299,7 @@ export function apiUpdateEvent(p: { eventId: string; title?: string; date?: stri
 export function apiDeleteEvent(eventId: string) {
   return apiMutate('deleteEvent', { eventId });
 }
-/** 過期通告：自行舉辦 → 放入「過期通告」封存（可查回）；區地域總會（外部）→ 直接刪除 */
+/** 過期通告：旅團活動 → 放入「過期通告」封存（可查回）；區地域總會（外部）→ 直接刪除 */
 export function apiArchiveEvent(eventId: string) {
   return apiMutate('archiveEvent', { eventId });
 }
@@ -550,7 +550,7 @@ export async function apiGetAttendanceMatrix(p: {
   });
 }
 
-/** 後補／補改：列出可以點名嘅場次（過期／即將嘅恆常集會日 + 旅團自辦活動） */
+/** 後補／補改：列出可以點名嘅場次（過期／即將嘅恆常集會日 + 旅團活動） */
 export async function apiGetAttendanceSessions(p: { branchId: string }) {
   const user = currentUser();
   return apiGet('getAttendanceSessions', {

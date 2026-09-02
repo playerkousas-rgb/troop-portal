@@ -434,7 +434,7 @@ export default function AttendancePage() {
       ...displayedRoster.map(r => [
         r.name, r.ymNumber, branchName(r.branchId || branchId), r.patrolName || '',
         statusLabel(r.status || ''), r.note || '', editor.date,
-        editor.mode === 'activity' ? '旅團自辦活動' : '恆常集會',
+        editor.mode === 'activity' ? '旅團活動' : '恆常集會',
       ]),
     ]);
   }
@@ -469,7 +469,7 @@ export default function AttendancePage() {
           <span className="badge green">內建功能</span>
           <h1>📝 簽到／點名</h1>
           <p className="muted" style={{ fontSize: 16 }}>
-            記錄日常／恆常集會及旅團自辦活動嘅實際出席（P／A／L／E／S）。
+            記錄日常／恆常集會及旅團活動嘅實際出席（P／A／L／E／S）。
             可以後補改返過期集會／活動，亦可以按期間匯出出席統計。
           </p>
           <div className="row" style={{ marginTop: 4 }}>
@@ -516,7 +516,7 @@ export default function AttendancePage() {
                   onClick={async () => { if (await guardDiscard()) { setMode('activity'); setEditor(null); setLoaded(false); setDirty(false); } }}
                   className={`${btnCls} text-base ${mode === 'activity' ? 'bg-brand-700 text-white border-brand-700' : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'}`}
                 >
-                  🎪 旅團自辦活動
+                  🎪 旅團活動
                 </button>
               </div>
 
@@ -756,7 +756,7 @@ export default function AttendancePage() {
                   <select className={inputCls} value={reportType} onChange={e => setReportType(e.target.value as any)}>
                     <option value="all">全部（集會＋活動）</option>
                     <option value="meeting">恆常集會</option>
-                    <option value="activity">旅團自辦活動</option>
+                    <option value="activity">旅團活動</option>
                   </select>
                 </label>
                 <label style={{ fontSize: 15 }}>小隊

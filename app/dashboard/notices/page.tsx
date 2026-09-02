@@ -4,6 +4,8 @@ import { useConfirm, kv } from '@/components/ConfirmProvider';
 
 /* ═══════════════════════════════════════════════════
    MOCK 最新消息 = notification（通知類）
+   ★ 已同真實 APP 對齊：真實版嘅「最新消息」係全站最上方嗰條 📣 BAR
+     （領袖直接點條 BAR 加入，最多 3 條），再冇「公告」呢個獨立概念。
    ── 對照用戶定義：公告係「突然要取消活動」「提家長交幾月團費」呢類提示，
       唔係活動通告文件（通告文件屬於活動，用 Drive 連結或模板）。
    ── 對照用戶要求 #6：有權限者直接喺呢一頁發佈／編輯／刪除，唔使跳去管理工具。
@@ -87,15 +89,15 @@ export default function NoticesPage() {
   function save() {
     if (!form) return;
     // 防呆：標題＋內文必填
-    if (!form.title.trim()) { setFormErr('請填寫公告標題。'); return; }
-    if (!form.body.trim()) { setFormErr('請填寫公告內容。'); return; }
+    if (!form.title.trim()) { setFormErr('請填寫消息標題。'); return; }
+    if (!form.body.trim()) { setFormErr('請填寫消息內容。'); return; }
     const clean = { ...form, title: form.title.trim(), body: form.body.trim() };
     if (form.id) {
       setItems(prev => prev.map(a => (a.id === form.id ? clean : a)));
-      setMsg(`✅ 已更新公告「${clean.title}」`);
+      setMsg(`✅ 已更新消息「${clean.title}」`);
     } else {
       setItems(prev => [{ ...clean, id: 'n' + Date.now() }, ...prev]);
-      setMsg(`✅ 已發佈公告「${clean.title}」（${clean.target}${clean.urgent ? ' · 緊急' : ''}）`);
+      setMsg(`✅ 已發佈消息「${clean.title}」（${clean.target}${clean.urgent ? ' · 緊急' : ''}）`);
     }
     setForm(null);
   }
@@ -105,14 +107,14 @@ export default function NoticesPage() {
     if (!a) return;
     // 防呆：刪除前確認
     const ok = await confirm({
-      title: '確認刪除公告',
-      message: kv([['公告', a.title], ['提示', '刪除後成員就唔會再見到']]),
+      title: '確認刪除最新消息',
+      message: kv([['消息', a.title], ['提示', '刪除後成員就唔會再見到']]),
       confirmLabel: '確認刪除',
       danger: true,
     });
     if (!ok) return;
     setItems(prev => prev.filter(x => x.id !== id));
-    setMsg(`🗑 已刪除公告「${a.title}」`);
+    setMsg(`🗑 已刪除消息「${a.title}」`);
   }
 
   const inputCls = 'flex-1 rounded-lg border border-slate-200 px-2 py-1.5 text-xs';
@@ -134,20 +136,20 @@ export default function NoticesPage() {
 
       {/* Header */}
       <div className="flex items-center justify-between gap-2 flex-wrap">
-        <h1 className="font-bold text-lg m-0">📢 公告</h1>
+        <h1 className="font-bold text-lg m-0">📣 最新消息</h1>
         {isLeader && (
-          <button onClick={openNew} className="text-[13px] px-2.5 py-1 rounded-lg font-bold bg-brand-600 text-white">+ 發佈公告</button>
+          <button onClick={openNew} className="text-[13px] px-2.5 py-1 rounded-lg font-bold bg-brand-600 text-white">+ 發佈消息</button>
         )}
       </div>
       <p className="text-[13px] text-slate-500 m-0 -mt-2 leading-relaxed">
-        最新消息＝通知類訊息，例如「活動因天氣取消」「請家長交團費」「集會改期」。活動通告文件分為旅團自辦及外部活動，統一喺「活動」入面。
+        最新消息＝通知類訊息，例如「活動因天氣取消」「請家長交團費」「集會改期」。活動通告文件分為旅團活動及外部活動，統一喺「活動」入面。
       </p>
 
       {msg && <div className="text-[13px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-xl px-3 py-2">{msg}</div>}
 
       {/* 列表 */}
       <div className="space-y-2">
-        {sorted.length === 0 && <p className="text-center text-sm text-slate-500 py-8">暫無公告</p>}
+        {sorted.length === 0 && <p className="text-center text-sm text-slate-500 py-8">暫無最新消息</p>}
         {sorted.map(a => {
           const expired = isExpired(a);
           return (
@@ -176,10 +178,10 @@ export default function NoticesPage() {
         })}
       </div>
 
-      {/* 過期公告開關 */}
+      {/* 過期消息開關 */}
       <div className="flex items-center gap-2">
         <button onClick={() => setShowExpired(v => !v)} className="text-[13px] font-bold text-slate-600 bg-slate-100 border-0 rounded-lg px-3 py-2 cursor-pointer hover:bg-slate-200">
-          {showExpired ? '隱藏已過期公告' : `顯示已過期公告（${items.filter(isExpired).length}）`}
+          {showExpired ? '隱藏已過期消息' : `顯示已過期消息（${items.filter(isExpired).length}）`}
         </button>
       </div>
 
@@ -187,7 +189,7 @@ export default function NoticesPage() {
       {form && (
         <div className="fixed inset-0 z-50 bg-black/30 flex items-end sm:items-center justify-center p-0 sm:p-4">
           <div className="bg-white w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl p-4 space-y-3 max-h-[90vh] overflow-y-auto">
-            <h3 className="font-bold text-sm m-0">{form.id ? '✏️ 編輯公告' : '📢 發佈公告'}</h3>
+            <h3 className="font-bold text-sm m-0">{form.id ? '✏️ 編輯消息' : '📣 發佈最新消息'}</h3>
             <label className="flex items-center gap-2 text-[13px] font-bold text-slate-600">標題<input className={inputCls} value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} placeholder="例如：9月20日露營因天氣取消" /></label>
             <label className="flex flex-col gap-1 text-[13px] font-bold text-slate-600">內容
               <textarea rows={4} className="rounded-lg border border-slate-200 px-2 py-1.5 text-xs" value={form.body} onChange={e => setForm({ ...form, body: e.target.value })} placeholder="寫清楚發生咩事、成員／家長要做咩、限期" />
