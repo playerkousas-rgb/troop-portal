@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { useConfirm, kv } from '@/components/ConfirmProvider';
 
 /* ═══════════════════════════════════════════════════
-   MOCK 公告 = announcement（提示類）
+   MOCK 最新消息 = notification（通知類）
    ── 對照用戶定義：公告係「突然要取消活動」「提家長交幾月團費」呢類提示，
       唔係活動通告文件（通告文件屬於活動，用 Drive 連結或模板）。
    ── 對照用戶要求 #6：有權限者直接喺呢一頁發佈／編輯／刪除，唔使跳去管理工具。
@@ -140,7 +140,7 @@ export default function NoticesPage() {
         )}
       </div>
       <p className="text-[13px] text-slate-500 m-0 -mt-2 leading-relaxed">
-        公告＝提示類訊息，例如「活動因天氣取消」「請家長交團費」「集會改期」。活動通告文件唔喺呢度，喺「活動」入面。
+        最新消息＝通知類訊息，例如「活動因天氣取消」「請家長交團費」「集會改期」。活動通告文件分為旅團自辦及外部活動，統一喺「活動」入面。
       </p>
 
       {msg && <div className="text-[13px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-xl px-3 py-2">{msg}</div>}

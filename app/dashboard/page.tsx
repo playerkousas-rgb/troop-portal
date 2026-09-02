@@ -81,7 +81,7 @@ export default function DashboardPage() {
             { href: '/dashboard/login', label: '🔑 登入頁' },
             { href: '/dashboard', label: '📊 控制台' },
             { href: '/dashboard/calendar', label: '📅 行事曆' },
-            { href: '/dashboard/notices', label: '📢 公告' },
+            { href: '/dashboard/notices', label: '📢 最新消息' },
             { href: '/dashboard/activities', label: '🎯 活動' },
             { href: '/dashboard/profile', label: '👤 我的' },
             { href: '/dashboard/updates', label: '🆕 更新公告' },
@@ -152,13 +152,13 @@ export default function DashboardPage() {
       )}
 
       {/* ═══════════════════════════════════════════
-          領袖 — 下方 4 格：行事曆 · 公告 · 點名 · 管理中心
+          領袖 — 下方 4 格：行事曆 · 最新消息 · 點名 · 管理中心
           ═══════════════════════════════════════════ */}
       {isLeader && (
         <section className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
           {[
             { icon: '📅', label: '行事曆', desc: '集會·活動·會議', href: '/dashboard/calendar', tone: 'from-blue-600 to-blue-800' },
-            { icon: '📢', label: '公告', desc: '通知類訊息', href: '/dashboard/notices', tone: 'from-amber-500 to-amber-700' },
+            { icon: '📢', label: '最新消息', desc: '最新消息／通知', href: '/dashboard/notices', tone: 'from-amber-500 to-amber-700' },
             { icon: '📝', label: '點名', desc: '出席紀錄', href: '/dashboard/attendance', tone: 'from-violet-600 to-violet-800' },
             { icon: '🔧', label: '管理中心', desc: '統計·管理項目', href: '/dashboard/admin', tone: 'from-slate-600 to-slate-800' },
           ].map(t => (

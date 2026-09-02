@@ -36,7 +36,7 @@ export default function MockAdminCenter() {
         <div>
           <Link href="/dashboard" className="text-[13px] font-bold text-slate-500 no-underline hover:text-brand-700">← 返回控制台</Link>
           <h1 className="font-black text-xl text-slate-900 m-0 mt-1">🔧 管理中心</h1>
-          <p className="text-[13px] text-slate-500 m-0 mt-1">管理權人士可在這裡進入各項管理；日常操作仍可在行事曆、公告及活動頁直接處理。</p>
+          <p className="text-[13px] text-slate-500 m-0 mt-1">管理權人士可在這裡進入各項管理；日常操作仍可在行事曆、最新消息及活動頁直接處理。</p>
         </div>
         <span className="text-[13px] font-black bg-amber-100 text-amber-800 border border-amber-200 rounded-full px-2.5 py-1">🎨 MOCK 管理中心</span>
       </div>
@@ -101,7 +101,7 @@ export default function MockAdminCenter() {
           <div className="text-sm">🏢</div><div className="font-bold text-[13px] mt-1">支部及小隊</div><div className="text-[13px] text-slate-500">成員分組</div>
         </Link>
         <Link href="/dashboard/notices" className="no-underline text-inherit bg-white border border-slate-200 rounded-xl px-3 py-2.5 hover:border-brand-300 transition">
-          <div className="text-sm">📢</div><div className="font-bold text-[13px] mt-1">公告管理</div><div className="text-[13px] text-slate-500">通知類訊息</div>
+          <div className="text-sm">📢</div><div className="font-bold text-[13px] mt-1">最新消息管理</div><div className="text-[13px] text-slate-500">最新消息／通知</div>
         </Link>
       </section>
     </main>
