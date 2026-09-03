@@ -1369,3 +1369,119 @@ notices 已清走／冇重複 id）。
 （同基線一致）· **9 個 check 全綠**：`check:gs` · **`check:gscards` 17**（新）·
 `check:perms` 47/47/18 · `check:public` 60 · `check:security` 114 ·
 `check:links` 210 · `check:modules` · `check:calendar` · `check:render`。
+
+---
+
+## 2026-09-03 ★★ 用執行搵到兩條真繞過路徑 —— §11 之前嘅「已封閉」係錯嘅
+
+### 先講我錯咗乜
+
+我之前多次聲稱「§11 peer-guard 漏洞已封閉」。**呢個講法對 GS 路徑而言係錯嘅。**
+
+守衛本身寫咗，但**有兩條路可以繞過佢**。兩者都係靠「執行」先至搵到 ——
+閱讀同 `node --check` 都睇唔出，而 §11 原有嘅測試只用 `updateUserRole`
+一條路（冇帶 `field`），所以一直綠燈。
+
+### 漏洞 1：`updateUserRole` 嘅守衛係有條件嘅
+
+`gs/SCOUTSYSTEM_2_SETUP.gs:3583`（修正前）：
+```js
+if (String(p.field || '').toLowerCase() !== 'role') {
+  var peer = checkAdminPeerGuard_(p, 'role');
+  if (peer) return peer;
+}
+```
+守衛**只喺 `field !== 'role'` 時先執行**。實測：
+```
+{action:'updateUserRole', userId:'u_tl', role:'member', field:'role'}
+→ success=true，旅長被降級做 member
+```
+`p.field` 係 `handleUpdateUserField_` 先用嘅參數，喺呢個**無條件寫 role**
+嘅 handler 入面根本冇意義 —— 條件係寫反咗。mock 側一直都係無條件，
+所以呢個係前後端落差。
+
+### 漏洞 2：`updateUserField` 完全冇 peer guard
+
+`handleUpdateUserField_` 係萬用寫入：
+```js
+updateCellByName_('Users', 'userId', p.userId, p.field, p.value || '');
+```
+`field='role'` 時佢會**直接寫 role**，等同 `updateUserRole`，但**冇任何 peer guard**。
+
+`checkActionPermission_` 經 `requestedRole_`（L1905）只擋**保留角色**
+（`super_admin`）同**不可指派角色**（`troop_leader`）；
+降級做 `member` 係合法角色，所以攔唔到。實測：
+```
+{action:'updateUserField', userId:'u_tl', field:'role', value:'member'}
+→ success=true，旅長被降級做 member
+```
+
+### 點解後果特別嚴重
+
+冇任何 API 路徑可以還原旅長 —— `transferTroopLeader` 要**現任旅長**發起。
+所以管理員一旦用呢兩條路降級咗旅長，**全旅領導層永久癱瘓**，
+要人手改 Sheet 先至救得返。
+
+呢個唔係推斷：`check:security` 嘅 negative control 跑返舊 code 時，
+除咗預期嘅 2 項之外仲有 **4 項連鎖失敗**
+（`已還原 u_gl`／`且 u_m1 冇變旅長`／`現任旅長可以交接俾支部領袖`／`對方變成旅長`）
+—— 因為旅長真係被降級咗，之後所有依賴旅長存在嘅測試全部冧。
+
+### 修正
+
+| 位置 | 修正 |
+|---|---|
+| `gs/…gs:3602` `handleUpdateUserRole_` | 守衛改為**無條件** |
+| `gs/…gs:3716-3719` `handleUpdateUserField_` | `field='role'` 時加 peer guard |
+| `lib/mockServer.ts:1164-1167` `updateUserField` | 同上（mock 原本都有同一個洞） |
+
+非 role 欄位（`branchId`／`name` 等）唔受限，避免誤擋正常編輯
+（`check:security` 有對照斷言）。
+
+### 驗證
+
+**新建 `scripts/check-gs-roles.mjs`（`npm run check:gsroles`）—— 38 項斷言全過：**
+
+| 節 | 覆盖 |
+|---|---|
+| A | 「👑 交接旅長」守衛：自己／非旅長／成員／家長全拒；成功路徑驗證**交換**（角色＋支部 4 次寫入）；交接後仍只得一個旅長 |
+| B | 「只能加不能減」：改／刪管理員、改／刪旅長全拒；**送 `field=role` 都擋**；旅長不受限 |
+| C | 保留角色 ＋ 不可指派角色 |
+| **C2** | **第二條繞過路徑 `updateUserField field=role`**：降旅長／降管理員全拒；`super_admin`／`troop_leader` 照擋；旅長不受限；非 role 欄位唔誤擋 |
+| D | 3 個 legacy `troop_super` 只歸一出 1 個旅長（最早 `createdAt`），其餘降 `admin` |
+
+**`check:security` 由 114 升到 120 項斷言**（§11 加 6 個繞過路徑斷言，mock 側）。
+
+**Negative control（第 14、15 個）：**
+- 還原 `handleUpdateUserRole_` 舊條件 → `check:gsroles` **恰好 4 項變紅**
+- 攞走 `handleUpdateUserField_` 守衛 → **恰好 4 項變紅**
+- 攞走 mock `updateUserField` 守衛 → `check:security` **6 項變紅（2 預期 ＋ 4 連鎖）**
+
+三者還原後 `grep -c NEGCTRL` 全部 0，`cmp` 同 `public/downloads/` 一致。
+`check:security` 連跑 3 次全綠（冪等）。
+
+### ★ 教訓
+
+1. **「測試綠燈」只証明測咗嗰條路。** §11 原有測試只用 `updateUserRole`
+   冇帶 `field`，所以守衛嘅條件式缺陷完全冇被觸發。
+   同一個操作有几條 API 路就要測几条。
+2. **萬用寫入 endpoint 係守衛嘅天然缺口。** `updateUserField(field, value)`
+   可以寫任何欄位，包括受保護嗰啲 —— 任何守衛都要諗「有冇第二條路做到同一件事」。
+3. **前後端落差又出現一次。** mock 無條件、GS 有條件 —— 而 mock 先係開發時
+   日常跑嗰個，所以漏洞一直隱形。
+
+### 驗證（全套）
+
+`tsc` 0 error · `next build` exit 0 / 64 routes · `npm run lint` 9 warnings / 0 errors
+（同基線一致）· **10 個 check 全綠**：`check:gs` · `check:gscards` 17 ·
+**`check:gsroles` 38**（新）· `check:perms` 47/47/18 · `check:public` 60 ·
+**`check:security` 120** · `check:links` 210 · `check:modules` ·
+`check:calendar` · `check:render`。
+GS 250,009 bytes，同 `public/downloads/` 副本 `cmp` 一致。
+
+### ⚠️ 82 旅 live 檢查
+
+呢兩條路都係**已存在**嘅漏洞（唔係今次引入），所以 82 旅 live Sheet
+理論上可能已經被人用過。重新部署後建議：
+1. 開 Sheet 嘅 `Users` 表，確認 `role='troop_leader'` **恰好一行**
+2. 睇 `AuditLog` 有冇 `updateUserField role=…` 或 `updateUserRole` 嘅可疑紀錄

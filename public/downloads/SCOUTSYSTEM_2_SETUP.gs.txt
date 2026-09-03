@@ -3579,11 +3579,28 @@ function handleBatchCreateMembers_(p) {
 }
 
 function handleUpdateUserRole_(p) {
-  // ★ 「只能加不能減」：admin 唔可以改其他管理員嘅角色
-  if (String(p.field || '').toLowerCase() !== 'role') {
-    var peer = checkAdminPeerGuard_(p, 'role');
-    if (peer) return peer;
-  }
+  /**
+   * ★ 「只能加不能減」：admin 唔可以改其他管理員／旅長嘅角色。
+   *
+   * ★★ 守衛必须**無條件**執行（2026-09-03 修正）。
+   *
+   *   原本係：
+   *     if (String(p.field || '').toLowerCase() !== 'role') { peer guard }
+   *   —— 即係 client 只要多送一個 `field=role` 就可以跳過守衛。
+   *
+   *   實測証明（scripts/check-gs-roles.mjs，經 doGet 驅動）：
+   *     {action:'updateUserRole', userId:'u_tl', role:'member', field:'role'}
+   *     → success=true，旅長被降級做 member。
+   *
+   *   呢個係 §11 漏洞嘅繞過路徑。後果特別嚴重：冇任何 API 路徑可以還原旅長
+   *   （transferTroopLeader 要現任旅長發起），所以全旅領導層會永久癱瘓。
+   *
+   *   `p.field` 係 handleUpdateUserField_（見下面）先用嘅參數，喺呢個
+   *   **無條件寫 role** 嘅 handler 入面根本冇意義 —— 條件係寫反咗。
+   *   mock 側（lib/mockServer.ts:1109）一直都係無條件，所以呢個係前後端落差。
+   */
+  var peer = checkAdminPeerGuard_(p, 'role');
+  if (peer) return peer;
   updateCellByName_('Users', 'userId', p.userId, 'role', p.role || 'member');
   writeAudit_(p.operatedBy || 'system', 'updateUserRole', 'Users', p.userId, 'role=' + (p.role || ''));
   return { success: true };
@@ -3678,6 +3695,28 @@ function handleTransferTroopLeader_(p) {
 }
 
 function handleUpdateUserField_(p) {
+  /**
+   * ★ field='role' 時要過 peer guard（2026-09-03 修正）。
+   *
+   * 呢個 handler 係萬用寫入（`updateCellByName_(…, p.field, p.value)`），
+   * 所以 `field='role'` 時佢會**直接寫 role** —— 等同 updateUserRole，
+   * 但原本**完全冇 peer guard**，等於第二條繞過「只能加不能減」嘅路。
+   *
+   * 實測証明（scripts/check-gs-roles.mjs C2 節，經 doGet 驅動）：
+   *   {action:'updateUserField', userId:'u_tl', field:'role', value:'member'}
+   *   → success=true，旅長被降級做 member。
+   *
+   * checkActionPermission_ 經 requestedRole_（L1905）只擋**保留角色**
+   * （super_admin）同**不可指派角色**（troop_leader）；降級做 `member`
+   * 係合法角色，所以攔唔到。後果同 updateUserRole 嗰條一樣嚴重：
+   * 冇 API 路徑可以還原旅長，全旅領導層永久癱瘓。
+   *
+   * 非 role 欄位（branchId／name 等）唔受限，避免誤擋正常編輯。
+   */
+  if (String(p.field || '').trim().toLowerCase() === 'role') {
+    var peer = checkAdminPeerGuard_(p, 'role');
+    if (peer) return peer;
+  }
   updateCellByName_('Users', 'userId', p.userId, p.field, p.value || '');
   writeAudit_(p.operatedBy || 'system', 'updateUserField', 'Users', p.userId, p.field + '=' + (p.value || ''));
   return { success: true };

@@ -574,6 +574,37 @@ console.log('\n【MOCK：必須鏡像「只能加不能減」＋交接旅長】'
   r = handleMockRequest('updateUserRole', { userId: 'u_m1', role: 'parent', operatedBy: 'u_admin' });
   ok('MOCK 對照：管理員可以改成員嘅角色（向下）', r.success === true, j(r));
 
+  // ── ★ 兩條繞過路徑（2026-09-03 用執行搵到，唔係靠閱讀推斷）──
+  //
+  // 「只能加不能減」原本得 updateUserRole 一條路有守衛。但改角色其實有**兩條**路：
+  //
+  //   1. updateUserRole 帶 field=role
+  //        GS handleUpdateUserRole_ 嘅守衛係**有條件**嘅：
+  //          if (String(p.field||'').toLowerCase() !== 'role') { peer guard }
+  //        → client 多送一個 field=role 就跳過守衛。（GS 已改為無條件）
+  //
+  //   2. updateUserField field=role value=member
+  //        呢個 case 係萬用寫入，會直接寫 role，但 GS 同 mock **兩邊都冇 peer guard**。
+  //        checkActionPermission_ 經 requestedRole_ 只擋保留角色（super_admin）
+  //        同不可指派角色（troop_leader）；降級做 member 係合法角色，攔唔到。
+  //
+  // 兩條路嘅後果都係：管理員可以把旅長降級，而**冇任何 API 路徑可以還原**
+  // （transferTroopLeader 要現任旅長發起）→ 全旅領導層永久癱瘓。
+  r = handleMockRequest('updateUserRole', { userId: 'u_tl', role: 'member', operatedBy: 'u_admin', field: 'role' });
+  ok('MOCK：送 field=role 都唔可以改旅長角色（唔可以用參數繞過）', r.success === false, j(r));
+  ok('  旅長角色冇被改', roleOf('u_tl') === 'troop_leader', `role=${roleOf('u_tl')}`);
+
+  r = handleMockRequest('updateUserField', { userId: 'u_tl', field: 'role', value: 'member', operatedBy: 'u_admin' });
+  ok('MOCK：updateUserField 唔可以把旅長降級', r.success === false, j(r));
+  ok('  旅長角色冇被改', roleOf('u_tl') === 'troop_leader', `role=${roleOf('u_tl')}`);
+
+  r = handleMockRequest('updateUserField', { userId: 'u_gl', field: 'role', value: 'member', operatedBy: 'u_admin' });
+  ok('MOCK 對照：updateUserField 改團長角色照舊可以（peer guard 只擋管理層）',
+    r.success === true, j(r));
+  // 還原 u_gl
+  handleMockRequest('updateUserField', { userId: 'u_gl', field: 'role', value: 'group_leader', operatedBy: 'u_tl' });
+  ok('  已還原 u_gl', roleOf('u_gl') === 'group_leader', `role=${roleOf('u_gl')}`);
+
   r = handleMockRequest('transferTroopLeader', { targetUserId: 'u_bl', operatedBy: 'u_admin' });
   ok('MOCK：非現任旅長交接被拒', r.success === false, j(r));
 

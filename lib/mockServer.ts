@@ -1153,6 +1153,18 @@ function handleMutate(action: string, p: Record<string, any>) {
       return { success: true, message: `已交接旅長職位。你而家嘅角色係「${oldRole}」${oldBranch ? `（${oldBranch} 支部）` : ''}。` };
     }
     case 'updateUserField': {
+      /**
+       * ★ field='role' 時要過 peer guard（2026-09-03 修正，同 GS 一致）。
+       *
+       * 呢個 case 係萬用寫入，所以 field='role' 時佢會直接寫 role ——
+       * 等同 updateUserRole，但原本完全冇 peer guard，等於第二條繞過
+       * 「只能加不能減」嘅路（管理員可以把旅長／其他管理員降級做 member）。
+       * GS 側 handleUpdateUserField_ 同一個洞已一併修正。
+       */
+      if (String(p.field || '').trim().toLowerCase() === 'role') {
+        const peer = checkAdminPeerGuard(ob, String(p.userId || ''), 'role');
+        if (peer) return peer;
+      }
       const i = findIdx(store.users, 'id', String(p.userId || ''));
       if (i >= 0 && p.field) (store.users[i] as any)[p.field] = String(p.value ?? '');
       return S(ob);
