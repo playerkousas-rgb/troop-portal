@@ -411,6 +411,12 @@ PRIVATE 活動、報名名單、聯絡電話一概唔入 feed。
 
 - **開卡即預設公開全旅內容**：`toggleCard()` 喺 scope 清單為空時會自動加入 `troop`；
   關卡**保留** scope（重開唔使重新設定）。
+- **seed 預設值**（GS `SystemConfig` ＋ mock 一致）：`PUBLIC_CARDS='calendar,notices'`、
+  三張卡嘅 `PUBLIC_SCOPE_*` 全部 `'troop'`。
+  ⚠️ 呢個值**唔可以 seed 做空字串** —— 82 旅嘅 `SystemConfig` 而家冇 `PUBLIC_CARDS` 呢個 key，
+  部署新 GS 時 backfill 會 append seed 值；若 seed 空 → 三張卡全關 →
+  佢哋而家運作緊嘅公開行事曆／通告會喺部署嗰一刻靜靜地熄咗（`/api/ics` 亦會 403）。
+  seed `calendar,notices` ＝ 保留舊版公開瀏覽嘅實際行為（舊版訪客本來就睇唔到相簿，所以相簿卡預設關）。
 - **`cardEffective()` = 卡開 ＋ 至少一個 scope**。全部範圍關晒 → 卡片等於重新關閉，
   要再由管理員開返（用戶明確要求）。
 - `isItemPublic(config, card, branchId)` 一次過檢查三層；branchId 空值／`troop` ⇒ `troop` scope。
