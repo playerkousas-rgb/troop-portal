@@ -52,7 +52,7 @@ function RegistrationsInner(){
   const [activeListTab, setActiveListTab] = useState<string>('all');
   const { confirm } = useConfirm();
 
-  useEffect(()=>{loadStateSlice(['patrols','users','members','events','replies']).then(st=>{setS(st);const q=search?.get('eventId');setEventId(q||st.events.filter(e=>eventCategory(e)==='self'&&e.status!=='archived')[0]?.id||'')}).catch(e=>setErr(e.message))},[]);
+  useEffect(()=>{loadStateSlice(['patrols','users','members','events','replies']).then(st=>{setS(st);const q=search?.get('eventId');setEventId(q||st.events.filter(e=>eventCategory(e)==='self'&&e.status!=='archived')[0]?.id||'')}).catch(e=>setErr(e.message))},[search]);
   async function togglePaid(mid:string){
     const m=s?.members.find(x=>x.id===mid);
     const cur=!!replyStatus(s,eventId,mid)?.paid;

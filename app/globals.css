@@ -282,9 +282,13 @@
   }
 
   @media (max-width: 760px) {
-    .month-grid { display: flex; overflow-x: auto; }
-    .month-head { display: none; }
-    .month-cell { min-width: 140px; }
+    /* 月曆仍然保持七欄；之前改成單行 flex 會把 42 日排成水平長條，
+       手機要左右掃先睇到日期，亦失去星期欄結構。 */
+    .month-grid { grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 3px; }
+    .month-head { display: block; padding: 6px 2px; font-size: 12px; }
+    .month-cell { min-height: 88px; border-radius: 9px; padding: 5px 3px; gap: 3px; }
+    .day-num { font-size: 13px; }
+    .mini-event { font-size: 10px; padding: 3px 4px; border-radius: 5px; }
   }
 
   @media (max-width: 480px) {

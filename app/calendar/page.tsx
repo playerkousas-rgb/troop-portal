@@ -175,9 +175,14 @@ export default function Calendar() {
   /* 邊個可以去改呢個設定 —— 卡片由管理層開關（/admin/settings） */
   const canTogglePublic = scope.adminTier;
 
+  function targetsMember(e: any, memberId: string) {
+    // 全旅／支部活動未指定 targetMemberIds 時，後台會視為該 scope 全員；
+    // MOCK 同真後台一致，前端亦不要因空陣列漏掉活動。
+    return e.targetMemberIds?.length ? e.targetMemberIds.includes(memberId) : e.scope === 'troop' || e.scope === 'branch';
+  }
   function visibleEvent(e: any) {
-    if (role === 'member') return !!myMember && e.targetMemberIds.includes(myMember.id) && replyStatus(s, e.id, myMember.id)?.type !== 'declined';
-    if (role === 'parent' && children.length > 0) return children.some(c => e.targetMemberIds.includes(c.id));
+    if (role === 'member') return !!myMember && targetsMember(e, myMember.id) && replyStatus(s, e.id, myMember.id)?.type !== 'declined';
+    if (role === 'parent' && children.length > 0) return children.some(c => targetsMember(e, c.id));
     return true;
   }
   const pubEvents = (s.events || []).filter(e => e.status === 'published').filter(visibleEvent).filter(e => inScope(e.branchId));
@@ -221,13 +226,13 @@ export default function Calendar() {
 
   function rightForEvent(e: any) {
     if (isLeader) {
-      const targets = (s.members || []).filter(m => e.targetMemberIds.includes(m.id));
+      const targets = (s.members || []).filter(m => targetsMember(e, m.id));
       const counts: any = { registered: 0, interested: 0, declined: 0, unresponded: 0 };
       targets.forEach(m => { const r = replyStatus(s, e.id, m.id); counts[r?.type || 'unresponded']++ });
       return `✅${counts.registered} ❤️${counts.interested} ⚠️${counts.unresponded}`;
     }
     if (role === 'parent') {
-      const cs = (child === 'all' ? children : children.filter(c => c.id === child)).filter(c => e.targetMemberIds.includes(c.id));
+      const cs = (child === 'all' ? children : children.filter(c => c.id === child)).filter(c => targetsMember(e, c.id));
       const ic = (t?: string) => t === 'registered' ? '✅' : t === 'declined' ? '❌' : t === 'interested' ? '❤️' : '';
       return cs.map(c => `${child === 'all' ? c.name + ' ' : ''}${ic(replyStatus(s, e.id, c.id)?.type) || '·'}`).join('  ') || '—';
     }

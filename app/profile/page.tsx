@@ -2,14 +2,14 @@
 import { useEffect, useState } from 'react';
 import { AppState, loadState, loadStateSlice } from '@/lib/store';
 import { apiUpdateMember, apiUpdateUserField } from '@/lib/api';
-import { getSession, Session } from '@/lib/session';
+import { getSession, setSession as persistSession, Session } from '@/lib/session';
 import { branches, ROLE_LABEL, LEADER_ROLES } from '@/lib/model';
 import Link from 'next/link';
 import { useConfirm, kv } from '@/components/ConfirmProvider';
 
 /* ═══════════════════════════════════════════════════
    個人資料 —— MOCK 乾淨版式：大頭像 + 白卡表單
-   （功能不變：姓名/密碼/Email/電話/小隊/隊內身份）
+   （姓名／密碼／Email／電話可自助更新；編制資料只讀）
    ═══════════════════════════════════════════════════ */
 
 export default function Profile() {
@@ -28,8 +28,6 @@ export default function Profile() {
   const [password, setPassword] = useState('');
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
-  const [patrolId, setPatrolId] = useState('');
-  const [patrolRole, setPatrolRole] = useState('');
 
   useEffect(() => {
     if (!session) return;
@@ -37,7 +35,14 @@ export default function Profile() {
       setS(st);
       if (session.role === 'member') {
         const m = st.members.find(x => x.id === session.memberId);
-        if (m) { setName(m.name); setPhone(m.emergencyContactPhone || ''); setEmail(''); setPatrolId(m.patrolId || ''); setPatrolRole(m.patrolRole || '') }
+        const linkedUser = st.users.find(x => x.id === session.userId || x.memberId === session.memberId);
+        if (m) {
+          setName(m.name);
+          setPhone(m.emergencyContactPhone || '');
+          // Member.email 及 Users.email 係舊資料可能分開存在，優先顯示較新的
+          // 成員資料，否則回退到登入帳戶 Email。
+          setEmail(m.email || linkedUser?.email || '');
+        }
       } else {
         const u = st.users.find(x => x.id === session.userId);
         if (u) { setName(u.name); if (!LEADER_ROLES.includes(session.role)) setEmail(u.email || '') }
@@ -60,19 +65,35 @@ export default function Profile() {
     setErr(''); setOk(''); setSaving(true);
     try {
       if (session?.role === 'member' && session.memberId) {
-        const updates: any = { memberId: session.memberId, name };
+        if (!name.trim()) throw new Error('姓名不可留空。');
+        const updates: Record<string, string> = {
+          memberId: session.memberId,
+          name: name.trim(),
+          email: email.trim(),
+          // 一律送出電話，先可以清除過期聯絡電話；後端白名單只容許安全欄位。
+          emergencyContactPhone: phone.trim(),
+        };
         if (password) updates.password = password;
-        if (phone) updates.emergencyContactPhone = phone;
-        if (patrolId !== undefined) updates.patrolId = patrolId;
-        if (patrolRole) updates.patrolRole = patrolRole;
         const fresh = await apiUpdateMember(updates);
+        // 有 Users 對應列時同步 Email，忘記密碼才會寄到新地址；Members-only
+        // 舊資料則保留在 Members，避免因為沒有 Users row 令整次儲存失敗。
+        const linkedUser = fresh.users.find(u => u.id !== session.memberId && u.memberId === session.memberId);
+        if (linkedUser && email.trim() !== linkedUser.email) {
+          await apiUpdateUserField(linkedUser.id, 'email', email.trim());
+        }
         setS(fresh);
       } else if (session?.userId) {
+        if (!name.trim()) throw new Error('姓名不可留空。');
         if (name) await apiUpdateUserField(session.userId, 'name', name);
         if (password) await apiUpdateUserField(session.userId, 'password', password);
         if (!LEADER_ROLES.includes(session.role) && email) await apiUpdateUserField(session.userId, 'email', email);
         const { loadState } = await import('@/lib/store');
         setS(await loadState());
+      }
+      if (name.trim() && name.trim() !== session.name) {
+        const next = { ...session, name: name.trim() };
+        persistSession(next);
+        setSession(next);
       }
       setOk('✅ 已儲存');
       setPassword('');
@@ -84,7 +105,6 @@ export default function Profile() {
   if (!s) return <main className="max-w-2xl mx-auto px-4 py-8 pb-24 text-sm text-slate-600">載入中...</main>;
 
   const myMember = session.role === 'member' ? s.members.find(m => m.id === session.memberId) : null;
-  const availablePatrols = myMember ? s.patrols.filter(p => p.branchId === myMember.branchId && p.enabled) : [];
 
   const inputCls = 'w-full rounded-lg border border-slate-200 px-3 py-2.5 text-base bg-white';
   const labelCls = 'block text-sm font-bold text-slate-600 mb-1.5';
@@ -122,34 +142,25 @@ export default function Profile() {
             </div>
           )}
           {session.role === 'member' && (
-            <>
-              <div>
-                <span className={labelCls}>電話</span>
-                <input className={inputCls} value={phone} onChange={e => setPhone(e.target.value)} placeholder="聯絡電話" />
-              </div>
-              <div>
-                <span className={labelCls}>小隊</span>
-                <select className={inputCls} value={patrolId} onChange={e => setPatrolId(e.target.value)}>
-                  <option value="">不適用 / 未分隊</option>
-                  {availablePatrols.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                </select>
-              </div>
-              <div>
-                <span className={labelCls}>隊內身份</span>
-                <select className={inputCls} value={patrolRole} onChange={e => setPatrolRole(e.target.value)}>
-                  <option value="">隊員</option>
-                  <option value="leader">隊長</option>
-                  <option value="deputy">副隊長</option>
-                </select>
-              </div>
-            </>
+            <div>
+              <span className={labelCls}>電話</span>
+              <input className={inputCls} value={phone} onChange={e => setPhone(e.target.value)} placeholder="聯絡電話" />
+            </div>
           )}
         </div>
+        {session.role === 'member' && myMember && (
+          <div className="rounded-xl bg-slate-50 border border-slate-100 px-3 py-2.5 text-sm text-slate-600">
+            <span className="font-bold text-slate-700">編制資料（唯讀）</span>
+            <span className="ml-2">{branches.find(b => b.id === myMember.branchId)?.name || myMember.branchId}</span>
+            <span className="ml-2">· 小隊 {s.patrols.find(p => p.id === myMember.patrolId)?.name || '未分隊'}</span>
+            <span className="ml-2">· YMIS {myMember.ymNumber || '—'}</span>
+          </div>
+        )}
         {LEADER_ROLES.includes(session.role) && (
           <p className="text-sm text-slate-500 m-0">領袖的 Email 如需更改，請聯絡管理員。</p>
         )}
         {session.role === 'member' && (
-          <p className="text-sm text-slate-500 m-0">出生日期和 YMIS 不可自行修改，如有需要請聯絡領袖。</p>
+          <p className="text-sm text-slate-500 m-0">支部、小隊、隊內身份、出生日期和 YMIS 不可自行修改，如有需要請聯絡領袖。</p>
         )}
         <button className="w-full text-base font-black bg-brand-600 text-white py-3 rounded-xl border-0 cursor-pointer hover:bg-brand-700 transition disabled:opacity-60" disabled={saving} onClick={save}>
           {saving ? '儲存中...' : '儲存'}

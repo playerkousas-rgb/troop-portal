@@ -28,11 +28,31 @@ function buildUrl(action: string, params?: Record<string, string | undefined>): 
   return url.toString();
 }
 
+/**
+ * 後台未必一定回 JSON（例如 Apps Script 暫時錯誤、proxy 500 或部署頁面），
+ * 所以先讀文字再解析；否則直接 res.json() 會把真正原因吞掉，前端只見到
+ * 一個難以理解的 SyntaxError。
+ */
+async function readApiResponse(res: Response): Promise<any> {
+  const text = await res.text();
+  let data: any;
+  try {
+    data = text ? JSON.parse(text) : {};
+  } catch {
+    const preview = text.replace(/\\s+/g, ' ').trim().slice(0, 160);
+    throw new Error(`後台回應格式錯誤（HTTP ${res.status}）${preview ? `：${preview}` : ''}`);
+  }
+  if (!res.ok) {
+    throw new Error(data?.error || data?.message || `後台請求失敗（HTTP ${res.status}）`);
+  }
+  return data;
+}
+
 async function apiGet<T = any>(action: string, params?: Record<string, string | undefined>): Promise<T> {
   // ★ MOCK 已實作進 MAIN：所有請求（包括演示旅團）都經真實 HTTP 路徑
   //   /api/proxy。演示旅團由 proxy 轉到內置 MOCK 後台，不再在瀏覽器模擬。
   const res = await fetch(buildUrl(action, params), { cache: 'no-store' });
-  const data = await res.json();
+  const data = await readApiResponse(res);
   if (!data.success && data.error) {
     throw new Error(data.error);
   }
@@ -50,7 +70,7 @@ async function apiPost<T = any>(action: string, body: Record<string, any>): Prom
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ ...body, action }),
   });
-  const data = await res.json();
+  const data = await readApiResponse(res);
   if (!data.success && data.error) {
     throw new Error(data.error);
   }
@@ -106,7 +126,11 @@ export async function apiForgotPassword(params: {
   identifier: string; loginType: 'account' | 'member';
 }) {
   const res = await fetch(buildUrl('forgotPassword', params as any), { cache: 'no-store' });
-  return res.json();
+  try {
+    return await readApiResponse(res);
+  } catch (e: any) {
+    return { success: false, error: e?.message || '忘記密碼請求失敗，請稍後再試。' };
+  }
 }
 
 /** 更改密碼 */

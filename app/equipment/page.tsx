@@ -47,8 +47,8 @@ export default function EquipmentPage() {
 
   useEffect(() => { load(); }, [load]);
 
-  const equipment = s?.equipment || [];
-  const loans = s?.equipmentLoans || [];
+  const equipment = useMemo(() => s?.equipment || [], [s?.equipment]);
+  const loans = useMemo(() => s?.equipmentLoans || [], [s?.equipmentLoans]);
 
   const myMember = useMemo(() => {
     if (!s || !session) return null;
