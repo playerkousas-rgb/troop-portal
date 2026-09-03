@@ -802,19 +802,68 @@ function mapPatrols_() {
   });
 }
 
+/**
+ * 角色歸一（同 lib/model.ts normalizeRole 一致）。
+ *
+ * 舊資料兼容：`troop_super` 已廢除（用戶決定 2026-09-03），讀入時一律當旅長。
+ *
+ * 點解唔直接刪：82 旅嘅 live Sheet 可能已經有 role='troop_super' 嘅帳號。
+ * 直接刪會令嗰個帳號喺所有角色清單都搵唔到自己 → 失去所有權限（變死帳號）。
+ * 歸一做 troop_leader 先至安全：佢本来就係最高權限，語義上等價。
+ */
+function normalizeRole_(role) {
+  var r = String(role === null || role === undefined ? '' : role).trim().toLowerCase();
+  return r === 'troop_super' ? 'troop_leader' : r;
+}
+
+/**
+ * 「全旅只有一個旅長」不變量（用戶決定 2026-09-03）。
+ *
+ * ★ 點解需要呢個：`troop_super` 喺階梯守衛（56b94de）之前係**可以經 API 指派**嘅，
+ *   所以 82 旅嘅 live Sheet 有可能有**多於一行** role='troop_super'。
+ *   normalizeRole_ 會把佢哋全部歸一成 troop_leader —— 直接違反「全旅只有一個旅長」，
+ *   而且交接旅長會變得冇意義（唔知邊個先係現任）。
+ *
+ * 用 `createdAt` 決定邊個先係真旅長：**最早建立嗰個**（＝用戶講嘅「第一個管理員」）。
+ * 其餘降做 `admin` —— 唔係刪除，因為刪除會剝走佢哋所有權限。
+ *
+ * 冇 `createdAt` 嘅列排最後（用 9999-12-31）；同一時刻用 userId 打破平手，
+ * 令結果**確定**（唔會因為 Sheet 列序而擺動）。
+ *
+ * 呢個係**讀入時**修正，唔會寫返 Sheet —— 所以 Sheet 上面嘅 troop_super 仍然喺度，
+ * 每次讀都會重新歸一。要永久清理請人手改 Sheet。
+ */
+function enforceSingleTroopLeader_(users) {
+  var tls = users.filter(function (u) { return u.role === 'troop_leader'; });
+  if (tls.length <= 1) return users;
+  tls.sort(function (a, b) {
+    var ca = a.createdAt || '9999-12-31';
+    var cb = b.createdAt || '9999-12-31';
+    if (ca !== cb) return ca < cb ? -1 : 1;
+    return String(a.id) < String(b.id) ? -1 : 1;
+  });
+  var keepId = tls[0].id;
+  users.forEach(function (u) {
+    if (u.role === 'troop_leader' && u.id !== keepId) u.role = 'admin';
+  });
+  return users;
+}
+
 function mapUsers_() {
   var members = readTable_('Members');
-  return readTable_('Users').map(function (u) {
+  var users = readTable_('Users').map(function (u) {
     var childIds = members.filter(function (m) { return getField_(m, 'parentUserId') === getField_(u, 'userId'); })
       .map(function (m) { return getField_(m, 'memberId'); });
     return {
       id: getField_(u, 'userId'), name: getField_(u, 'name'), email: getField_(u, 'email'),
-      role: getField_(u, 'role'), branchId: getField_(u, 'branchId') || '',
+      role: normalizeRole_(getField_(u, 'role')), branchId: getField_(u, 'branchId') || '',
       memberId: getField_(u, 'memberId') || '',
+      createdAt: String(getField_(u, 'createdAt') || ''),
       childMemberIds: childIds, approved: parseBool_(getField_(u, 'approved')),
       techTest: String(getField_(u, 'note')).indexOf('techTest') >= 0
     };
   });
+  return enforceSingleTroopLeader_(users);
 }
 
 function mapMembers_() {

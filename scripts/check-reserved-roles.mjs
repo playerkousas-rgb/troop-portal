@@ -585,6 +585,91 @@ console.log('\n【MOCK：必須鏡像「只能加不能減」＋交接旅長】'
     `u_tl=${roleOf('u_tl')} u_m1=${roleOf('u_m1')}`);
 }
 
+// ==================== 12. 角色歸一 ＋「全旅只有一個旅長」不變量 ====================
+//
+// ★ 呢一節係為一個**未爆嘅炸彈**而設。
+//
+// `troop_super` 喺階梯守衛（56b94de）之前係**可以經 API 指派**嘅，所以 82 旅嘅
+// live Sheet 有可能有**多於一行** role='troop_super'。廢除 troop_super 之後，
+// normalizeRole() 會把佢哋全部歸一成 troop_leader —— 直接違反「全旅只有一個旅長」，
+// 而且交接旅長會變得冇意義（唔知邊個先係現任）。
+//
+// 修正：用 createdAt 決定邊個先係真旅長（**最早建立嗰個** ＝ 用戶講嘅「第一個管理員」），
+// 其餘降做 admin（唔係刪除 —— 刪除會剝走佢哋所有權限）。
+//
+// ⚠️ 呢個係**讀入時**修正，唔會寫返 Sheet／store —— 所以原始資料唔會被靜默改寫，
+//    每次讀都會重新歸一。要永久清理請人手改 Sheet。
+console.log('\n【GS：角色歸一 ＋ 旅長唯一不變量】');
+{
+  const ctx = loadGs();
+  ctx.getSheet_ = () => null;
+
+  // 直接驗 normalizeRole_（純函數，唔使 stub sheet）
+  ok('normalizeRole_：troop_super → troop_leader',
+    ctx.normalizeRole_('troop_super') === 'troop_leader', `得 ${ctx.normalizeRole_('troop_super')}`);
+  ok('normalizeRole_：大寫 TROOP_SUPER 一樣歸一',
+    ctx.normalizeRole_('TROOP_SUPER') === 'troop_leader', `得 ${ctx.normalizeRole_('TROOP_SUPER')}`);
+  ok('normalizeRole_：前後空格一樣歸一',
+    ctx.normalizeRole_('  troop_super ') === 'troop_leader', `得 ${ctx.normalizeRole_('  troop_super ')}`);
+  ok('normalizeRole_：其他角色原樣保留',
+    ctx.normalizeRole_('admin') === 'admin' && ctx.normalizeRole_('parent') === 'parent',
+    `admin=${ctx.normalizeRole_('admin')} parent=${ctx.normalizeRole_('parent')}`);
+  ok('normalizeRole_：空值唔會炸',
+    ctx.normalizeRole_('') === '' && ctx.normalizeRole_(null) === '' && ctx.normalizeRole_(undefined) === '',
+    `''=${ctx.normalizeRole_('')} null=${ctx.normalizeRole_(null)} undef=${ctx.normalizeRole_(undefined)}`);
+
+  // 兩個 troop_super（模擬 live Sheet 嘅歷史殘留）→ 應該淨返一個旅長
+  const users = [
+    { userId: 'u_b', name: '後開嘅超管', role: 'troop_super', branchId: '', createdAt: '2026-05-10', note: '' },
+    { userId: 'u_a', name: '最早嘅超管', role: 'troop_super', branchId: '', createdAt: '2026-01-02', note: '' },
+    { userId: 'u_m', name: '成員', role: 'member', branchId: 'b3', createdAt: '2026-02-01', note: '' },
+  ];
+  ctx.readTable_ = (n) => (n === 'Users' ? users : []);
+  const mapped = ctx.mapUsers_();
+  const tls = mapped.filter((u) => u.role === 'troop_leader');
+  ok('兩個 troop_super 歸一後，全旅仍然只有一個旅長',
+    tls.length === 1, JSON.stringify(mapped.map((u) => `${u.id}:${u.role}`)));
+  ok('  留低嘅係 createdAt 最早嗰個（u_a, 2026-01-02）',
+    tls[0] && tls[0].id === 'u_a', `得 ${tls.map((u) => u.id).join(',')}`);
+  ok('  另一個降做 admin（唔係刪除）',
+    mapped.some((u) => u.id === 'u_b' && u.role === 'admin'),
+    JSON.stringify(mapped.filter((u) => u.id === 'u_b')));
+  ok('  冇人被刪除（三行仲喺度）', mapped.length === 3, `得 ${mapped.length} 行`);
+  ok('  普通成員角色冇被搞到',
+    mapped.some((u) => u.id === 'u_m' && u.role === 'member'),
+    JSON.stringify(mapped.filter((u) => u.id === 'u_m')));
+
+  // createdAt 缺失／相同時要用 userId 打破平手（確定性）
+  const tie = [
+    { userId: 'u_z', name: '無日期乙', role: 'troop_super', branchId: '', createdAt: '', note: '' },
+    { userId: 'u_y', name: '無日期甲', role: 'troop_super', branchId: '', createdAt: '', note: '' },
+  ];
+  ctx.readTable_ = (n) => (n === 'Users' ? tie : []);
+  const tieMapped = ctx.mapUsers_();
+  const tieTL = tieMapped.filter((u) => u.role === 'troop_leader');
+  ok('createdAt 都缺失時，用 userId 打破平手（u_y 贏 u_z）',
+    tieTL.length === 1 && tieTL[0].id === 'u_y',
+    JSON.stringify(tieMapped.map((u) => `${u.id}:${u.role}`)));
+}
+
+console.log('\n【MOCK：必須鏡像角色歸一 ＋ 旅長唯一不變量】');
+{
+  const { handleMockRequest } = await import('../lib/mockServer.ts');
+  const j = (o) => JSON.stringify(o);
+  const users = () =>
+    ((handleMockRequest('getState', { userId: 'u_admin', keys: 'users' }).state || {}).users || []);
+  const base = users();
+  ok('MOCK seed：得一個旅長（u_tl）',
+    base.filter((u) => u.role === 'troop_leader').length === 1,
+    j(base.filter((u) => u.role === 'troop_leader').map((u) => u.id)));
+  ok('MOCK seed：冇 troop_super 殘留',
+    base.every((u) => u.role !== 'troop_super'),
+    j(base.filter((u) => u.role === 'troop_super').map((u) => u.id)));
+  ok('MOCK：normalizeRole 有 export（同 GS 對得上）',
+    (await import('../lib/model.ts')).normalizeRole('troop_super') === 'troop_leader',
+    `得 ${(await import('../lib/model.ts')).normalizeRole('troop_super')}`);
+}
+
 // ==================== 結果 ====================
 
 console.log('');

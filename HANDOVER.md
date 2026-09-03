@@ -812,7 +812,8 @@ group_leader / branch_leader / coach / parent / member
 ### 檢查腳本更新
 
 - `scripts/check-reserved-roles.mjs` —— §9／§10 為新模型重寫，新增 **§11**
-  （「只能加不能減」＋交接旅長，GS ＋ MOCK 兩邊）。**66 → 91 項斷言**。
+  （「只能加不能減」＋交接旅長）同 **§12**（角色歸一＋旅長唯一不變量），
+  GS ＋ MOCK 兩邊。**66 → 105 項斷言**。
 - `scripts/check-public-cards.mjs` —— L82／L87 角色列表去 `troop_super`。
 
 ### ⚠️ 兩個踩過嘅陷阱（寫測試時必讀）
@@ -826,8 +827,28 @@ group_leader / branch_leader / coach / parent / member
    咁先可以證明「唔可以」嗰啲斷言真係靠守衛先過。
    本次負對照：11 項失敗（包括 6 條「唔可以」斷言），還原後 91 項全綠。
 
+### 「全旅只有一個旅長」不變量（§12）
+
+**★ 呢個係為一個未爆嘅炸彈而設。** `troop_super` 喺階梯守衛（`56b94de`）之前
+係**可以經 API 指派**嘅，所以 82 旅嘅 live Sheet 有可能有**多於一行**
+`role='troop_super'`。廢除 `troop_super` 之後，`normalizeRole()` 會把佢哋**全部**
+歸一成 `troop_leader` —— 直接違反「全旅只有一個旅長」，而且交接旅長會變得
+冇意義（唔知邊個先係現任）。
+
+修正（GS `normalizeRole_` + `enforceSingleTroopLeader_`，MOCK 鏡像）：
+- 用 `createdAt` 決定邊個先係真旅長 —— **最早建立嗰個**（＝用戶講嘅「第一個管理員」）
+- 其餘降做 `admin`（**唔係刪除** —— 刪除會剝走佢哋所有權限）
+- 冇 `createdAt` 嘅排最後（`9999-12-31`）；同一時刻用 `userId` 打破平手，令結果**確定**
+- ⚠️ 呢個係**讀入時**修正，**唔會寫返 Sheet／store** —— 原始資料唔會被靜默改寫，
+  每次讀都會重新歸一。**要永久清理請人手改 Sheet。**
+
+實測（§12，14 項斷言）：兩個 `troop_super`（2026-05-10 / 2026-01-02）→
+淨返一個旅長（最早嗰個 `u_a`），另一個降做 `admin`，三行都冇被刪除，
+普通成員角色冇被搞到；`createdAt` 都缺失時用 `userId` 打破平手。
+負對照：癱瘓 `enforceSingleTroopLeader_` → 4 項失敗，還原後 105 項全綠。
+
 ### 仍需人手做（呢個環境做唔到）
 
 - **82 旅重新部署 GS** —— 上面所有 GS 修正**喺重新部署之前全部係 inert**。
-- 「第一個管理員 = 旅長」由 `createdAt` 推導 —— **未實作**。
-  （`Users` 表頭已含 `createdAt`；bootstrap 已經 seed 旅長。）
+- **人手清理 live Sheet 入面殘留嘅 `role='troop_super'` 列** —— 讀入時會自動歸一
+  ＋ 只留最早嗰個做旅長，但 Sheet 上面嘅原始值唔會被改寫。

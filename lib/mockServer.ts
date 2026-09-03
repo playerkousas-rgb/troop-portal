@@ -19,7 +19,7 @@
  */
 import type { AppState, Equipment } from './store';
 import type { Role } from './model';
-import { branches as modelBranches, MANAGER_ROLES, LEADER_ROLES } from './model';
+import { branches as modelBranches, MANAGER_ROLES, LEADER_ROLES, normalizeRole } from './model';
 // PublicCardId 係純 type，要用 `import type`：Node 嘅 --experimental-strip-types
 // （npm run check:* 用）唔會自動 elide 混喺 value import 入面嘅 type。
 import { PUBLIC_CARD_IDS, scopeKey, toggleCard, toggleScope, canToggleCard, canToggleScope } from './publicScope';
@@ -354,6 +354,44 @@ function findUser(userId: string) {
   return store.users.find(u => u.id === userId) || null;
 }
 
+/**
+ * 「全旅只有一個旅長」不變量（鏡像 GS `enforceSingleTroopLeader_`）。
+ *
+ * ★ 點解 mock 都要有：MOCK 係示範頁，要跟真實行為。真實 82 旅嘅 live Sheet
+ *   可能有多於一行 `role='troop_super'`（喺階梯守衛 56b94de 之前佢係可以經 API
+ *   指派嘅），`normalizeRole()` 會把佢哋全部歸一成 `troop_leader`，
+ *   直接違反「全旅只有一個旅長」。
+ *
+ * 用 `createdAt` 決定邊個先係真旅長：**最早建立嗰個**（＝用戶講嘅「第一個管理員」）。
+ * 其餘降做 `admin` —— 唔係刪除，因為刪除會剝走佢哋所有權限。
+ * 冇 createdAt 嘅排最後；同一時刻用 id 打破平手，令結果**確定**。
+ *
+ * ⚠️ 呢個係**讀入時**修正，唔會寫返 store —— 所以原始資料唔會被靜默改寫。
+ */
+function enforceSingleTroopLeader<T extends { id: string; role: string; createdAt?: string }>(users: T[]): T[] {
+  const tls = users.filter(u => u.role === 'troop_leader');
+  if (tls.length <= 1) return users;
+  const sorted = [...tls].sort((a, b) => {
+    const ca = a.createdAt || '9999-12-31';
+    const cb = b.createdAt || '9999-12-31';
+    if (ca !== cb) return ca < cb ? -1 : 1;
+    return String(a.id) < String(b.id) ? -1 : 1;
+  });
+  const keepId = sorted[0].id;
+  return users.map(u =>
+    (u.role === 'troop_leader' && u.id !== keepId) ? { ...u, role: 'admin' } : u
+  );
+}
+
+/**
+ * 讀入 users 嘅唯一入口 —— 先歸一角色（`troop_super`→`troop_leader`），
+ * 再強制「全旅只有一個旅長」。所有讀 users 嘅位都要經呢度，唔好直接讀 `store.users`。
+ */
+function normalizedUsers() {
+  const mapped = store.users.map(u => ({ ...u, role: normalizeRole(u.role) as Role }));
+  return enforceSingleTroopLeader(mapped);
+}
+
 export function buildMockState(userId: string): AppState {
   const user = findUser(userId);
   const role: Role = (user?.role as Role) || 'guest';
@@ -404,18 +442,19 @@ export function buildMockState(userId: string): AppState {
   else if (isParent) out.equipmentLoans = store.equipmentLoans.filter(l => (user!.childMemberIds || []).includes(l.memberId));
 
   // 使用者
-  if (admin || leaderAll) out.users = [...store.users];
-  else if (leaderBranch) out.users = store.users.filter(u => inScope(u.branchId));
+  const users = normalizedUsers();
+  if (admin || leaderAll) out.users = [...users];
+  else if (leaderBranch) out.users = users.filter(u => inScope(u.branchId));
   // ★ 成員：除咗自己，亦回傳「已連結嘅家長」帳戶 —— 緊急聯絡資料要直接用家長資料
   //   （同 GS buildDashboardCore_ 嘅 member 分支一致）。
-  else if (isMember) out.users = store.users.filter(u =>
+  else if (isMember) out.users = users.filter(u =>
     u.id === user!.id ||
     (u.role === 'parent' && (
       (u.childMemberIds || []).includes(user!.memberId || '') ||
       store.members.some(m => m.id === user!.memberId && m.parentUserId === u.id)
     ))
   );
-  else if (isParent) out.users = store.users.filter(u => u.id === user!.id);
+  else if (isParent) out.users = users.filter(u => u.id === user!.id);
 
   // 活動
   const visibleEvents = (e: typeof store.events[number]) =>
