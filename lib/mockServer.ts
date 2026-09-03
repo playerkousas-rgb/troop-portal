@@ -22,7 +22,7 @@ import type { Role } from './model';
 import { branches as modelBranches, MANAGER_ROLES, LEADER_ROLES, normalizeRole } from './model';
 // PublicCardId 係純 type，要用 `import type`：Node 嘅 --experimental-strip-types
 // （npm run check:* 用）唔會自動 elide 混喺 value import 入面嘅 type。
-import { PUBLIC_CARD_IDS, scopeKey, toggleCard, toggleScope, canToggleCard, canToggleScope, normalizeCardId } from './publicScope';
+import { PUBLIC_CARD_IDS, scopeKey, toggleCard, toggleScope, canToggleCard, canToggleScope, normalizeCardId, isItemPublic } from './publicScope';
 import type { PublicCardId } from './publicScope';
 import { DEMO_TROOP_KEY, MOCK_TROOP } from './mockConstants';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
@@ -361,7 +361,28 @@ function hasFeatureInBranch(userId: string, role: string, feature: string, branc
 }
 
 function findUser(userId: string) {
-  return store.users.find(u => u.id === userId) || null;
+  const user = store.users.find(u => u.id === userId);
+  if (user) return user;
+  // 部分舊資料只有 Members 記錄、未建立對應 Users 帳戶；仍可用 YMIS 登入，
+  // 因此後續自助操作亦要有一致的最低限度 member caller context。
+  const member = store.members.find(m => m.id === userId);
+  return member ? ({
+    id: member.id, name: member.name, email: member.email || '', role: 'member',
+    branchId: member.branchId, memberId: member.id, approved: member.active,
+  } as any) : null;
+}
+
+const SELF_MEMBER_PROFILE_FIELDS = new Set(['name', 'email', 'password', 'emergencyContactPhone']);
+const SELF_USER_PROFILE_FIELDS = new Set(['name', 'email', 'password']);
+const MEMBER_UPDATE_FIELDS = new Set([
+  'ymNumber', 'password', 'name', 'email', 'branchId', 'patrolId', 'patrolRole',
+  'specialRole', 'dateOfBirth', 'parentUserId', 'emergencyContactName',
+  'emergencyContactPhone', 'active', 'note', 'wantedBadges', 'wantedBadgesAt',
+]);
+
+function isSelfMemberTarget(operator: any, memberId: string): boolean {
+  const target = store.members.find(m => m.id === String(memberId || ''));
+  return !!target && String(operator?.memberId || '') === target.id;
 }
 
 /**
@@ -398,7 +419,12 @@ function enforceSingleTroopLeader<T extends { id: string; role: string; createdA
  * 再強制「全旅只有一個旅長」。所有讀 users 嘅位都要經呢度，唔好直接讀 `store.users`。
  */
 function normalizedUsers() {
-  const mapped = store.users.map(u => ({ ...u, role: normalizeRole(u.role) as Role }));
+  const mapped = store.users.map(u => {
+    const safe: any = { ...u };
+    // 密碼只留在 mock backend 內，絕不隨 users slice 回傳瀏覽器。
+    delete safe.password;
+    return { ...safe, role: normalizeRole(u.role) as Role };
+  });
   return enforceSingleTroopLeader(mapped);
 }
 
@@ -467,8 +493,13 @@ export function buildMockState(userId: string): AppState {
   else if (isParent) out.users = users.filter(u => u.id === user!.id);
 
   // 活動
+  const publicBranchId = (tag: string) => {
+    const value = String(tag || '').trim();
+    if (!value || value === '全旅' || value === 'troop') return 'troop';
+    return modelBranches.find(b => b.id === value || b.name === value || b.short === value)?.id || value;
+  };
   const visibleEvents = (e: typeof store.events[number]) =>
-    guest ? e.status === 'published'
+    guest ? e.status === 'published' && isItemPublic(store.config, 'activities', e.branchId)
       : admin || leaderAll ? true
       : leaderBranch ? (e.status !== 'archived' && (e.scope === 'branch' ? inScope(e.branchId) : e.status === 'published'))
       // 成員／家長：睇到已發布活動；另外「已封存但自己曾經報過名」嘅活動亦要睇到，
@@ -505,13 +536,16 @@ export function buildMockState(userId: string): AppState {
     out.announcementPdfs = store.announcementPdfs.filter(p => p.visible !== false);
     out.announcements = [...store.announcements];
   } else {
-    out.bookmarks = store.bookmarks.filter(b => b.status === 'published');
-    out.announcementPdfs = store.announcementPdfs.filter(p => p.visible !== false);
+    out.bookmarks = store.bookmarks.filter(b => b.status === 'published' &&
+      (b.branchTags?.length ? b.branchTags : ['troop']).some(t => isItemPublic(store.config, 'activities', publicBranchId(t))));
+    out.announcementPdfs = store.announcementPdfs.filter(p => p.visible !== false &&
+      (p.branchTags?.length ? p.branchTags : ['troop']).some(t => isItemPublic(store.config, 'activities', publicBranchId(t))));
   }
 
   // 集會
   if (guest) {
-    out.regularMeetings = [...store.regularMeetings];
+    out.regularMeetings = store.regularMeetings.filter(r => r.enabled && isItemPublic(store.config, 'calendar', r.branchId));
+    out.meetings = store.meetings.filter(m => m.status === 'published' && isItemPublic(store.config, 'calendar', m.branchId));
   } else if (admin || leaderAll) {
     out.regularMeetings = [...store.regularMeetings];
     out.cancelledMeetings = [...store.cancelledMeetings];
@@ -537,6 +571,12 @@ export function buildMockState(userId: string): AppState {
   // 最新消息：登入後所有人都見到（最多 3 條）
   if (!guest) out.latestNews = [...store.latestNews];
 
+  // Members.password 只供登入／寫入驗證，唔可以跟 state 回傳。
+  out.members = out.members.map(m => {
+    const safe: any = { ...m };
+    delete safe.password;
+    return safe;
+  });
   return out;
 }
 
@@ -576,6 +616,15 @@ function handleMockLogin(p: Record<string, any>) {
   }
   if (!u) return { success: false, error: '找不到此帳號(演示資料只有預設帳號)' };
   const member = store.members.find(m => m.id === u!.memberId);
+  // 演示種子帳戶沒有預設密碼，方便一鍵登入；一旦使用者設定密碼，
+  // 後續登入必須驗證，避免 profile 顯示「已儲存」但登入完全不受影響。
+  const credential = String((u as any).password || (member as any)?.password || '').trim();
+  if (credential && String(p.password || '') !== credential) {
+    return { success: false, error: '密碼不正確' };
+  }
+  if ((u as any).approved === false || member?.active === false) {
+    return { success: false, error: '帳號已停用' };
+  }
   return {
     success: true,
     user: {
@@ -733,10 +782,30 @@ function handleGetSessions(p: Record<string, any>) {
 
   const seen = new Set<string>();
   const meetings: any[] = [];
+  const matchesFrequency = (rule: typeof store.regularMeetings[number], d: Date) => {
+    if (d.getDay() !== Number(rule.weekday)) return false;
+    if (rule.frequency === 'biweekly') {
+      const firstDayOfYear = new Date(d.getFullYear(), 0, 1);
+      const pastDaysOfYear = (d.getTime() - firstDayOfYear.getTime()) / 86400000;
+      const weekNum = Math.ceil((pastDaysOfYear + firstDayOfYear.getDay() + 1) / 7);
+      return weekNum % 2 === 0;
+    }
+    if (String(rule.frequency || '').startsWith('monthly_')) {
+      const weekOfMonth = Math.ceil(d.getDate() / 7);
+      const lastDay = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+      const isLastWeek = d.getDate() > lastDay - 7;
+      if (rule.frequency === 'monthly_1') return weekOfMonth === 1;
+      if (rule.frequency === 'monthly_2') return weekOfMonth === 2;
+      if (rule.frequency === 'monthly_3') return weekOfMonth === 3;
+      if (rule.frequency === 'monthly_4') return weekOfMonth === 4;
+      if (rule.frequency === 'monthly_last') return isLastWeek;
+    }
+    return true;
+  };
   store.regularMeetings.filter(r => r.enabled && r.branchId === branchId).forEach(rule => {
     for (let i = 0; i < 120; i++) {
       const d = new Date(now); d.setDate(now.getDate() - i);
-      if (d.getDay() !== rule.weekday) continue;
+      if (!matchesFrequency(rule, d)) continue;
       const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
       const cancelled = store.cancelledMeetings.some(c => c.branchId === branchId && c.date === iso);
       if (cancelled) continue;
@@ -832,7 +901,7 @@ const S = (operatedBy: string) => ({ success: true, state: buildMockState(String
 function checkAdminPeerGuard(
   operatedBy: string,
   targetId: string,
-  kind: 'role' | 'delete' | 'toggle'
+  kind: 'role' | 'delete' | 'toggle' | 'password'
 ): { success: false; error: string } | null {
   if (!operatedBy) return null;
   const op = store.users.find(u => u.id === operatedBy);
@@ -855,10 +924,10 @@ function checkAdminPeerGuard(
    *   'toggle' = 停用／啟用帳號。停用唔係改 role，但效果一樣致命
    *   （停用咗嘅旅長做唔到 transferTroopLeader），所以一樣要擋。
    */
-  const verb = kind === 'delete' ? '刪除' : (kind === 'toggle' ? '停用' : '更改');
-  const noun = kind === 'role' ? '角色' : '帳號';
+  const verb = kind === 'delete' ? '刪除' : (kind === 'toggle' ? '停用' : (kind === 'password' ? '重設' : '更改'));
+  const noun = kind === 'role' ? '角色' : (kind === 'password' ? '密碼' : '帳號');
   const act = kind === 'delete' ? 'deleteUser'
-    : (kind === 'toggle' ? 'toggleUser' : 'updateUserRole');
+    : (kind === 'toggle' ? 'toggleUser' : (kind === 'password' ? 'updatePassword' : 'updateUserRole'));
   logAudit(operatedBy, 'DENIED:' + act, 'Security', '',
     `admin 試圖${verb}${isTL ? '旅長' : '另一個管理員'}嘅${noun}（只能加不能減）`);
   if (isTL) {
@@ -939,6 +1008,12 @@ function checkMockPermission(action: string, p: Record<string, any>): { success:
     return { success: false, error: '未能確認操作者身份，請重新登入。' };
   }
   const role = String((operator as any).role || '');
+
+  // 個人資料係自助功能，唔應該因為成員／家長沒有「members」或「users」管理權限
+  // 而被中央 feature gate 擋住；handler 仍會嚴格限制只可寫安全欄位。
+  if (action === 'updateMember' && isSelfMemberTarget(operator, String(p.memberId || ''))) return null;
+  if (action === 'updateUserField' && String(p.userId || '') === operator.id) return null;
+
   if (TROOP_WIDE.includes(role)) return null;
 
   // ★ 支部範圍檢查：唔單止睇「有冇呢個功能」，仲要睇「喺邊個支部有」。
@@ -957,6 +1032,12 @@ function checkMockPermission(action: string, p: Record<string, any>): { success:
 
 /** 由 request 參數推斷今次操作嘅目標支部（用嚟做跨支部檢查） */
 function resolveTargetBranch(action: string, p: Record<string, any>): string {
+  // 旅團活動可能係 scope=troop、branchId 留空，但付款／報名紀錄仍有實際
+  // 成員支部；支部領袖必須按該成員支部驗權限，避免改到其他支部。
+  if (['togglePaid', 'confirmPayment'].includes(action) && p.memberId) {
+    const targetMember = store.members.find(m => m.id === String(p.memberId));
+    if (targetMember?.branchId) return String(targetMember.branchId);
+  }
   if (p.branchId) return String(p.branchId);
   const mem = store.members.find(m => m.id === String(p.memberId || ''));
   if (mem) return String(mem.branchId || '');
@@ -982,6 +1063,23 @@ function albumAllowed(operatedBy: string, url: string): string {
   return url;
 }
 
+function resolveMockReplyOperator(p: Record<string, any>, member: any) {
+  const operatorId = String(p.operatedBy || '');
+  const actor = findUser(operatorId);
+  if (!actor && operatorId === String(member?.id || '')) {
+    return { ok: true, role: 'member', id: operatorId, memberId: operatorId, parent: false };
+  }
+  if (!actor) return { ok: false, role: '', id: operatorId, memberId: '', parent: false };
+  const role = String(actor.role || '').toLowerCase();
+  const leader = ['super_admin', 'troop_leader', 'admin', 'group_leader', 'branch_leader', 'coach'].includes(role);
+  const self = String(actor.memberId || '') === String(member?.id || '');
+  const parent = role === 'parent' && String(member?.parentUserId || '') === actor.id;
+  if (role === 'parent' && p.parentUserId && String(p.parentUserId) !== actor.id) {
+    return { ok: false, role, id: actor.id, memberId: actor.memberId || '', parent };
+  }
+  return { ok: leader || self || parent, role, id: actor.id, memberId: actor.memberId || '', parent };
+}
+
 function handleMutate(action: string, p: Record<string, any>) {
   const ob = String(p.operatedBy || '');
   const findIdx = (arr: any[], idField: string, id: string) => arr.findIndex(x => x[idField] === id);
@@ -994,7 +1092,20 @@ function handleMutate(action: string, p: Record<string, any>) {
       return S(ob);
     case 'updateMember': {
       const i = findIdx(store.members, 'id', String(p.memberId || ''));
-      if (i >= 0) Object.assign(store.members[i], Object.fromEntries(Object.entries(p).filter(([k]) => !['action', 'operatedBy', 'memberId'].includes(k))));
+      if (i < 0) return { success: false, error: '找不到成員' };
+      const target = store.members[i];
+      const actor = findUser(ob);
+      const isSelf = isSelfMemberTarget(actor, target.id);
+      const entries = Object.entries(p).filter(([k]) => !['action', 'operatedBy', 'memberId'].includes(k));
+      if (entries.some(([k]) => !MEMBER_UPDATE_FIELDS.has(k))) {
+        return { success: false, error: '包含不支援的成員欄位。' };
+      }
+      // 成員只能更新自己嘅聯絡／登入資料，支部編制、家長連結、啟用狀態等
+      // 必須由獲授權領袖處理；唔可以只靠前端隱藏輸入框。
+      if (isSelf && entries.some(([k]) => !SELF_MEMBER_PROFILE_FIELDS.has(k))) {
+        return { success: false, error: '成員只可以修改自己嘅姓名、Email、電話或密碼。' };
+      }
+      Object.assign(target, Object.fromEntries(entries));
       return S(ob);
     }
     case 'setWantedBadges': {
@@ -1010,6 +1121,13 @@ function handleMutate(action: string, p: Record<string, any>) {
       const isSelf = String(opUser?.memberId || '') === me.id;
       const isParent = String(me.parentUserId || '') === String(p.operatedBy || '');
       if (!isLeader && !isSelf && !isParent) return { success: false, error: '只可以登記自己（或自己子女）想考的章。' };
+      if (isLeader && !(TROOP_WIDE as string[]).includes(opRole)) {
+        const actorBranch = String(opUser?.branchId || '');
+        const granted = grantsFor(String(p.operatedBy || '')).some(g => g.branchId === '*' || g.branchId === me.branchId);
+        if (!actorBranch || (actorBranch !== me.branchId && !granted)) {
+          return { success: false, error: '你未獲授權管理該支部嘅想考的章。' };
+        }
+      }
       if (me.branchId !== 'b2' && me.branchId !== 'b3' && !isLeader) {
         return { success: false, error: '你嘅支部冇「想考的章」選單，請直接同領袖講。' };
       }
@@ -1075,7 +1193,7 @@ function handleMutate(action: string, p: Record<string, any>) {
     }
     // 使用者
     case 'createUser': {
-      const nu: any = { id: uid('u'), name: String(p.name || ''), email: String(p.email || ''), role: (p.role || 'member') as Role, branchId: String(p.branchId || ''), approved: true };
+      const nu: any = { id: uid('u'), name: String(p.name || ''), email: String(p.email || ''), password: String(p.password || 'changeme'), role: (p.role || 'member') as Role, branchId: String(p.branchId || ''), approved: true };
       store.users.push(nu);
       mockLinkChildren(nu, p.children);
       return S(ob);
@@ -1083,7 +1201,7 @@ function handleMutate(action: string, p: Record<string, any>) {
     case 'batchCreateUsers': {
       const rows: any[] = Array.isArray(p.rows) ? p.rows : [];
       rows.forEach(r => {
-        const nu: any = { id: uid('u'), name: String(r.name || ''), email: String(r.email || ''), role: (r.role || 'member') as Role, branchId: String(r.branchId || ''), approved: true };
+        const nu: any = { id: uid('u'), name: String(r.name || ''), email: String(r.email || ''), password: String(r.password || 'changeme'), role: (r.role || 'member') as Role, branchId: String(r.branchId || ''), approved: true };
         store.users.push(nu);
         if (String(r.role || '').toLowerCase() === 'parent' && r.children) mockLinkChildren(nu, r.children);
       });
@@ -1187,19 +1305,37 @@ function handleMutate(action: string, p: Record<string, any>) {
         const peer = checkAdminPeerGuard(ob, String(p.userId || ''), 'role');
         if (peer) return peer;
       }
+      const field = String(p.field || '').trim();
       const i = findIdx(store.users, 'id', String(p.userId || ''));
-      if (i >= 0 && p.field) (store.users[i] as any)[p.field] = String(p.value ?? '');
+      if (i < 0) return { success: false, error: '找不到使用者' };
+      const target = store.users[i];
+      const isSelf = String(p.userId || '') === ob;
+      // 角色仍可由舊版管理 API 更新，但先前的 peer guard 及中央不可指派守衛
+      // 必須保留；自助流程絕不可以改 role。管理層替其他帳戶更新既有欄位則
+      // 沿用原有流程，維持舊版管理介面相容性。
+      if (isSelf && !SELF_USER_PROFILE_FIELDS.has(field)) {
+        return { success: false, error: '個人資料只可以更新姓名、Email 或密碼。' };
+      }
+      (target as any)[field] = String(p.value ?? '');
       return S(ob);
     }
     // 物資清單
-    case 'createEquipment':
+    case 'createEquipment': {
+      const manager = mockEquipmentManager(ob);
+      if (!manager.ok) return { success: false, error: manager.error };
+      const total = Math.max(0, Math.floor(Number(p.totalQty) || 0));
+      const name = String(p.name || '').trim();
+      if (!name) return { success: false, error: '請填寫物資名稱。' };
       store.equipment.push({
-        id: uid('eq'), name: String(p.name || ''), category: String(p.category || '其他'),
-        unit: String(p.unit || '件'), totalQty: Number(p.totalQty) || 0, availableQty: Number(p.totalQty) || 0,
+        id: uid('eq'), name, category: String(p.category || '其他'),
+        unit: String(p.unit || '件'), totalQty: total, availableQty: total,
         location: String(p.location || ''), note: String(p.note || ''), enabled: p.enabled !== false,
       });
       return S(ob);
+    }
     case 'updateEquipment': {
+      const manager = mockEquipmentManager(ob);
+      if (!manager.ok) return { success: false, error: manager.error };
       const i = findIdx(store.equipment, 'id', String(p.equipmentId || ''));
       if (i >= 0) {
         const eq = store.equipment[i];
@@ -1214,6 +1350,8 @@ function handleMutate(action: string, p: Record<string, any>) {
       return S(ob);
     }
     case 'adjustEquipmentQty': {
+      const manager = mockEquipmentManager(ob);
+      if (!manager.ok) return { success: false, error: manager.error };
       const i = findIdx(store.equipment, 'id', String(p.equipmentId || ''));
       if (i >= 0) {
         const eq = store.equipment[i];
@@ -1223,23 +1361,40 @@ function handleMutate(action: string, p: Record<string, any>) {
       }
       return S(ob);
     }
-    case 'deleteEquipment': store.equipment = store.equipment.filter(e => e.id !== p.equipmentId); return S(ob);
+    case 'deleteEquipment': {
+      const manager = mockEquipmentManager(ob);
+      if (!manager.ok) return { success: false, error: manager.error };
+      store.equipment = store.equipment.filter(e => e.id !== p.equipmentId);
+      return S(ob);
+    }
     // 借用申請
     case 'requestEquipmentLoan': {
+      const borrower = mockEquipmentBorrower(ob);
+      if (!borrower.ok) return { success: false, error: borrower.error };
       let items: any[] = [];
       try { items = JSON.parse(String(p.items || '[]')); } catch { items = []; }
-      const me = findUser(ob);
-      const borrower = me || { id: ob, name: '演示用家', branchId: 'b3', memberId: ob };
-      const batchRef = uid('BR');
-      items.forEach((it: any) => {
+      const borrowDate = String(p.borrowDate || '').trim();
+      const returnDueDate = String(p.returnDueDate || '').trim();
+      if (!borrowDate || !returnDueDate) return { success: false, error: '請填寫借出日期及預計歸還日期。' };
+      if (returnDueDate < borrowDate) return { success: false, error: '預計歸還日期不可早於借出日期。' };
+      if (!items.length) return { success: false, error: '請在物資旁填寫最少一項借用數量。' };
+      const accepted: { eq: any; qty: number }[] = [];
+      for (const it of items) {
         const eq = store.equipment.find(e => e.id === String(it.equipmentId || ''));
         const qty = Math.floor(Number(it.qty) || 0);
-        if (!eq || !(qty > 0) || qty > eq.availableQty) return;
+        if (!eq) return { success: false, error: '找不到物資。' };
+        if (!(qty > 0)) return { success: false, error: '借用數量必須大於 0。' };
+        const already = accepted.filter(x => x.eq.id === eq.id).reduce((sum, x) => sum + x.qty, 0);
+        if (qty + already > eq.availableQty) return { success: false, error: `「${eq.name}」目前只餘 ${eq.availableQty - already} ${eq.unit} 可借。` };
+        accepted.push({ eq, qty });
+      }
+      const batchRef = uid('BR');
+      accepted.forEach(({ eq, qty }) => {
         store.equipmentLoans.push({
           id: uid('ln'), batchRef, equipmentId: eq.id, equipmentName: eq.name, unit: eq.unit, qty,
-          memberId: String(borrower.memberId || borrower.id), memberName: String(borrower.name || ''),
-          branchId: String(borrower.branchId || ''), purpose: String(p.purpose || ''),
-          borrowDate: String(p.borrowDate || ''), returnDueDate: String(p.returnDueDate || ''),
+          memberId: String(borrower.memberId || ob), memberName: String(borrower.user?.name || ''),
+          branchId: String(borrower.user?.branchId || ''), purpose: String(p.purpose || ''),
+          borrowDate, returnDueDate,
           status: 'pending', requestedAt: new Date().toISOString(), note: String(p.note || ''),
         });
       });
@@ -1249,6 +1404,12 @@ function handleMutate(action: string, p: Record<string, any>) {
       const i = findIdx(store.equipmentLoans, 'id', String(p.loanId || ''));
       if (i >= 0 && store.equipmentLoans[i].status === 'pending') {
         const l = store.equipmentLoans[i];
+        const actor = findUser(ob);
+        const actorRole = String(actor?.role || '').toLowerCase();
+        const actorMemberId = String(actor?.memberId || ob);
+        const canManage = ['super_admin', 'troop_leader', 'admin', 'group_leader', 'branch_leader'].includes(actorRole);
+        if (actorRole === 'branch_leader' && String(l.branchId || '') !== String(actor?.branchId || '')) return { success: false, error: '支部領袖只可以處理自己支部的借用申請。' };
+        if (l.memberId !== actorMemberId && !canManage) return { success: false, error: '只能修改自己的借用申請。' };
         if (p.qty !== undefined && String(p.qty) !== '') l.qty = Math.floor(Number(p.qty) || l.qty);
         ['purpose', 'borrowDate', 'returnDueDate', 'note'].forEach(k => { if (p[k] !== undefined) (l as any)[k] = String(p[k]); });
       }
@@ -1256,13 +1417,25 @@ function handleMutate(action: string, p: Record<string, any>) {
     }
     case 'cancelEquipmentLoan': {
       const i = findIdx(store.equipmentLoans, 'id', String(p.loanId || ''));
-      if (i >= 0 && store.equipmentLoans[i].status === 'pending') store.equipmentLoans[i].status = 'cancelled';
+      if (i >= 0 && store.equipmentLoans[i].status === 'pending') {
+        const l = store.equipmentLoans[i];
+        const actor = findUser(ob);
+        const actorRole = String(actor?.role || '').toLowerCase();
+        const actorMemberId = String(actor?.memberId || ob);
+        const canManage = ['super_admin', 'troop_leader', 'admin', 'group_leader', 'branch_leader'].includes(actorRole);
+        if (actorRole === 'branch_leader' && String(l.branchId || '') !== String(actor?.branchId || '')) return { success: false, error: '支部領袖只可以處理自己支部的借用申請。' };
+        if (l.memberId !== actorMemberId && !canManage) return { success: false, error: '只能取消自己的借用申請。' };
+        l.status = 'cancelled';
+      }
       return S(ob);
     }
     case 'decideEquipmentLoan': {
+      const manager = mockEquipmentManager(ob);
+      if (!manager.ok) return { success: false, error: manager.error };
       const i = findIdx(store.equipmentLoans, 'id', String(p.loanId || ''));
       if (i >= 0 && store.equipmentLoans[i].status === 'pending') {
         const l = store.equipmentLoans[i];
+        if (String(manager.user?.role || '').toLowerCase() === 'branch_leader' && String(l.branchId || '') !== String(manager.user?.branchId || '')) return { success: false, error: '支部領袖只可以處理自己支部的借用申請。' };
         const eq = store.equipment.find(e => e.id === l.equipmentId);
         if (String(p.decision) === 'approved' && eq && l.qty <= eq.availableQty) {
           eq.availableQty -= l.qty;
@@ -1277,9 +1450,12 @@ function handleMutate(action: string, p: Record<string, any>) {
       return S(ob);
     }
     case 'returnEquipmentLoan': {
+      const manager = mockEquipmentManager(ob);
+      if (!manager.ok) return { success: false, error: manager.error };
       const i = findIdx(store.equipmentLoans, 'id', String(p.loanId || ''));
       if (i >= 0 && store.equipmentLoans[i].status === 'approved') {
         const l = store.equipmentLoans[i];
+        if (String(manager.user?.role || '').toLowerCase() === 'branch_leader' && String(l.branchId || '') !== String(manager.user?.branchId || '')) return { success: false, error: '支部領袖只可以處理自己支部的借用申請。' };
         const eq = store.equipment.find(e => e.id === l.equipmentId);
         if (eq) eq.availableQty += l.qty;
         l.status = 'returned';
@@ -1301,7 +1477,24 @@ function handleMutate(action: string, p: Record<string, any>) {
      *
      * 如果日後要令 mock 真係寫密碼，**必须一併加返同一個守衛**。
      */
-    case 'updatePassword': return S(ob);
+    case 'updatePassword': {
+      const userId = String(p.userId || ob);
+      const newPassword = String(p.newPassword || '');
+      if (!newPassword) return { success: false, error: '請提供新密碼' };
+      if (userId !== ob) {
+        const actor = findUser(ob);
+        if (!['super_admin', 'troop_leader', 'admin'].includes(String(actor?.role || ''))) {
+          return { success: false, error: '只有管理層可以重設其他用戶嘅密碼。' };
+        }
+        const peer = checkAdminPeerGuard(ob, userId, 'password');
+        if (peer) return peer;
+      }
+      const u = store.users.find(x => x.id === userId);
+      if (u) { (u as any).password = newPassword; return S(ob); }
+      const m = store.members.find(x => x.id === userId);
+      if (m) { (m as any).password = newPassword; return S(ob); }
+      return { success: false, error: '找不到使用者記錄' };
+    }
     case 'updateUserPermissions':
     case 'grantFeature':
     case 'revokeFeature': {
@@ -1442,29 +1635,40 @@ function handleMutate(action: string, p: Record<string, any>) {
       if (tgtEv && isDistrictEvent(tgtEv)) {
         return { success: false, error: '區地域總會活動為通告性質，旅團不代收報名，請按通告連結自行報名。' };
       }
-      // ★ 18 歲以下：參加／不參加必須由家長代做（同 GS handleSetReply_ 一致）
-      //   前端個掣鎖咗，但後台一樣要擋，因為個 request 可以繞過 UI 直接發。
-      if (p.type === 'registered' || p.type === 'declined') {
-        const tgtMem = store.members.find(m => m.id === p.memberId);
-        const age = Number(tgtMem?.age);
-        if (tgtMem && Number.isFinite(age) && age < 18) {
-          const op = store.users.find(u => u.id === String(p.operatedBy || ''));
-          const opRole = String((op as any)?.role || '');
-          const isParentOrLeader = opRole === 'parent' || opRole === 'admin' || opRole === 'super_admin'
-            || opRole === 'group_leader' || opRole === 'branch_leader' || opRole === 'coach';
-          if (!isParentOrLeader) {
-            return { success: false, error: '18歲以下成員需由家長代為操作參加 / 不參加' };
-          }
-        }
+      const m = store.members.find(x => x.id === String(p.memberId || ''));
+      if (!m) return { success: false, error: '找不到成員' };
+      const caller = resolveMockReplyOperator(p, m);
+      if (!caller.ok) return { success: false, error: '只可以登記自己或自己子女嘅活動回覆。' };
+      // 18 歲以下：參加／不參加必須由家長或領袖代做。
+      if ((p.type === 'registered' || p.type === 'declined') && Number.isFinite(Number(m.age)) && Number(m.age) < 18
+          && caller.role !== 'parent' && !['super_admin', 'troop_leader', 'admin', 'group_leader', 'branch_leader', 'coach'].includes(caller.role)) {
+        return { success: false, error: '18歲以下成員需由家長代為操作參加 / 不參加' };
       }
       const replyId = `${p.eventId}_${p.memberId}`;
-      const m = store.members.find(x => x.id === p.memberId);
       const i = findIdx(store.replies, 'id', replyId);
-      if (i >= 0) { store.replies[i].type = p.type as any; store.replies[i].operatedBy = (p.operatedByRole || 'member') as any; store.replies[i].parentUserId = String(p.parentUserId || store.replies[i].parentUserId || ''); store.replies[i].cancelled = false; store.replies[i].updatedAt = new Date().toISOString().slice(0, 10); }
-      else store.replies.push({ id: replyId, eventId: String(p.eventId), memberId: String(p.memberId), memberName: m?.name || '', branchId: m?.branchId || '', parentUserId: String(p.parentUserId || ''), type: p.type as any, operatedBy: (p.operatedByRole || 'member') as any, paid: false, cancelled: false, updatedAt: new Date().toISOString().slice(0, 10) });
+      const operatedByRole = caller.role === 'parent' ? 'parent'
+        : ['super_admin', 'troop_leader', 'admin', 'group_leader', 'branch_leader', 'coach'].includes(caller.role) ? 'leader' : 'member';
+      if (i >= 0) {
+        store.replies[i].type = p.type as any;
+        store.replies[i].operatedBy = operatedByRole as any;
+        store.replies[i].parentUserId = caller.parent ? caller.id : String(store.replies[i].parentUserId || '');
+        store.replies[i].cancelled = false;
+        store.replies[i].updatedAt = new Date().toISOString().slice(0, 10);
+      } else {
+        store.replies.push({ id: replyId, eventId: String(p.eventId), memberId: String(p.memberId), memberName: m.name || '', branchId: m.branchId || '', parentUserId: caller.parent ? caller.id : '', type: p.type as any, operatedBy: operatedByRole as any, paid: false, cancelled: false, updatedAt: new Date().toISOString().slice(0, 10) });
+      }
       return S(ob);
     }
-    case 'cancelReply': { const i = findIdx(store.replies, 'id', `${p.eventId}_${p.memberId}`); if (i >= 0) store.replies[i].cancelled = !store.replies[i].cancelled; return S(ob); }
+    case 'cancelReply': {
+      const member = store.members.find(m => m.id === String(p.memberId || ''));
+      if (!member) return { success: false, error: '找不到成員' };
+      const caller = resolveMockReplyOperator(p, member);
+      if (!caller.ok) return { success: false, error: '只可以取消自己或自己子女嘅活動回覆。' };
+      const i = findIdx(store.replies, 'id', `${p.eventId}_${p.memberId}`);
+      if (i < 0) return { success: false, error: '找不到報名記錄' };
+      store.replies[i].cancelled = true;
+      return S(ob);
+    }
     case 'togglePaid': {
       const payEv = store.events.find(e => e.id === p.eventId);
       if (payEv && isDistrictEvent(payEv)) {
@@ -1556,15 +1760,17 @@ function handleMutate(action: string, p: Record<string, any>) {
     case 'deleteBookmark': store.bookmarks = store.bookmarks.filter(b => b.id !== p.bookmarkId); return S(ob);
     // 集會
     case 'createRegularMeeting':
-      store.regularMeetings.push({ id: uid('rm'), branchId: String(p.branchId || ''), title: String(p.title || ''), weekday: (parseInt(String(p.weekday), 10) || 6) as any, startTime: String(p.startTime || ''), endTime: String(p.endTime || ''), location: String(p.location || ''), enabled: true });
+      store.regularMeetings.push({ id: uid('rm'), branchId: String(p.branchId || ''), title: String(p.title || ''), weekday: (parseInt(String(p.weekday), 10) || 6) as any, frequency: String(p.frequency || 'weekly'), startTime: String(p.startTime || ''), endTime: String(p.endTime || ''), location: String(p.location || ''), enabled: true });
       return S(ob);
     case 'updateRegularMeeting': { const i = findIdx(store.regularMeetings, 'id', String(p.meetingId || '')); if (i >= 0) Object.assign(store.regularMeetings[i], Object.fromEntries(Object.entries(p).filter(([k]) => !['action', 'operatedBy', 'meetingId'].includes(k)))); return S(ob); }
     case 'toggleRegularMeeting': { const i = findIdx(store.regularMeetings, 'id', String(p.meetingId || '')); if (i >= 0) store.regularMeetings[i].enabled = !store.regularMeetings[i].enabled; return S(ob); }
     case 'deleteRegularMeeting': store.regularMeetings = store.regularMeetings.filter(r => r.id !== p.meetingId); return S(ob);
     case 'toggleMeetingCancel': {
-      const i = findIdx(store.cancelledMeetings, 'date', String(p.date || ''));
+      const branchId = String(p.branchId || '');
+      const date = String(p.date || '');
+      const i = store.cancelledMeetings.findIndex(c => c.branchId === branchId && c.date === date);
       if (i >= 0) store.cancelledMeetings.splice(i, 1);
-      else store.cancelledMeetings.push({ id: uid('cm'), branchId: String(p.branchId || ''), date: String(p.date || ''), reason: String(p.reason || ''), markedBy: ob, markedAt: new Date().toISOString().slice(0, 10) });
+      else store.cancelledMeetings.push({ id: uid('cm'), branchId, date, reason: String(p.reason || ''), markedBy: ob, markedAt: new Date().toISOString().slice(0, 10) });
       logAudit(ob, 'toggleMeetingCancel', '集會', `${p.branchId}/${p.date}`, String(p.reason || ''));
       return S(ob);
     }
@@ -1642,6 +1848,30 @@ function requestedRole(p: Record<string, any>): string {
   // updateUserField 係萬用寫入：field='role' 時角色喺 value
   if (String(p.field || '').trim().toLowerCase() === 'role') return String(p.value || '').trim().toLowerCase();
   return '';
+}
+
+function mockEquipmentManager(userId: string): { ok: boolean; user?: any; error?: string } {
+  const u = findUser(userId);
+  if (!u) return { ok: false, error: '找不到使用者，請重新登入。' };
+  const role = String((u as any).role || '').toLowerCase();
+  if (!['admin', 'troop_leader', 'super_admin', 'group_leader', 'branch_leader'].includes(role)) {
+    return { ok: false, error: '只有領袖或以上可以管理物資及批核借用。' };
+  }
+  return { ok: true, user: u };
+}
+
+function mockEquipmentBorrower(userId: string): { ok: boolean; user?: any; memberId?: string; error?: string } {
+  const u = findUser(userId);
+  if (!u) return { ok: false, error: '找不到使用者，請重新登入。' };
+  const role = String((u as any).role || '').toLowerCase();
+  if (['admin', 'troop_leader', 'super_admin', 'group_leader', 'branch_leader', 'coach'].includes(role)) {
+    return { ok: true, user: u, memberId: String((u as any).memberId || userId) };
+  }
+  const m = store.members.find(x => x.id === String((u as any).memberId || ''));
+  if (!m || !['b3', 'b4', 'b5'].includes(String(m.branchId || ''))) {
+    return { ok: false, error: '只限領袖及童軍支部或以上成員借用物資（小童軍／幼童軍請由領袖代借）。' };
+  }
+  return { ok: true, user: u, memberId: m.id };
 }
 
 export function handleMockRequest(action: string, params: Record<string, any> = {}): any {

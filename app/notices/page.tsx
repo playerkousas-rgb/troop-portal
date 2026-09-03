@@ -5,7 +5,7 @@ import { AppState, loadStateSlice, Bookmark } from '@/lib/store';
 import { apiSaveConfig, apiUpdateBookmark, apiDeleteBookmark, apiUpdatePdfTags } from '@/lib/api';
 import { getSession } from '@/lib/session';
 import { branches, publicViewEnabled } from '@/lib/model';
-import { isItemPublic, TROOP_SCOPE } from '@/lib/publicScope';
+import { cardEffective, isItemPublic, TROOP_SCOPE } from '@/lib/publicScope';
 import PublicScopePanel from '@/components/ui/PublicScopePanel';
 import PublicLocked from '@/components/ui/PublicLocked';
 import { useConfirm, kv } from '@/components/ConfirmProvider';
@@ -130,7 +130,7 @@ export default function Notices() {
 
   if (err && !s) return <main className="max-w-3xl mx-auto px-4 py-8 pb-24"><p className="bg-rose-50 border border-rose-200 rounded-xl p-4 text-sm text-rose-700 font-bold m-0 whitespace-pre-wrap">{err}</p></main>;
   if (!s) return <main className="max-w-3xl mx-auto px-4 py-8 pb-24 text-sm text-slate-600">載入中...</main>;
-  if (!session && !publicViewEnabled(s.config)) return <PublicLocked troopName={s.config?.TROOP_NAME} />;
+  if (!session && (!publicViewEnabled(s.config) || !cardEffective(s.config, 'activities'))) return <PublicLocked troopName={s.config?.TROOP_NAME} />;
 
   /* ★ 三層公開模型（lib/publicScope.ts）：
      通告卡（notices）由管理員開放，內容範圍＝全旅（管理員決定）＋各支部（該支部團長決定）。
@@ -150,6 +150,11 @@ export default function Notices() {
     ? allPdfs.filter(p => p.visible !== false
         && (p.branchTags || ['全旅']).some(t => isItemPublic(s.config, 'activities', tagToScope(t))))
     : allPdfs;
+  // bookmarks 同樣屬於「活動」公開卡；之前只過濾 PDF，會令訪客看到
+  // 管理員未公開嘅支部／全旅通告。
+  const bookmarks = isGuest
+    ? s.bookmarks.filter(b => (b.branchTags || ['全旅']).some(t => isItemPublic(s.config, 'activities', tagToScope(t))))
+    : s.bookmarks;
 
   return (
     <main className="max-w-3xl mx-auto px-4 py-4 pb-24 space-y-4">
@@ -184,13 +189,13 @@ export default function Notices() {
       {/* ═════ 活動通告（內部／外部）═════ */}
       <section className="bg-white rounded-2xl border border-slate-200 p-4 space-y-3">
         <div className="flex items-center justify-between">
-          <h2 className="font-bold text-base m-0">通告（{s.bookmarks.length}）</h2>
+          <h2 className="font-bold text-base m-0">通告（{bookmarks.length}）</h2>
         </div>
-        {s.bookmarks.length === 0 ? (
+        {bookmarks.length === 0 ? (
           <p className="text-sm text-slate-500 m-0 py-4 text-center">暫無通告，領袖引入區地域總會活動或上傳通告後會顯示在這裡。</p>
         ) : (
           <div className="space-y-2">
-            {s.bookmarks.map(b => editingId === b.id ? (
+            {bookmarks.map(b => editingId === b.id ? (
               <div key={b.id} className="rounded-xl border border-slate-200 bg-slate-50/70 p-3 space-y-2.5">
                 <label className={labelCls}>標題<input className={inputCls} value={bm.title} onChange={e => setBm({ ...bm, title: e.target.value })} /></label>
                 <label className={labelCls}>類型

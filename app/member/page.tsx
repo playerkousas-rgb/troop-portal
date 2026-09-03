@@ -21,9 +21,27 @@ export default function Member(){
   const session=getSession();
 
   if(err)return <div className="bg-rose-50 border border-rose-200 rounded-2xl p-4"><p className="text-sm text-rose-700 font-bold m-0 whitespace-pre-wrap leading-relaxed">{err}</p></div>;
+  if (!s && !session) return (
+    <main className="max-w-2xl mx-auto px-4 py-10 pb-24 text-center">
+      <h1 className="text-xl font-black text-slate-800 m-0">成員專區</h1>
+      <p className="text-sm text-slate-600 mt-2">請先登入成員帳戶，先可以查看活動、出席紀錄及個人資料。</p>
+      <Link href="/login" className="inline-flex mt-4 no-underline text-sm font-bold bg-brand-600 text-white px-4 py-2.5 rounded-xl">前往登入</Link>
+    </main>
+  );
   if(!s)return <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 text-sm text-slate-600">載入中...</div>;
-  const member=s.members.find(m=>m.id===(session?.memberId))||s.members[0];
-  if(!member)return <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 text-sm text-slate-600">找不到成員資料。</div>;
+  // 絕不以 members[0] 作後備對象；任何 session 缺漏都不應令成員看到／操作別人的資料。
+  if (session?.role !== 'member') return (
+    <main className="max-w-2xl mx-auto px-4 py-10 pb-24 text-center">
+      <h1 className="text-xl font-black text-slate-800 m-0">成員專區</h1>
+      <p className="text-sm text-slate-600 mt-2">此頁只供成員帳戶使用；你可以返回自己角色的控制台。</p>
+      <Link href={session ? (session.role === 'parent' ? '/parent' : '/admin') : '/login'} className="inline-flex mt-4 no-underline text-sm font-bold bg-brand-600 text-white px-4 py-2.5 rounded-xl">
+        {session ? '返回控制台' : '前往登入'}
+      </Link>
+    </main>
+  );
+  const linkedMemberId = session.memberId || s.users.find(u => u.id === session.userId)?.memberId;
+  const member = s.members.find(m => m.id === linkedMemberId || m.id === session.userId);
+  if (!member) return <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 text-sm text-slate-600">找不到你嘅成員資料，請重新登入或聯絡領袖。</div>;
   const adult=member.age>=18;
 
   /* ★ 成年成員（18+）冇「想考的章」（用戶要求 #6）：

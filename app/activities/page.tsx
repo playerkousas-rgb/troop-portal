@@ -102,6 +102,15 @@ export default function Activities() {
                 {e.source ? ` · ${e.source}` : ''}
                 {e.fee ? ` · ${e.fee}` : ''}
               </p>
+              <div className="flex flex-wrap gap-1.5 mt-2">
+                {e.noticeUrl && <a href={e.noticeUrl} target="_blank" rel="noreferrer" className="text-sm font-bold text-brand-700 bg-brand-50 border border-brand-100 rounded-lg px-2.5 py-1.5 no-underline">📄 查看通告</a>}
+                {e.paymentUrl && <a href={e.paymentUrl} target="_blank" rel="noreferrer" className="text-sm font-bold text-violet-700 bg-violet-50 border border-violet-100 rounded-lg px-2.5 py-1.5 no-underline">🔗 報名／付款</a>}
+                {session && eventCategory(e) === 'self' && (
+                  <Link href={session.role === 'parent' ? '/parent' : session.role === 'member' ? '/member' : '/admin/events'} className="text-sm font-bold text-slate-700 bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 no-underline">
+                    {session.role === 'member' || session.role === 'parent' ? '✅ 返回活動回覆' : '⚙️ 管理活動'}
+                  </Link>
+                )}
+              </div>
             </div>
           ))}
         </div>

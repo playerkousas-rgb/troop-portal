@@ -49,7 +49,7 @@ export default function AlbumsPage() {
     setSession(getSession());
     loadStateSlice(['events', 'members', 'userFeatures', 'config'])
       .then(setState)
-      .catch(() => setState({ events: [] } as unknown as AppState));
+      .catch((e: any) => setErr(e?.message || '相簿資料載入失敗，請稍後再試。'));
   }, []);
 
   const me = (state?.members || []).find(m => m.id === session?.memberId);
@@ -84,6 +84,14 @@ export default function AlbumsPage() {
       .slice()
       .sort((a, b) => (b.date || '').localeCompare(a.date || '')),
     [state]
+  );
+
+  if (!state) return (
+    <main className="max-w-2xl mx-auto px-4 py-8 pb-24">
+      <div className={`${err ? 'bg-rose-50 border-rose-200 text-rose-700' : 'bg-white border-slate-200 text-slate-600'} border rounded-2xl p-4 text-sm font-bold`}>
+        {err || '相簿載入中...'}
+      </div>
+    </main>
   );
 
   async function save() {

@@ -1117,6 +1117,37 @@ function publicConfig_(cfg) {
   return out;
 }
 
+/** GS 端公開資料過濾，與前端 lib/publicScope.ts／MOCK 三層模型保持一致。 */
+function publicCardOpen_(cfg, card) {
+  return parseArray_(normalizeCards_(cfg.PUBLIC_CARDS || '')).indexOf(card) >= 0;
+}
+function publicScopes_(cfg, card) {
+  var own = parseArray_(cfg['PUBLIC_SCOPE_' + String(card).toUpperCase()] || '');
+  if (own.length) return own;
+  if (card === 'activities') return parseArray_(cfg.PUBLIC_SCOPE_NOTICES || '');
+  return [];
+}
+function publicItemOpen_(cfg, card, branchId) {
+  var publicView = String(cfg.PUBLIC_VIEW === undefined ? '' : cfg.PUBLIC_VIEW).trim().toLowerCase();
+  if (['false', '0', 'off', 'no', 'n', '否', '關閉', 'disable', 'disabled'].indexOf(publicView) >= 0) return false;
+  if (!publicCardOpen_(cfg, card)) return false;
+  var scopes = publicScopes_(cfg, card);
+  if (!scopes.length) return false;
+  var scope = (!branchId || branchId === 'troop') ? 'troop' : String(branchId);
+  return scopes.indexOf(scope) >= 0;
+}
+function publicScopeFromTag_(tag) {
+  var value = String(tag || '').trim();
+  if (!value || value === '全旅' || value === 'troop') return 'troop';
+  var rows = readTable_('Branches');
+  for (var i = 0; i < rows.length; i++) {
+    if (value === getField_(rows[i], 'branchId') || value === getField_(rows[i], 'name') || value === getField_(rows[i], 'shortName')) {
+      return String(getField_(rows[i], 'branchId') || value);
+    }
+  }
+  return value;
+}
+
 // ==================== ★ 角色過濾 Dashboard（取代 getState） ====================
 
 /**
@@ -1253,8 +1284,31 @@ function buildDashboardCore_(userId, loadPdfs) {
     }
   } catch (e) {}
 
-  // 未登入或無效使用者：只回 config
+  // 未登入或無效使用者：只回傳真正已公開嘅內容，唔可以因為前端 route
+  // 可直接打開就收到全份活動／通告／集會資料。
   if (!user) {
+    state.events = allEvents.filter(function (e) {
+      return (e.status === 'published' || e.status === 'active') && publicItemOpen_(config, 'activities', e.branchId);
+    });
+    state.bookmarks = allBookmarks.filter(function (b) {
+      if (b.status !== 'published') return false;
+      var tags = b.branchTags && b.branchTags.length ? b.branchTags : ['troop'];
+      return tags.some(function (t) { return publicItemOpen_(config, 'activities', publicScopeFromTag_(t)); });
+    });
+    state.regularMeetings = allRegularMeetings.filter(function (r) {
+      return r.enabled && publicItemOpen_(config, 'calendar', r.branchId);
+    });
+    state.meetings = allMeetings.filter(function (m) {
+      return m.status === 'published' && publicItemOpen_(config, 'calendar', m.branchId);
+    });
+    if (loadPdfs) {
+      // PDF 只按可見狀態及活動卡公開範圍回傳；Drive 讀取失敗時維持空陣列。
+      state.announcementPdfs = (state.announcementPdfs || []).filter(function (pdf) {
+        if (!pdf.visible) return false;
+        var tags = pdf.branchTags && pdf.branchTags.length ? pdf.branchTags : ['troop'];
+        return tags.some(function (t) { return publicItemOpen_(config, 'activities', publicScopeFromTag_(t)); });
+      });
+    }
     return state;
   }
 
@@ -1801,6 +1855,25 @@ var ACTION_REQUIRED_FEATURE_ = {
   deleteRegularMeeting: 'calendar', toggleRegularMeeting: 'calendar', toggleMeetingCancel: 'calendar'
 };
 
+/** 自助個人資料允許欄位；編制／權限欄位永遠只可由領袖管理。 */
+var SELF_MEMBER_PROFILE_FIELDS_ = ['name', 'email', 'password', 'emergencyContactPhone'];
+var SELF_USER_PROFILE_FIELDS_ = ['name', 'email', 'password'];
+var MEMBER_UPDATE_FIELDS_ = [
+  'ymNumber', 'password', 'name', 'email', 'branchId', 'patrolId', 'patrolRole',
+  'specialRole', 'dateOfBirth', 'parentUserId', 'emergencyContactName',
+  'emergencyContactPhone', 'active', 'note', 'wantedBadges', 'wantedBadgesAt'
+];
+
+function isSelfMemberTarget_(p, actor) {
+  if (!p || !actor) return false;
+  var targetId = String(p.memberId || '');
+  if (!targetId) return false;
+  var member = readTable_('Members').filter(function (m) {
+    return String(getField_(m, 'memberId')) === targetId;
+  })[0];
+  return !!member && String(getField_(actor, 'memberId')) === targetId;
+}
+
 /**
  * 檢查 operatedBy 有冇權做呢個 action。
  * 回傳 null = 放行；回傳 object = 拒絕（已經係 error payload）。
@@ -1941,12 +2014,23 @@ function checkActionPermission_(action, p) {
   var users = readTable_('Users');
   var actor = users.filter(function (u) { return getField_(u, 'userId') === operatedBy; })[0];
   if (!actor) {
+    // 舊版 Members 可能沒有 Users 對應列；它仍可用 YMIS 登入，
+    // 只容許同一個 memberId 做個人資料自助，不能藉此取得任何管理權限。
+    if (action === 'updateMember' && String(p.operatedBy || '') === String(p.memberId || '') &&
+        readTable_('Members').some(function (m) { return String(getField_(m, 'memberId')) === String(p.memberId || ''); })) {
+      return null;
+    }
     return { success: false, error: '找不到操作者帳號，請重新登入' };
   }
   if (!parseBool_(getField_(actor, 'approved'))) {
     return { success: false, error: '帳號已停用，無法執行此操作' };
   }
   var role = String(getField_(actor, 'role') || '').toLowerCase();
+
+  // 個人資料係自助功能：成員／家長未必有 members／users feature，
+  // 但只會喺 handler 以白名單欄位放行。其他寫入仍要經 feature gate。
+  if (action === 'updateMember' && isSelfMemberTarget_(p, actor)) return null;
+  if (action === 'updateUserField' && String(p.userId || '') === operatedBy) return null;
 
   // ★ 不可指派角色守衛：旅長唔可以經 API 指派。
   //   旅長全旅只有一個（＝最早建立嘅管理員），交接只可以經 transferTroopLeader
@@ -2345,7 +2429,8 @@ function handleDeleteEquipment_(p) {
 
 function handleRequestEquipmentLoan_(p) {
   ensureEquipmentSheets_();
-  var who = equipmentBorrower_(p.memberId || p.operatedBy || p.userId);
+  // 借用資格必須以真正操作者判斷，唔可以信任前端傳入的 memberId 冒充另一位成員。
+  var who = equipmentBorrower_(p.operatedBy || p.userId);
   if (!who.ok) return { success: false, error: who.error };
 
   var items = parseLoanItems_(p.items);
@@ -2356,31 +2441,36 @@ function handleRequestEquipmentLoan_(p) {
   if (returnDueDate < borrowDate) return { success: false, error: '預計歸還日期不可早於借出日期。' };
 
   var eqs = mapEquipment_();
-  var batchRef = uid_('BR');
-  var created = 0;
+  // 先完整驗證，再一次寫入，避免同一批申請部分成功；同一物資重複列亦要合併計算庫存。
+  var accepted = [];
   for (var i = 0; i < items.length; i++) {
     var eq = eqs.filter(function (e) { return e.id === items[i].equipmentId; })[0];
     if (!eq) return { success: false, error: '找不到物資（' + items[i].equipmentId + '）' };
     var qty = Math.floor(items[i].qty);
-    if (!(qty > 0)) continue;
+    if (!(qty > 0)) return { success: false, error: '借用數量必須大於 0。' };
     if (!eq.enabled) return { success: false, error: '「' + eq.name + '」已停用，暫不可借用。' };
-    if (qty > eq.availableQty) {
-      return { success: false, error: '「' + eq.name + '」目前只餘 ' + eq.availableQty + ' ' + eq.unit + ' 可借。' };
+    var used = accepted.filter(function (x) { return x.eq.id === eq.id; }).reduce(function (sum, x) { return sum + x.qty; }, 0);
+    if (qty + used > eq.availableQty) {
+      return { success: false, error: '「' + eq.name + '」目前只餘 ' + Math.max(0, eq.availableQty - used) + ' ' + eq.unit + ' 可借。' };
     }
+    accepted.push({ eq: eq, qty: qty });
+  }
+  var batchRef = uid_('BR');
+  accepted.forEach(function (item) {
+    var eq = item.eq;
     appendRowByHeaders_('EquipmentLoans', {
       loanId: uid_('ln'), batchRef: batchRef, equipmentId: eq.id, equipmentName: eq.name,
-      unit: eq.unit, qty: qty,
-      memberId: who.memberId || p.memberId || '', memberName: who.name, branchId: who.branchId,
+      unit: eq.unit, qty: item.qty,
+      memberId: who.memberId || '', memberName: who.name, branchId: who.branchId,
       purpose: p.purpose || '', borrowDate: borrowDate, returnDueDate: returnDueDate,
       status: 'pending', requestedAt: now_(), note: p.note || ''
     });
-    created++;
-  }
-  if (!created) return { success: false, error: '請填寫借用數量（最少 1 件）。' };
+  });
+  if (!accepted.length) return { success: false, error: '請填寫借用數量（最少 1 件）。' };
 
   writeAudit_(p.operatedBy || p.memberId || 'system', 'requestEquipmentLoan', 'EquipmentLoans', batchRef,
-    created + ' 項待批核 · ' + who.name);
-  return { success: true, batchRef: batchRef, count: created };
+    accepted.length + ' 項待批核 · ' + who.name);
+  return { success: true, batchRef: batchRef, count: accepted.length };
 }
 
 /** 待批核時可改數量／日期／用途／取消 */
@@ -2390,8 +2480,15 @@ function handleUpdateEquipmentLoan_(p) {
   if (loan.status !== 'pending') {
     return { success: false, error: '只有「待批核」的申請可以修改（現時：' + loanStatusLabel_(loan.status) + '）。' };
   }
-  var requesterId = p.memberId || p.operatedBy || '';
-  if (loan.memberId !== requesterId && !isPrivilegedOperator_(p.operatedBy)) {
+  var caller = mapUsers_().filter(function (u) { return u.id === String(p.operatedBy || ''); })[0];
+  var callerRole = caller ? String(caller.role || '').toLowerCase() : '';
+  var requesterId = p.memberId || (caller && caller.memberId) || p.operatedBy || '';
+  var canManageLoan = isPrivilegedOperator_(p.operatedBy) ||
+    ['super_admin', 'troop_leader', 'admin', 'group_leader', 'branch_leader'].indexOf(callerRole) >= 0;
+  if (callerRole === 'branch_leader' && String(loan.branchId || '') !== String(caller && caller.branchId || '')) {
+    return { success: false, error: '支部領袖只可以處理自己支部的借用申請。' };
+  }
+  if (loan.memberId !== requesterId && !canManageLoan) {
     return { success: false, error: '只能修改自己的借用申請。' };
   }
   if (p.qty !== undefined && String(p.qty) !== '') {
@@ -2416,8 +2513,15 @@ function handleCancelEquipmentLoan_(p) {
   if (loan.status !== 'pending') {
     return { success: false, error: '只有「待批核」的申請可以取消（現時：' + loanStatusLabel_(loan.status) + '）。' };
   }
-  var requesterId = p.memberId || p.operatedBy || '';
-  if (loan.memberId !== requesterId && !isPrivilegedOperator_(p.operatedBy)) {
+  var caller = mapUsers_().filter(function (u) { return u.id === String(p.operatedBy || ''); })[0];
+  var callerRole = caller ? String(caller.role || '').toLowerCase() : '';
+  var requesterId = p.memberId || (caller && caller.memberId) || p.operatedBy || '';
+  var canManageLoan = isPrivilegedOperator_(p.operatedBy) ||
+    ['super_admin', 'troop_leader', 'admin', 'group_leader', 'branch_leader'].indexOf(callerRole) >= 0;
+  if (callerRole === 'branch_leader' && String(loan.branchId || '') !== String(caller && caller.branchId || '')) {
+    return { success: false, error: '支部領袖只可以處理自己支部的借用申請。' };
+  }
+  if (loan.memberId !== requesterId && !canManageLoan) {
     return { success: false, error: '只能取消自己的借用申請。' };
   }
   updateCellByName_('EquipmentLoans', 'loanId', p.loanId, 'status', 'cancelled');
@@ -2431,6 +2535,9 @@ function handleDecideEquipmentLoan_(p) {
   if (!op.ok) return { success: false, error: op.error };
   var loan = mapEquipmentLoans_().filter(function (l) { return l.id === p.loanId; })[0];
   if (!loan) return { success: false, error: '找不到借用紀錄' };
+  if (String(op.role || '').toLowerCase() === 'branch_leader' && String(loan.branchId || '') !== String(op.branchId || '')) {
+    return { success: false, error: '支部領袖只可以處理自己支部的借用申請。' };
+  }
   if (loan.status !== 'pending') {
     return { success: false, error: '此申請已處理（' + loanStatusLabel_(loan.status) + '）。' };
   }
@@ -2461,6 +2568,9 @@ function handleReturnEquipmentLoan_(p) {
   if (!op.ok) return { success: false, error: op.error };
   var loan = mapEquipmentLoans_().filter(function (l) { return l.id === p.loanId; })[0];
   if (!loan) return { success: false, error: '找不到借用紀錄' };
+  if (String(op.role || '').toLowerCase() === 'branch_leader' && String(loan.branchId || '') !== String(op.branchId || '')) {
+    return { success: false, error: '支部領袖只可以處理自己支部的借用申請。' };
+  }
   if (loan.status !== 'approved') {
     return { success: false, error: '只有「已批核（未歸還）」的紀錄可以標記歸還（現時：' + loanStatusLabel_(loan.status) + '）。' };
   }
@@ -2554,8 +2664,14 @@ function handleLogin_(p) {
     if (memberPw && memberPw !== password) return json({ success: false, error: '密碼不正確' });
     if (!memberPw) return json({ success: false, error: '此成員尚未設定密碼，請聯絡領袖在 Members 表設定密碼。' });
     var age = calcAge_(getField_(member, 'dateOfBirth'));
+    // 優先使用 Users.userId 作為 session identity；Members-only 舊資料才退回
+    // memberId。後續權限檢查需要真正的 Users row，否則成員無法自助改資料／登記想考的章。
+    var linkedUser = readTable_('Users').filter(function (u) {
+      return String(getField_(u, 'memberId')) === String(getField_(member, 'memberId'));
+    })[0];
     return json({ success: true, user: {
-      userId: getField_(member, 'memberId'), name: getField_(member, 'name'), role: 'member',
+      userId: linkedUser ? getField_(linkedUser, 'userId') : getField_(member, 'memberId'),
+      name: getField_(member, 'name'), role: 'member',
       branchId: getField_(member, 'branchId'), memberId: getField_(member, 'memberId'), age: age,
       specialRole: getField_(member, 'specialRole') || '',
       dashboard: '/member'
@@ -2980,14 +3096,40 @@ function handleCreateMember_(p) {
 }
 
 function handleUpdateMember_(p) {
-  var fields = ['ymNumber', 'password', 'name', 'email', 'branchId', 'patrolId', 'patrolRole', 'specialRole', 'dateOfBirth', 'parentUserId', 'emergencyContactName', 'emergencyContactPhone', 'active', 'note', 'wantedBadges', 'wantedBadgesAt'];
+  var memberId = String(p.memberId || '');
+  var rows = readTable_('Members');
+  var target = rows.filter(function (m) { return String(getField_(m, 'memberId')) === memberId; })[0];
+  if (!target) return { success: false, error: '找不到成員' };
+
+  var fields = MEMBER_UPDATE_FIELDS_;
+  var supplied = Object.keys(p).filter(function (k) {
+    return ['action', 'operatedBy', 'memberId'].indexOf(k) < 0;
+  });
+  if (supplied.some(function (f) { return fields.indexOf(f) < 0; })) {
+    return { success: false, error: '包含不支援的成員欄位。' };
+  }
+
+  var users = mapUsers_();
+  var actor = users.filter(function (u) { return u.id === String(p.operatedBy || ''); })[0];
+  // Members-only 舊帳戶可能沒有 Users row；central guard 已只容許
+  // operatedBy == memberId 的自助請求，呢度同樣視為本人。
+  var isSelf = isSelfMemberTarget_(p, actor) ||
+    (!actor && String(p.operatedBy || '') === memberId);
+  if (isSelf && supplied.some(function (f) { return SELF_MEMBER_PROFILE_FIELDS_.indexOf(f) < 0; })) {
+    return { success: false, error: '成員只可以修改自己嘅姓名、Email、電話或密碼。' };
+  }
+
+  var oldPatrolId = String(getField_(target, 'patrolId') || '');
   fields.forEach(function (f) {
     if (p[f] !== undefined && p[f] !== null) {
-      updateCellByName_('Members', 'memberId', p.memberId, f, p[f]);
+      updateCellByName_('Members', 'memberId', memberId, f, p[f]);
     }
   });
-  if (p.patrolId) syncPatrolMembers_(p.patrolId);
-  writeAudit_(p.operatedBy || 'system', 'updateMember', 'Members', p.memberId, '');
+  // 轉隊時要同步新舊兩個小隊，避免舊小隊仍殘留隊員 ID。
+  var newPatrolId = p.patrolId !== undefined ? String(p.patrolId || '') : oldPatrolId;
+  if (oldPatrolId && oldPatrolId !== newPatrolId) syncPatrolMembers_(oldPatrolId);
+  if (newPatrolId) syncPatrolMembers_(newPatrolId);
+  writeAudit_(p.operatedBy || 'system', 'updateMember', 'Members', memberId, '');
   return { success: true };
 }
 
@@ -3009,10 +3151,17 @@ function handleSetWantedBadges_(p) {
   // ★ 角色清單必須同 lib/model.ts 嘅 MANAGER_ROLES ＋ LEADER_ROLES 一致
   //   （super_admin／troop_leader／admin ＋ group_leader／branch_leader／coach）。
   var isLeader = ['super_admin', 'troop_leader', 'admin', 'group_leader', 'branch_leader', 'coach'].indexOf(opRole) >= 0;
-  var isSelf = String(getField_(op, 'memberId') || '') === memberId;
+  var isSelf = String(getField_(op, 'memberId') || '') === memberId || (!op && String(opId) === memberId);
   var isParent = String(getField_(member, 'parentUserId') || '') === opId;
   if (!isLeader && !isSelf && !isParent) {
     return { success: false, error: '只可以登記自己（或自己子女）想考的章。' };
+  }
+  // 領袖亦只可以處理自己所屬／獲授權嘅支部；管理層則可全旅處理。
+  if (isLeader && ['super_admin', 'troop_leader', 'admin'].indexOf(opRole) < 0) {
+    var allowedBranches = visibleBranchesFor_(opId, opRole, String(getField_(op, 'branchId') || ''));
+    if (allowedBranches.indexOf(String(getField_(member, 'branchId') || '')) < 0) {
+      return { success: false, error: '你未獲授權管理該支部嘅想考的章。' };
+    }
   }
 
   // 只有幼童軍（b2）／童軍（b3）支部有呢個選單
@@ -3303,6 +3452,30 @@ function isDistrictEvent_(evRow) {
  * registered / declined：18 歲以下必須由家長操作
  * interested：任何人都可以
  */
+function resolveReplyOperator_(p, member) {
+  var operatorId = String(p.operatedBy || '');
+  var role = '';
+  var actor = null;
+  if (TECH_TEST_ACCOUNTS_.indexOf(operatorId) >= 0 || operatorId === 'staff_token' || operatorId === 'SUPER_ADMIN') {
+    return { ok: true, role: 'super_admin', id: operatorId, memberId: '' };
+  }
+  actor = mapUsers_().filter(function (u) { return u.id === operatorId; })[0] || null;
+  // Members-only 舊帳戶沒有 Users row，只能以自己的 memberId 表達興趣。
+  if (!actor && operatorId === String(getField_(member, 'memberId'))) {
+    actor = { id: operatorId, role: 'member', memberId: operatorId };
+  }
+  if (!actor) return { ok: false, role: '', id: operatorId, memberId: '' };
+  role = String(actor.role || '').toLowerCase();
+  var leader = ['super_admin', 'troop_leader', 'admin', 'group_leader', 'branch_leader', 'coach'].indexOf(role) >= 0;
+  var self = String(actor.memberId || '') === String(getField_(member, 'memberId'));
+  var parent = role === 'parent' && String(getField_(member, 'parentUserId') || '') === actor.id;
+  // 家長不能靠 request 自己填另一個 parentUserId 冒認其他家長。
+  if (role === 'parent' && p.parentUserId && String(p.parentUserId) !== actor.id) {
+    return { ok: false, role: role, id: actor.id, memberId: actor.memberId || '' };
+  }
+  return { ok: leader || self || parent, role: role, id: actor.id, memberId: actor.memberId || '' , parent: parent };
+}
+
 function handleSetReply_(p) {
   var eventId = p.eventId, memberId = p.memberId;
   var type = p.type || 'interested';
@@ -3313,24 +3486,17 @@ function handleSetReply_(p) {
     return { success: false, error: '區地域總會活動為通告性質，旅團不代收報名，請按通告連結自行報名。' };
   }
 
+  var member = readTable_('Members').filter(function (m) { return getField_(m, 'memberId') === memberId; })[0];
+  if (!member) return { success: false, error: '找不到成員' };
+  var caller = resolveReplyOperator_(p, member);
+  if (!caller.ok) return { success: false, error: '只可以登記自己或自己子女嘅活動回覆。' };
+
   // 年齡檢查
   if (type === 'registered' || type === 'declined') {
-    var members = readTable_('Members');
-    var member = members.filter(function (m) { return getField_(m, 'memberId') === memberId; })[0];
-    if (member) {
-      var age = calcAge_(getField_(member, 'dateOfBirth'));
-      if (age >= 0 && age < 18) {
-        // 必須由家長操作
-        var parentUserId = p.parentUserId || '';
-        if (!parentUserId) {
-          // 檢查操作者是否為家長
-          var users = readTable_('Users');
-          var operator = users.filter(function (u) { return getField_(u, 'userId') === (p.operatedBy || ''); })[0];
-          if (!operator || String(getField_(operator, 'role')).toLowerCase() !== 'parent') {
-            return { success: false, error: '18歲以下成員需由家長代為操作參加 / 不參加' };
-          }
-        }
-      }
+    var age = calcAge_(getField_(member, 'dateOfBirth'));
+    if (age >= 0 && age < 18 && caller.role !== 'parent' &&
+        ['super_admin', 'troop_leader', 'admin', 'group_leader', 'branch_leader', 'coach'].indexOf(caller.role) < 0) {
+      return { success: false, error: '18歲以下成員需由家長代為操作參加 / 不參加' };
     }
   }
 
@@ -3784,12 +3950,22 @@ function handleUpdateUserField_(p) {
    *
    * 非 role 欄位（branchId／name 等）唔受限，避免誤擋正常編輯。
    */
-  if (String(p.field || '').trim().toLowerCase() === 'role') {
+  var field = String(p.field || '').trim();
+  if (field === 'role') {
     var peer = checkAdminPeerGuard_(p, 'role');
     if (peer) return peer;
   }
-  updateCellByName_('Users', 'userId', p.userId, p.field, p.value || '');
-  writeAudit_(p.operatedBy || 'system', 'updateUserField', 'Users', p.userId, p.field + '=' + (p.value || ''));
+  var self = String(p.userId || '') === String(p.operatedBy || '');
+  // 舊版管理介面仍會用此萬用 action 更新非 role 欄位；只限制自助帳戶，
+  // 管理層替其他帳戶的既有欄位更新則沿用原有流程。
+  if (self && SELF_USER_PROFILE_FIELDS_.indexOf(field) < 0) {
+    return { success: false, error: '個人資料只可以更新姓名、Email 或密碼。' };
+  }
+  if (!readTable_('Users').some(function (u) { return String(getField_(u, 'userId')) === String(p.userId || ''); })) {
+    return { success: false, error: '找不到使用者' };
+  }
+  updateCellByName_('Users', 'userId', p.userId, field, p.value === undefined || p.value === null ? '' : p.value);
+  writeAudit_(p.operatedBy || 'system', 'updateUserField', 'Users', p.userId, field + '=' + (p.value || ''));
   return { success: true };
 }
 
@@ -4064,6 +4240,10 @@ function handleTogglePluginStatus_(p) {
 // ==================== 取消報名回覆（1.0 邏輯：軟刪除） ====================
 
 function handleCancelReply_(p) {
+  var member = readTable_('Members').filter(function (m) { return getField_(m, 'memberId') === String(p.memberId || ''); })[0];
+  if (!member) return { success: false, error: '找不到成員' };
+  var caller = resolveReplyOperator_(p, member);
+  if (!caller.ok) return { success: false, error: '只可以取消自己或自己子女嘅活動回覆。' };
   var replyId = p.eventId + '_' + p.memberId;
   var idx = findRowIndexById_('EventReplies', 'replyId', replyId);
   if (idx < 0) return { success: false, error: '找不到報名記錄' };

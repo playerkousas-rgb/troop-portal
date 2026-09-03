@@ -6,6 +6,7 @@ import EmptyState from '@/components/ui/EmptyState';
 import { AppState, loadStateSlice } from '@/lib/store';
 import { apiSetWantedBadges } from '@/lib/api';
 import { getSession } from '@/lib/session';
+import { branches } from '@/lib/model';
 import { badgeSchemeFor, parseWantedBadges } from '@/lib/badges';
 import { useConfirm, kv } from '@/components/ConfirmProvider';
 
@@ -52,7 +53,7 @@ export default function BadgesPage() {
 
   const target = s?.members.find((m) => m.id === targetId);
   const scheme = badgeSchemeFor(target?.branchId);
-  const branchName = s?.patrols?.find((p) => p.id === target?.branchId)?.name || target?.branchId || '';
+  const branchName = branches.find(b => b.id === target?.branchId)?.name || target?.branchId || '';
 
   // 家長可替多名子女揀
   const childOptions = useMemo(() => {

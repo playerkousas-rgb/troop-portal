@@ -326,7 +326,7 @@ export default function AttendancePage() {
   // 切換場次後捲到點名表
   useEffect(() => {
     if (editor && editorRef.current) editorRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  }, [editor?.key]);
+  }, [editor]);
 
   function patchRoster(memberId: string, patch: Partial<AttendanceRosterItem>) {
     setRoster(prev => prev.map(item => item.memberId === memberId ? { ...item, ...patch } : item));

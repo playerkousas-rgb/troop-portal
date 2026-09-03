@@ -154,6 +154,8 @@ export default function Page(){
   const { confirm } = useConfirm();
 
   useEffect(()=>{loadStateSlice(['patrols','users','members','applications']).then(setS).catch(e=>setErr(e.message))},[]);
+  // previewBulk 係本頁內部穩定的事件處理函式；只應在 state 載入後處理 deep link 一次。
+  /* eslint-disable react-hooks/exhaustive-deps */
   useEffect(()=>{
     if (s && typeof window !== 'undefined' && window.location.hash === '#bulk-onboard') {
       setShowBulk(true);
@@ -170,6 +172,7 @@ export default function Page(){
       }
     }
   },[s]);
+  /* eslint-enable react-hooks/exhaustive-deps */
 
   async function toggle(id:string){
     const u=s?.users.find(x=>x.id===id);

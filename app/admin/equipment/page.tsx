@@ -44,8 +44,8 @@ export default function AdminEquipment() {
     catch (e: any) { setErr(e.message || String(e)); }
   }
 
-  const equipment = s?.equipment || [];
-  const loans = s?.equipmentLoans || [];
+  const equipment = useMemo(() => s?.equipment || [], [s?.equipment]);
+  const loans = useMemo(() => s?.equipmentLoans || [], [s?.equipmentLoans]);
 
   const stats = useMemo(() => ({
     kinds: equipment.length,
