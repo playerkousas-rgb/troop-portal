@@ -6,8 +6,9 @@ import { getSession } from '@/lib/session';
 import { AppState, EQUIPMENT_BORROW_BRANCHES, Equipment, EquipmentLoan, LOAN_STATUS_LABEL, LOAN_STATUS_TONE } from '@/lib/store';
 import { branches } from '@/lib/model';
 import { useConfirm, kv } from '@/components/ConfirmProvider';
+import { canAccessRoute } from '@/lib/routeAccess';
 
-const LEADER_ROLES = ['super_admin', 'troop_super', 'troop_leader', 'admin', 'group_leader', 'branch_leader', 'coach'];
+const LEADER_ROLES = ['super_admin', 'troop_leader', 'admin', 'group_leader', 'branch_leader', 'coach'];
 
 function today() { return new Date().toISOString().slice(0, 10); }
 function branchName(id: string) { return branches.find(b => b.id === id)?.name || id || '—'; }
@@ -27,6 +28,16 @@ export default function EquipmentPage() {
   const session = typeof window === 'undefined' ? null : getSession();
   const role = session?.role || 'guest';
   const isLeader = LEADER_ROLES.includes(role);
+  /**
+   * ★ 「物資管理」掣嘅守衛 —— 唔可以直接用 isLeader。
+   *
+   * `LEADER_ROLES` 包教練員，但目標頁 `/admin/equipment` 嘅 gate 唔收教練員
+   * （教練員冇固定支部，物資權限要團長逐項授權）。用 isLeader 嘅話教練員會
+   * 睇到掣但撳落去撞「未獲授權」牆 —— 呢個係 2026-09-03 全 repo 掃描測出嚟嘅。
+   *
+   * 用 canAccessRoute() 讀 ROUTE_ROLES（同目標頁 <Auth> 同一個來源），咁先唔會 drift。
+   */
+  const canManageEquipment = canAccessRoute('/admin/equipment', role);
 
   const load = useCallback(async () => {
     setErr('');
@@ -180,7 +191,7 @@ export default function EquipmentPage() {
         </p>
         <div className="row">
           <button className="btn" onClick={load} disabled={!!busy}>↻ 更新數量</button>
-          {isLeader && <Link className="btn primary" href="/admin/equipment">🛠️ 物資管理（新增／批核）</Link>}
+          {canManageEquipment && <Link className="btn primary" href="/admin/equipment">🛠️ 物資管理（新增／批核）</Link>}
         </div>
       </section>
 

@@ -98,7 +98,7 @@ export const ATTENDANCE_STATUSES: Array<{
 ];
 
 export const LEADER_ATTENDANCE_ROLES: Role[] = [
-  'super_admin', 'troop_super', 'troop_leader', 'admin', 'group_leader', 'branch_leader', 'coach',
+  'super_admin', 'troop_leader', 'admin', 'group_leader', 'branch_leader', 'coach',
 ];
 
 export function canMarkAttendance(role?: Role) {

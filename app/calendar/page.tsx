@@ -6,6 +6,10 @@ import { apiToggleMeetingCancel, apiCreateEvent, apiUpdateEvent, apiDeleteEvent,
   apiDeleteMeeting } from '@/lib/api';
 import { getSession, Session } from '@/lib/session';
 import { publicViewEnabled } from '@/lib/model';
+import { isItemPublic, cardEffective } from '@/lib/publicScope';
+import { calendarScope } from '@/lib/calendarScope';
+import { buildIcs, downloadIcs } from '@/lib/ics';
+import SubscribeCalendar from '@/components/ui/SubscribeCalendar';
 import PublicLocked from '@/components/ui/PublicLocked';
 import Link from 'next/link';
 import { useConfirm, kv } from '@/components/ConfirmProvider';
@@ -71,6 +75,7 @@ export default function Calendar() {
   const [session, setSessionState] = useState<Session | null>(undefined);
   const [err, setErr] = useState('');
   const [msg, setMsg] = useState('');
+  const [icsMsg, setIcsMsg] = useState('');
   const [view, setView] = useState<'month' | 'list'>('month');
   const [base, setBase] = useState(new Date());
   const [filterBranch, setFilterBranch] = useState('all');
@@ -103,17 +108,21 @@ export default function Calendar() {
   if (!s) return <main className="max-w-4xl mx-auto px-4 py-8 pb-24 text-sm text-slate-600">載入中...</main>;
 
   const role = session?.role;
-  const isLeader = !!role && ['super_admin', 'troop_super', 'troop_leader', 'admin', 'group_leader', 'branch_leader', 'coach'].includes(role);
-  const canCancel = !!role && ['super_admin', 'troop_super', 'troop_leader', 'admin', 'group_leader', 'branch_leader'].includes(role);
+  const isLeader = !!role && ['super_admin', 'troop_leader', 'admin', 'group_leader', 'branch_leader', 'coach'].includes(role);
+  const canCancel = !!role && ['super_admin', 'troop_leader', 'admin', 'group_leader', 'branch_leader'].includes(role);
   const parent = role === 'parent' ? s.users.find(u => u.id === session.userId) : null;
   const children = parent ? (s.members || []).filter(m => (parent.childMemberIds || []).includes(m.id) || m.parentUserId === parent.id) : [];
 
   // ===== 公開（未登入） =====
   if (!session) {
     if (!publicViewEnabled(s.config)) return <PublicLocked troopName={s.config?.TROOP_NAME} />;
-    const pubEvents = (s.events || []).filter(e => e.status === 'published');
-    const pubMeetings = (s.meetings || []).filter(m => m.status === 'published');
-    const pubRules = (s.regularMeetings || []).filter(r => r.enabled);
+    // ★ 兩層同意（用戶要求）：管理員開咗總掣（PUBLIC_VIEW）只係開放呢個功能，
+    //   每個支部仲要由自己嘅領袖另外同意，佢哋支部嘅項目先至公開。
+    //   全旅項目（scope=troop／冇 branchId）由管理層發佈 → 總掣開咗就公開。
+    //   例：A／C 支部領袖同意、B 冇 → 訪客睇到 全旅＋A＋C；B 嘅活動／集會唔會公開。
+    const pubEvents = (s.events || []).filter(e => e.status === 'published' && isItemPublic(s.config, 'calendar', e.branchId));
+    const pubMeetings = (s.meetings || []).filter(m => m.status === 'published' && isItemPublic(s.config, 'calendar', m.branchId));
+    const pubRules = (s.regularMeetings || []).filter(r => r.enabled && isItemPublic(s.config, 'calendar', r.branchId));
     return (
       <main className="max-w-4xl mx-auto px-4 py-4 pb-24 space-y-4">
         <div className="flex items-center justify-between gap-2 flex-wrap">
@@ -123,6 +132,12 @@ export default function Calendar() {
         <p className="text-sm text-slate-500 m-0 -mt-2">登入後可查看個人化行事曆及回覆活動。</p>
         <Chips options={BRANCH_OPTIONS} value={filterBranch} onChange={setFilterBranch} />
         <Chips options={TYPE_OPTIONS} value={filterType} onChange={setFilterType} />
+        {/* 未登入訪客一樣可以訂閱 —— 公開版內容同 feed 內容本来就係同一套 */}
+        <SubscribeCalendar
+          branchIds={[]}
+          count={pubEvents.length + pubRules.length}
+          onDownload={() => setIcsMsg('請先登入，或直接用上面嘅訂閱連結。')}
+        />
         <MonthNav year={year} mo={mo} onPrev={() => setBase(addMonths(base, -1))} onNext={() => setBase(addMonths(base, 1))} />
         <MonthGrid
           days={days} base={base} year={year} mo={mo}
@@ -136,12 +151,73 @@ export default function Calendar() {
 
   // ===== 已登入 =====
   const myMember = role === 'member' ? s.members.find(x => x.id === session.memberId) : null;
+
+  /* ═════ 支部可見範圍（用戶要求 #3 #4）═════
+     規則抽咗去 lib/calendarScope.ts（同檢查腳本共用同一個函式）：
+     管理員級睇全部支部；其他人只睇「全旅」＋自己（家長＝子女）支部；
+     家長／成員亦唔會見到「會議」（領袖會議）呢個分類。 */
+  const scope = calendarScope({
+    role,
+    ownBranchId: myMember?.branchId || session?.branchId,
+    childBranchIds: children.map(c => c.branchId),
+  });
+  const inScope = scope.inScope;
+  const branchOptions = scope.adminTier
+    ? BRANCH_OPTIONS
+    : BRANCH_OPTIONS.filter(b => b.id === 'all' || b.id === 'troop' || scope.branchIds.includes(b.id));
+  const typeOptions = scope.hideMeetings ? TYPE_OPTIONS.filter(t => t.id !== 'oneoff') : TYPE_OPTIONS;
+  /* 訂閱 feed 用嘅支部範圍：管理員級＝全旅（唔帶 branch 參數）；
+     其他人＝自己／子女支部。呢個只係「預設幫你 filter 好」，
+     feed 本身公開，內容同未登入訪客睇到嘅一樣。 */
+  const subscribeBranchIds = scope.adminTier ? [] : scope.branchIds;
+  /* 訂閱功能跟住「行事曆」卡開放：feed 必然公開，卡未開（或範圍全關）就唔好顯示掣 */
+  const publicOn = publicViewEnabled(s.config) && cardEffective(s.config, 'calendar');
+  /* 邊個可以去改呢個設定 —— 卡片由管理層開關（/admin/settings） */
+  const canTogglePublic = scope.adminTier;
+
   function visibleEvent(e: any) {
     if (role === 'member') return !!myMember && e.targetMemberIds.includes(myMember.id) && replyStatus(s, e.id, myMember.id)?.type !== 'declined';
     if (role === 'parent' && children.length > 0) return children.some(c => e.targetMemberIds.includes(c.id));
     return true;
   }
-  const pubEvents = (s.events || []).filter(e => e.status === 'published').filter(visibleEvent);
+  const pubEvents = (s.events || []).filter(e => e.status === 'published').filter(visibleEvent).filter(e => inScope(e.branchId));
+  const visMeetings = (s.meetings || []).filter(m => m.status === 'published').filter(m => inScope(m.branchId));
+  const visRules = (s.regularMeetings || []).filter(r => r.enabled).filter(r => inScope(r.branchId));
+
+  /* 產生 .ics：只用用戶當時睇到嘅範圍（pubEvents／visRules），唔會洩漏其他支部 */
+  function exportIcs() {
+    try {
+      const bname = (id?: string) => (s.patrols || []).find(p => p.id === id)?.name || (id ? id : '全旅');
+      const troopName = s.config?.TROOP_NAME || session?.troopName || '旅團';
+      const ics = buildIcs({
+        calendarName: `${troopName} 行事曆`,
+        events: pubEvents.map(e => ({
+          id: e.id,
+          title: `[${bname(e.branchId)}] ${e.title}`,
+          date: e.date,
+          location: e.location || '',
+          description: e.noticeUrl ? `通告：${e.noticeUrl}` : '',
+          branchLabel: bname(e.branchId),
+        })),
+        rules: visRules.map(r => ({
+          id: r.id,
+          title: `[${bname(r.branchId)}] ${r.title}`,
+          weekday: Number(r.weekday),
+          frequency: r.frequency,
+          startTime: r.startTime,
+          endTime: r.endTime,
+          location: r.location,
+          branchLabel: bname(r.branchId),
+          // ★ 只排除「同一支部」嘅取消日子，唔好把其他支部嘅取消混埋入嚟
+          cancelledDates: (s.cancelledMeetings || [])
+            .filter(c => c.branchId === r.branchId)
+            .map(c => c.date),
+        })),
+      });
+      downloadIcs(`${troopName}-calendar.ics`, ics);
+      setIcsMsg('✅ 已下載。Google 日曆：設定 → 匯入及匯出 → 選呢個 .ics 檔；Apple／Outlook 直接開檔就會加入。');
+    } catch (e: any) { setIcsMsg('❌ 產生失敗：' + (e?.message || e)); }
+  }
 
   function rightForEvent(e: any) {
     if (isLeader) {
@@ -306,9 +382,44 @@ export default function Calendar() {
         </div>
       )}
 
-      {/* 篩選 chips */}
-      <Chips options={TYPE_OPTIONS} value={filterType} onChange={setFilterType} />
-      <Chips options={BRANCH_OPTIONS} value={filterBranch} onChange={setFilterBranch} />
+      {/* 篩選 chips（家長／成員：冇「會議」分類，支部只列自己相關嘅） */}
+      <Chips options={typeOptions} value={filterType} onChange={setFilterType} />
+      <Chips options={branchOptions} value={filterBranch} onChange={setFilterBranch} />
+
+      {/* ═════ 加入我的行事曆（訂閱）═════
+          ★ 旅團行事曆存喺 Google **Sheet**（Events／RegularMeetings），唔係旅團 Google 帳戶嘅
+            Google Calendar，所以冇現成訂閱連結。/api/ics 由後台即時產生標準 RFC 5545 feed，
+            Google／Apple／Outlook 就可以「訂閱」→ 之後自動同步，唔使每次下載再匯入。
+          ★ 訂閱 feed 必然公開（Google 嘅伺服器唔會帶你嘅 cookie），所以內容＝已公佈活動
+            ＋已啟用恆常集會，同未登入訪客睇到嘅一樣；PRIVATE 活動／報名名單唔會出現。 */}
+      {/* ★ 訂閱 feed 必然公開 → 呢個功能跟住「公開瀏覽」設定開放。
+          旅團未開放公開行事曆時，唔顯示掣（後台 /api/ics 亦會 403），
+          改成一個解釋框話畀用戶知點解、同埋去邊度開。 */}
+      {publicOn ? (
+        <SubscribeCalendar
+          branchIds={subscribeBranchIds}
+          count={pubEvents.length + visRules.length}
+          onDownload={exportIcs}
+          msg={icsMsg}
+        />
+      ) : (
+        <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3.5 py-3">
+          <p className="text-sm font-bold text-slate-700 m-0">🔒 未開放「加入我的行事曆」</p>
+          <p className="text-xs text-slate-500 m-0 mt-1 leading-relaxed">
+            訂閱連結必須係公開嘅（Google／Apple 嘅伺服器唔會帶你嘅登入身分嚟攞），
+            所以呢個功能跟住旅團嘅<strong>「公開瀏覽」</strong>設定：旅團開放公開行事曆之後就會自動出現。
+          </p>
+          {canTogglePublic && (
+            <p className="text-xs text-slate-500 m-0 mt-1.5 leading-relaxed">
+              你係管理層 → 去 <Link href="/admin/settings" className="font-bold text-brand-700">管理中心 → 系統設定 → 🌐 公開瀏覽</Link> 打開。
+              打開後未登入訪客都會睇到已公佈活動／恆常集會（PRIVATE 活動、報名名單、聯絡電話一律唔會公開）。
+            </p>
+          )}
+          {!canTogglePublic && (
+            <p className="text-xs text-slate-500 m-0 mt-1.5">如需要，可向旅團領袖反映。</p>
+          )}
+        </div>
+      )}
 
       <MonthNav year={year} mo={mo} onPrev={() => setBase(addMonths(base, -1))} onNext={() => setBase(addMonths(base, 1))} />
 
@@ -316,7 +427,7 @@ export default function Calendar() {
       {view === 'month' && (
         <MonthGrid
           days={days} base={base} year={year} mo={mo}
-          events={pubEvents} meetings={(s.meetings || []).filter(m => m.status === 'published')} rules={(s.regularMeetings || []).filter(r => r.enabled)}
+          events={pubEvents} meetings={visMeetings} rules={visRules}
           cancelledMeetings={s.cancelledMeetings || []}
           filterBranch={filterBranch} filterType={filterType} isLeader={!!isLeader} canCancel={!!canCancel}
           role={role} myBranch={myMember?.branchId}
@@ -329,11 +440,10 @@ export default function Calendar() {
           {(() => {
             const rows: any[] = [];
             pubEvents.forEach(e => rows.push({ type: 'event', date: e.date, title: e.title, branchId: e.branchId, event: e, location: e.location }));
-            (s.meetings || []).filter(m => m.status === 'published').forEach(m => {
-              if (role === 'member' && myMember && m.branchId && m.branchId !== myMember.branchId) return;
+            visMeetings.forEach(m => {
               rows.push({ type: 'oneoff', date: m.date, title: m.title, branchId: m.branchId || 'troop', meeting: m, time: `${m.startTime || ''}${m.endTime ? '-' + m.endTime : ''}`, location: m.location });
             });
-            (s.regularMeetings || []).filter(r => r.enabled).forEach(r => {
+            visRules.forEach(r => {
               for (let i = -30; i < 60; i++) {
                 const d = new Date(base); d.setDate(d.getDate() + i);
                 if (!matchFrequency(r, d)) continue;

@@ -5,7 +5,7 @@ import { getSession } from './session';
 
 // ==================== 取得旅團資訊 ====================
 
-function getTroopKey(): string {
+export function getTroopKey(): string {
   if (typeof window === 'undefined') return '';
   try {
     const troop = JSON.parse(localStorage.getItem('scoutsystem2_selected_troop') || 'null');
@@ -285,6 +285,23 @@ export function apiUpdateMember(p: Record<string, string>) {
   return apiMutate('updateMember', p);
 }
 
+/** 成員自助登記「想考的章」（唔需要 members 權限；後端會檢查係咪本人／家長） */
+export function apiSetWantedBadges(p: { memberId: string; wantedBadges: string }) {
+  return apiMutate('setWantedBadges', p);
+}
+
+/** 公開資料第 1 層：管理員開／關卡片（行事曆／相簿／通告）。
+ *  開卡時後端會預設把 troop（全旅內容）一齊公開。 */
+export function apiSetPublicCard(p: { card: 'calendar' | 'albums' | 'activities'; enabled: boolean }) {
+  return apiMutate('setPublicCard', { card: p.card, enabled: p.enabled ? 'TRUE' : 'FALSE' });
+}
+
+/** 公開資料第 2 層：內容 scope。
+ *  `troop`（全旅內容）只可以由管理層改；支部 scope 由該支部團長／支部領袖改（後端會檢查）。 */
+export function apiSetPublicScope(p: { card: 'calendar' | 'albums' | 'activities'; scope: string; enabled: boolean }) {
+  return apiMutate('setPublicScope', { card: p.card, scope: p.scope, enabled: p.enabled ? 'TRUE' : 'FALSE' });
+}
+
 // ==================== 活動 / 報名 ====================
 
 export function apiCreateEvent(p: { title: string; scope?: string; branchId?: string; date?: string; location?: string; kind?: string; status?: string; source?: string; fee?: string; paymentUrl?: string; dutyPatrol?: string; targetMemberIds?: string; category?: string; calendarTag?: string; noticeUrl?: string; noticeFileName?: string; albumUrl?: string; inputMode?: string }) {
@@ -362,6 +379,16 @@ export function apiBatchCreateMembers(rows: Array<{ name: string; ymNumber: stri
 }
 export function apiUpdateUserRole(userId: string, role: string) {
   return apiMutate('updateUserRole', { userId, role });
+}
+/**
+ * 交接旅長 —— **交換職位**（唔係單向指派）。
+ *
+ * 旅長全旅只有一個 ＝ 最早建立嘅管理員。現任旅長撳呢個按鈕同另一人對調：
+ * 對方變旅長，自己接手對方原本嘅角色＋支部（對象可以是支部領袖）。
+ * 只有現任旅長先調得動，後端 `handleTransferTroopLeader_` 會再驗一次。
+ */
+export function apiTransferTroopLeader(targetUserId: string) {
+  return apiMutate('transferTroopLeader', { targetUserId });
 }
 export function apiDeleteUser(userId: string) {
   return apiMutate('deleteUser', { userId });

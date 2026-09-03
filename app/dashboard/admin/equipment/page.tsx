@@ -28,7 +28,7 @@ export default function EquipmentAdminPage() {
   const [loans, setLoans] = useState<Loan[]>(SEED_LOANS);
   const [msg, setMsg] = useState('');
 
-  const isLeader = ['admin', 'group_leader', 'branch_leader', 'coach'].includes(role);
+  const isLeader = ['troop_leader', 'admin', 'group_leader', 'branch_leader', 'coach'].includes(role);
 
   function decide(id: string, status: 'approved' | 'rejected' | 'returned') {
     setLoans(prev => prev.map(l => {

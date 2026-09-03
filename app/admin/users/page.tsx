@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { AppState, loadStateSlice, branchPeopleStats } from '@/lib/store';
-import { apiToggleUser, apiCreateUser, apiUpdateUserRole, apiDeleteUser, apiGetUserFeatures, apiUpdateUserPermissions, apiBatchCreateUsers, apiBatchCreateMembers, apiDecideApplication, apiUpdateMember, apiLinkParent, apiDeleteMember } from '@/lib/api';
+import { apiToggleUser, apiCreateUser, apiUpdateUserRole, apiTransferTroopLeader, apiDeleteUser, apiGetUserFeatures, apiUpdateUserPermissions, apiBatchCreateUsers, apiBatchCreateMembers, apiDecideApplication, apiUpdateMember, apiLinkParent, apiDeleteMember } from '@/lib/api';
 import { ROLE_LABEL, branches, LEADER_ROLES } from '@/lib/model';
 import { checkEditPermission, assignableRoles } from '@/lib/permissions';
 import { getSession } from '@/lib/session';
@@ -183,6 +183,27 @@ export default function Page(){
     if(!ok)return;
     setErr('');try{const f=await apiUpdateUserRole(userId,newRole);setS(f)}catch(e:any){setErr(e.message)}
   }
+  /**
+   * 交接旅長 —— **交換職位**（唔係單向指派）。
+   * 只有現任旅長見到呢個按鈕；後端 handleTransferTroopLeader_ 會再驗一次。
+   * 對象可以是支部領袖 —— 交換後自己會接手對方原本嘅角色＋支部。
+   */
+  async function transferLeadership(id:string,userName:string){
+    const u=s?.users.find(x=>x.id===id);
+    const myOldRole=ROLE_LABEL[(u?.role as Role)]||u?.role||'—';
+    const ok=await confirm({
+      title:'確認交接旅長',
+      message:kv([
+        ['對方',userName],
+        ['對方現時角色',myOldRole],
+        ['交接後',`${userName} 成為旅長；你變成「${myOldRole}」${u?.branchId?`（${branches.find(b=>b.id===u.branchId)?.short||u.branchId} 支部）`:''}`],
+      ]),
+      confirmLabel:'確認交接',
+      danger:true,
+    });
+    if(!ok)return;
+    setErr('');try{const f=await apiTransferTroopLeader(id);setS(f)}catch(e:any){setErr(e.message)}
+  }
   async function del(id:string,userName:string){
     const ok=await confirm({title:'確認刪除帳號',message:kv([['帳號',userName]]),confirmLabel:'確認刪除',danger:true});
     if(!ok)return;
@@ -235,7 +256,7 @@ export default function Page(){
       const branchId = normaliseBranchId(raw.branchId || raw.branch || raw['支部'] || raw['單位']);
       const type = String(raw.type || raw['類型'] || (ymNumber ? 'member' : 'user')).toLowerCase().includes('member') || String(raw.type || '').includes('成員') ? 'member' : 'user';
       const roleValue = String(raw.role || raw['角色'] || (type === 'member' ? 'member' : 'parent')).trim() as Role;
-      const roleSafe = (assignable.includes(roleValue) || ['parent','member','coach','branch_leader','group_leader','admin','troop_super'].includes(roleValue)) ? roleValue : 'parent';
+      const roleSafe = (assignable.includes(roleValue) || ['parent','member','coach','branch_leader','group_leader','admin'].includes(roleValue)) ? roleValue : 'parent';
       const patrolId = normalisePatrolId(String(raw.patrolId || raw.patrol || raw.squad || raw['小隊'] || raw['隊'] || ''), branchId);
       const item: BulkRow = {
         type, name, email, ymNumber,
@@ -459,7 +480,7 @@ export default function Page(){
   const myBranchId=session?.branchId||'';
   const myUserId=session?.userId||'';
   const assignable=assignableRoles(myRole);
-  const seeAllBranches=['super_admin','troop_super', 'troop_leader', 'admin'].includes(myRole);
+  const seeAllBranches=['super_admin','troop_leader', 'admin'].includes(myRole);
   const branchStats=branchPeopleStats(s,{role:myRole,branchId:myBranchId});
 
   // ★ 團長／支部領袖：使用者管理只管自己支部嘅事。
@@ -483,7 +504,7 @@ export default function Page(){
     return true;
   });
 
-  return <Auth roles={['super_admin', 'troop_super', 'troop_leader', 'admin', 'group_leader', 'branch_leader']}><div className="stack">
+  return <Auth roles={['super_admin', 'troop_leader', 'admin', 'group_leader', 'branch_leader']}><div className="stack">
     <section className="hero"><span className="badge gold">使用者管理</span><h1>👥 使用者管理</h1>
       <p>帳號、成員資料庫與審核申請已合併喺一處，用下方分頁切換。上級可授權下級額外功能。</p>
       {branchScoped && <p className="badge blue" style={{ marginTop: 6 }}>
@@ -541,7 +562,7 @@ export default function Page(){
       <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="搜尋姓名或 Email" style={{flex:1}}/>
       <select value={filterRole} onChange={e=>setFilterRole(e.target.value)}>
         <option value="all">全部角色</option>
-        <option value="troop_super">超管</option><option value="admin">管理員</option>
+        <option value="troop_leader">旅長</option><option value="admin">管理員</option>
         <option value="group_leader">團長</option><option value="branch_leader">支部領袖</option>
         <option value="coach">教練員</option><option value="parent">家長</option><option value="member">成員</option>
       </select>
@@ -655,9 +676,9 @@ export default function Page(){
         <tbody>{filtered.filter(u => u.role !== 'member' && u.role !== 'parent').map(u=>{
           const perm=checkEditPermission(myRole,myBranchId,myUserId,u.role,u.branchId||'',u.id);
           const canChangeRole=perm.canChangeRole&&assignable.includes(u.role);
-          const locked=u.techTest||u.role==='troop_super';
+          const locked=u.techTest||u.role==='troop_leader';
           return <tr key={u.id}>
-            <td data-label="姓名">{u.name}{u.techTest&&<span className="badge blue" style={{marginLeft:4}}>技術</span>}{u.role==='troop_super'&&<span className="badge gold" style={{marginLeft:4}}>超管</span>}</td>
+            <td data-label="姓名">{u.name}{u.techTest&&<span className="badge blue" style={{marginLeft:4}}>技術</span>}{u.role==='troop_leader'&&<span className="badge gold" style={{marginLeft:4}}>旅長</span>}</td>
             <td data-label="Email">{u.email||'—'}</td>
             <td data-label="角色">
               {locked && <span className="badge blue">{ROLE_LABEL[u.role as Role]||u.role}</span>}
@@ -669,6 +690,8 @@ export default function Page(){
             <td data-label="操作">
               {perm.canEdit?<>
                 {!locked&&<button className="btn" style={{fontSize:'0.8em',marginRight:4}} onClick={()=>openPerms(u.id)}>🔑 權限</button>}
+                {myRole==='troop_leader'&&u.id!==myUserId&&u.role!=='super_admin'&&
+                  <button className="btn gold" style={{fontSize:'0.8em',marginRight:4}} onClick={()=>transferLeadership(u.id,u.name)}>👑 交接旅長</button>}
                 <button className="btn" style={{fontSize:'0.8em'}} onClick={()=>toggle(u.id)}>{u.approved?'停用':'啟用'}</button>
                 <button className="btn" style={{fontSize:'0.8em',marginLeft:4,color:'#d93025'}} onClick={()=>del(u.id,u.name)}>刪除</button>
               </>:<span className="muted" style={{fontSize:'0.8em'}}>無權</span>}
@@ -679,7 +702,7 @@ export default function Page(){
     </section>
 
     {/* Semi-Leaders (Members with specialRole) */}
-    {['super_admin','admin','troop_super','group_leader','branch_leader'].includes(myRole) && (
+    {['super_admin','admin','group_leader','branch_leader'].includes(myRole) && (
       <section className="card stack">
         <div className="row" style={{marginBottom:'1rem'}}><h3>特別身份成員 (執委/管委)</h3></div>
         <p className="muted">深資、樂行童軍具備特別身份者，可由支部領袖授予特定的管理權限。</p>

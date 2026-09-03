@@ -5,7 +5,7 @@ import { Role, branches as BRANCH_DEFS } from './model';
 
 export type Patrol = { id:string; branchId:string; name:string; short:string; leaderMemberId?:string; deputyLeaderMemberId?:string; memberIds?:string[]; enabled:boolean; order:number };
 export type User = { id:string; name:string; email:string; role:Role; branchId?:string; memberId?:string; childMemberIds?:string[]; approved:boolean; techTest?:boolean };
-export type Member = { id:string; ymNumber:string; name:string; email?:string; branchId:string; patrolId?:string; patrolRole?:''|'leader'|'deputy'|'member'; specialRole?:string; age:number; dateOfBirth?:string; parentUserId?:string; emergencyContactName?:string; emergencyContactPhone?:string; active:boolean };
+export type Member = { id:string; ymNumber:string; name:string; email?:string; branchId:string; patrolId?:string; patrolRole?:''|'leader'|'deputy'|'member'; specialRole?:string; age:number; dateOfBirth?:string; parentUserId?:string; emergencyContactName?:string; emergencyContactPhone?:string; active:boolean; wantedBadges?:string; wantedBadgesAt?:string };
 export type Application = { id:string; type:'parent'|'leader'|'member'; name:string; email:string; role:Role; branchId?:string; ymNumbers?:string; status:'pending'|'approved'|'rejected'; createdAt:string; decidedAt?:string };
 export type EventItem = { id:string; title:string; date:string; location:string; scope:'troop'|'branch'; branchId?:string; kind:'activity'|'notice_troop_participation'; status:'draft'|'published'|'archived'; source?:string; targetMemberIds:string[]; fee?:string; paymentUrl?:string; dutyPatrol?:string; calendarTag?:string; category?:'self'|'district'; noticeUrl?:string; noticeFileName?:string; inputMode?:'form'|'upload'|'link'; lateRegistration?:boolean; albumUrl?:string };
 export type Reply = { id:string; eventId:string; memberId:string; memberName?:string; branchId?:string; parentUserId?:string; type:'interested'|'registered'|'declined'; operatedBy:'member'|'parent'|'leader'|'admin'; paid?:boolean; paymentConfirmed?:boolean; paymentConfirmedBy?:string; paymentConfirmedAt?:string; cancelled?:boolean; updatedAt:string };
@@ -288,7 +288,7 @@ export function branchPeopleStats(
   s: AppState,
   opts: { role?: string; branchId?: string } = {}
 ): BranchPeopleStat[] {
-  const seeAll = ['super_admin', 'troop_super', 'troop_leader', 'admin'].includes(String(opts.role || ''));
+  const seeAll = ['super_admin', 'troop_leader', 'admin'].includes(String(opts.role || ''));
   const scope = seeAll ? BRANCH_DEFS : BRANCH_DEFS.filter(b => b.id === opts.branchId);
   return scope.map(b => {
     const leaders = (s.users || []).filter(u => LEADER_ROLE_SET.includes(u.role) && u.branchId === b.id).length;

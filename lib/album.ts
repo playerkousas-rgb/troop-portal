@@ -138,7 +138,7 @@ export function canViewAlbum(opts: {
 }): boolean {
   const { role = '', userFeatures = [], ownBranchId = '', eventBranchId = '' } = opts;
   // 全旅級：旅長／管理員／超管
-  if (['super_admin', 'troop_super', 'troop_leader', 'admin'].includes(role)) {
+  if (['super_admin', 'troop_leader', 'admin'].includes(role)) {
     return userFeatures.includes('photos');
   }
   // 功能未開通 → 一律睇唔到

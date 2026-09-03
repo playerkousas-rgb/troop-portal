@@ -75,7 +75,7 @@ export default function NoticesPage() {
   const [showExpired, setShowExpired] = useState(false);
   const { confirm } = useConfirm();
 
-  const isLeader = ['admin', 'group_leader', 'branch_leader', 'coach'].includes(role);
+  const isLeader = ['troop_leader', 'admin', 'group_leader', 'branch_leader', 'coach'].includes(role);
   const isExpired = (a: Announcement) => !!a.validUntil && a.validUntil < TODAY;
   const visible = showExpired ? items : items.filter(a => !isExpired(a));
   const sorted = [...visible].sort((a, b) => (Number(b.urgent) - Number(a.urgent)) || b.date.localeCompare(a.date));
@@ -125,10 +125,10 @@ export default function NoticesPage() {
       {/* Demo 角色 */}
       <div className="flex gap-1.5 flex-wrap items-center">
         <span className="text-[13px] text-slate-500 mr-1">Demo：</span>
-        {['parent', 'member', 'branch_leader', 'admin'].map(r => (
+        {['troop_leader', 'admin', 'branch_leader', 'parent', 'member'].map(r => (
           <button key={r} onClick={() => { setRole(r); setMsg(''); }}
             className={`text-[13px] px-2 py-0.5 rounded-full border font-bold ${role === r ? 'bg-brand-600 text-white border-brand-600' : 'bg-white text-slate-500 border-slate-200'}`}>
-            {r === 'parent' ? '家長' : r === 'member' ? '成員' : r === 'branch_leader' ? '支部領袖' : '管理員'}
+            {r === 'troop_leader' ? '旅長' : r === 'parent' ? '家長' : r === 'member' ? '成員' : r === 'branch_leader' ? '支部領袖' : '管理員'}
           </button>
         ))}
         {isLeader && <span className="text-[13px] text-emerald-700 font-bold">· 你可直接喺本頁發佈／編輯</span>}

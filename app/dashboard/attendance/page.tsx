@@ -37,7 +37,7 @@ export default function AttendancePage() {
   const [msg, setMsg] = useState('');
   const [savedAt, setSavedAt] = useState('');
 
-  const isLeader = ['admin', 'group_leader', 'branch_leader', 'coach'].includes(role);
+  const isLeader = ['troop_leader', 'admin', 'group_leader', 'branch_leader', 'coach'].includes(role);
   const session = SESSIONS.find(s => s.id === sessionId)!;
 
   function setStatus(id: string, s: Row['status']) {

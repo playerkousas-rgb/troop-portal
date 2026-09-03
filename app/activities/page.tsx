@@ -5,6 +5,7 @@ import { AppState, loadStateSlice, eventCategory } from '@/lib/store';
 import Link from 'next/link';
 import { getSession } from '@/lib/session';
 import { publicViewEnabled } from '@/lib/model';
+import { isItemPublic } from '@/lib/publicScope';
 import PublicLocked from '@/components/ui/PublicLocked';
 
 export default function Activities() {
@@ -28,7 +29,23 @@ export default function Activities() {
   // 旅團管理員可以關閉公開瀏覽 → 未登入乜都睇唔到
   if (!session && !publicViewEnabled(s.config)) return <PublicLocked troopName={s.config?.TROOP_NAME} />;
 
-  const published = s.events.filter(e => e.status === 'published'); // 'archived'（過期通告）唔會顯示畀成員
+  /**
+   * ★ 未登入訪客要過「活動」公開卡（2026-09-03 用戶決定）。
+   *
+   * 之前呢頁**完全冇消費任何公開卡** —— 只用咗 L0 嘅 `publicViewEnabled`
+   * （全旅公開總開關），冇做 L1（卡片）／L2（支部範圍）過濾。
+   * 對照 `/calendar` 一直有做（`isItemPublic(s.config,'calendar',e.branchId)` ×4）。
+   * 結果：管理員關咗卡、或者某支部領袖未同意公開，訪客喺「🎯 活動」掣
+   * 一樣睇到晒 —— 三張公開卡入面有一張係完全冇效力嘅。
+   *
+   * 用戶決定：第三張卡由「通告 📄」改成「活動 🎯」
+   * （「應該沒有 NOTICE 卡的，也只有活動管理，根本沒有通告管理，
+   *   通告是由活動管理去上載的」）。
+   *
+   * 登入後唔過濾 —— 同 `/calendar` 一致：公開卡只管未登入訪客睇到乜。
+   */
+  const published = s.events.filter(e => e.status === 'published'   // 'archived'（過期通告）唔會顯示畀成員
+    && (!!session || isItemPublic(s.config, 'activities', e.branchId)));
   const visible = published.filter(e =>
     filter === 'all' ? true
     : filter === 'internal' ? eventCategory(e) === 'self'

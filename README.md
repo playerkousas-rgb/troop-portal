@@ -42,8 +42,6 @@
 - **報名管理**：旅團自辦及外間活動的參加意願、付款、統計及名單匯出，保留在 `/admin/registrations`。
 - 兩者不共用卡片或狀態。旅團自辦活動可先收集報名，活動當日再獨立點名。
 
-完整接入及資料邊界見 [`ATTENDANCE_INTEGRATION.md`](ATTENDANCE_INTEGRATION.md)。
-
 ## 平台管理員
 
 新旅團接入、Vercel 環境變數設定、換 Key / 停用旅團,照 [`DEPLOY_ADMIN_GUIDE.md`](DEPLOY_ADMIN_GUIDE.md) 做。

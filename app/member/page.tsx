@@ -20,17 +20,27 @@ export default function Member(){
   useEffect(()=>{loadStateSlice(['patrols','members','users','events','replies']).then(setS).catch(e=>setErr(e.message))},[]);
   const session=getSession();
 
-  const tools: ConsoleTool[] = [
-    { id: 'attendance', icon: '📝', label: '出席紀錄', desc: '日常集會及旅團活動的出席紀錄。', href: '/attendance' },
-    { id: 'equipment', icon: '📦', label: '借用物資', desc: '查看可借數量並申請借用，待領袖批核。', href: '/equipment' },
-    { id: 'badges', icon: '🎖️', label: '想考的章', desc: '登記想考的章，讓領袖安排及跟進。', href: '/profile?tab=badges' },
-  ];
-
   if(err)return <div className="bg-rose-50 border border-rose-200 rounded-2xl p-4"><p className="text-sm text-rose-700 font-bold m-0 whitespace-pre-wrap leading-relaxed">{err}</p></div>;
   if(!s)return <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 text-sm text-slate-600">載入中...</div>;
   const member=s.members.find(m=>m.id===(session?.memberId))||s.members[0];
   if(!member)return <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 text-sm text-slate-600">找不到成員資料。</div>;
   const adult=member.age>=18;
+
+  /* ★ 成年成員（18+）冇「想考的章」（用戶要求 #6）：
+     成年成員人數少，要考乜章直接同旅團領袖講就得，唔使喺 APP 登記跟進。 */
+  /* 想考的章：只有幼童軍（b2）／童軍（b3）有選單；已登記就顯示數量 */
+  const wanted = String(member.wantedBadges || '').split(/[|,;]/).map(x=>x.trim()).filter(Boolean);
+  const hasBadgeScheme = member.branchId === 'b2' || member.branchId === 'b3';
+  const badgeDesc = !hasBadgeScheme
+    ? '你嘅支部暫未設有選單，想考乜章直接同領袖講。'
+    : wanted.length
+      ? `已登記 ${wanted.length} 個章，領袖會安排跟進。撳入去可修改。`
+      : '由訓練綱要嘅活動／專科徽章入面揀，登記後領袖會安排跟進。';
+  const tools: ConsoleTool[] = [
+    { id: 'attendance', icon: '📝', label: '出席紀錄', desc: '日常集會及旅團活動的出席紀錄。', href: '/attendance' },
+    { id: 'equipment', icon: '📦', label: '借用物資', desc: '查看可借數量並申請借用，待領袖批核。', href: '/equipment' },
+    ...(adult ? [] : [{ id: 'badges', icon: '🎖️', label: '想考的章', desc: badgeDesc, href: '/badges' }]),
+  ];
   async function act(eid:string,type:'interested'|'registered'|'declined'){
     const ev=s?.events.find(e=>e.id===eid);
     const label={interested:'❤️ 有興趣',registered:'✅ 確定參加',declined:'❌ 婉拒不參加'}[type]||type;
@@ -100,8 +110,9 @@ export default function Member(){
                   //   咁樣成員睇到嘅版面同家長一樣（同一個活動、同一組功能），
                   //   分別只在於「我冇權撳」，而唔係「呢個功能唔存在」。
                   actions={(isDistrict || e.status === 'archived') ? [] : [
-                    // ❤️ 有興趣＝成員向家長及領袖表達意見，唔等於報名（家長端冇呢個掣）
-                    { type: 'interested' as const, idle: '❤️ 有興趣（非報名）', active: '【已表達】❤️ 有興趣' },
+                    // ❤️ 有興趣＝未成年成員向家長及領袖表達意見，唔等於報名（家長端冇呢個掣）。
+                    // ★ 成年成員（18+）已經可以自己報名，「有興趣」冇意思 → 唔顯示（用戶要求 #5）。
+                    ...(adult ? [] : [{ type: 'interested' as const, idle: '❤️ 有興趣（非報名）', active: '【已表達】❤️ 有興趣' }]),
                     { type: 'registered' as const, idle: '✅ 參加', active: '【已報名】✅ 參加',
                       lockedReason: adult ? undefined : '未滿 18 歲，參加／不參加須由家長代為決定（家長登入回覆＝已簽署）。' },
                     { type: 'declined' as const, idle: '❌ 不參加', active: '【已婉拒】❌ 不參加',
@@ -125,7 +136,13 @@ export default function Member(){
         </div>
       </Panel>
 
-      <ToolGroup icon="🧰" title="我的工具" subtitle="出席紀錄 · 借用物資 · 想考的章" tone="emerald" tools={tools} />
+      <ToolGroup
+        icon="🧰"
+        title="我的工具"
+        subtitle={adult ? '出席紀錄 · 借用物資' : '出席紀錄 · 借用物資 · 想考的章'}
+        tone="emerald"
+        tools={tools}
+      />
 
       {/* 🆘 緊急聯絡資料：已連結家長帳戶就直接用家長資料（唔會再手動抄一次，
           家長改咗資料呢度即刻跟住變）。冇連結先顯示手動填寫嘅聯絡人。 */}

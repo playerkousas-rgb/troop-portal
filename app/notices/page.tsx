@@ -5,6 +5,8 @@ import { AppState, loadStateSlice, Bookmark } from '@/lib/store';
 import { apiSaveConfig, apiUpdateBookmark, apiDeleteBookmark, apiUpdatePdfTags } from '@/lib/api';
 import { getSession } from '@/lib/session';
 import { branches, publicViewEnabled } from '@/lib/model';
+import { isItemPublic, TROOP_SCOPE } from '@/lib/publicScope';
+import PublicScopePanel from '@/components/ui/PublicScopePanel';
 import PublicLocked from '@/components/ui/PublicLocked';
 import { useConfirm, kv } from '@/components/ConfirmProvider';
 
@@ -41,7 +43,7 @@ export default function Notices() {
   const { confirm } = useConfirm();
 
   const session = getSession();
-  const isLeader = session && ['super_admin', 'troop_super', 'troop_leader', 'admin', 'group_leader', 'branch_leader', 'coach'].includes(session.role);
+  const isLeader = session && ['super_admin', 'troop_leader', 'admin', 'group_leader', 'branch_leader', 'coach'].includes(session.role);
 
   useEffect(() => {
     loadStateSlice(['bookmarks', 'announcementPdfs', 'config']).then(st => { setS(st); setFolderId(st.config.ANNOUNCEMENT_FOLDER_ID || ''); }).catch(e => setErr(e.message));
@@ -130,10 +132,33 @@ export default function Notices() {
   if (!s) return <main className="max-w-3xl mx-auto px-4 py-8 pb-24 text-sm text-slate-600">載入中...</main>;
   if (!session && !publicViewEnabled(s.config)) return <PublicLocked troopName={s.config?.TROOP_NAME} />;
 
-  const pdfs = s.announcementPdfs || [];
+  /* ★ 三層公開模型（lib/publicScope.ts）：
+     通告卡（notices）由管理員開放，內容範圍＝全旅（管理員決定）＋各支部（該支部團長決定）。
+     通告嘅 branchTags 存嘅係顯示名（例：「全旅」「童軍」），所以要譯返做 branchId 先比到。 */
+  const tagToScope = (t?: string): string => {
+    const v = String(t || '').trim();
+    if (!v || v === '全旅' || v === TROOP_SCOPE) return TROOP_SCOPE;
+    const hit = branches.find(b => b.name === v || b.short === v || b.id === v);
+    return hit ? hit.id : v;
+  };
+  const isGuest = !session || session.role === 'guest';
+  /* 邊個可以設定「公開通告範圍」：管理層可改全部＋全旅；支部領袖只可以改自己支部 */
+  const adminTier = ['super_admin', 'troop_leader', 'admin'].includes(session?.role || '');
+  const canSetScope = adminTier || ['group_leader', 'branch_leader', 'coach'].includes(session?.role || '');
+  const allPdfs = s.announcementPdfs || [];
+  const pdfs = isGuest
+    ? allPdfs.filter(p => p.visible !== false
+        && (p.branchTags || ['全旅']).some(t => isItemPublic(s.config, 'activities', tagToScope(t))))
+    : allPdfs;
 
   return (
     <main className="max-w-3xl mx-auto px-4 py-4 pb-24 space-y-4">
+
+      {/* 公開通告範圍 —— 全旅內容由管理層決定，各支部內容由該支部團長決定 */}
+      {canSetScope && (
+        <PublicScopePanel card="activities" s={s} adminTier={adminTier}
+          ownBranchId={session?.branchId || ''} onSaved={setS} />
+      )}
 
       {/* Header + 直接發佈入口 */}
       <div className="flex items-center justify-between gap-2 flex-wrap">

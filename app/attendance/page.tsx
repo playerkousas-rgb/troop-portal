@@ -5,7 +5,7 @@ import Link from 'next/link';
 import Auth from '@/components/Auth';
 import { AppState, loadStateSlice, Member } from '@/lib/store';
 import { branches as BRANCH_DEFS, Role, canMarkAllBranchesAttendance } from '@/lib/model';
-import { getSession, Session } from '@/lib/session';
+import { dashboardFor, getSession, Session } from '@/lib/session';
 import {
   apiGetAttendance,
   apiGetAttendanceMatrix,
@@ -29,14 +29,9 @@ import {
   weekdayLabel,
 } from '@/lib/attendance';
 
-const LEADER_ROLES: Role[] = ['super_admin', 'troop_super', 'troop_leader', 'admin', 'group_leader', 'branch_leader', 'coach'];
-
 function dashboardHref(role?: Role) {
-  if (role === 'member') return '/member';
-  if (role === 'parent') return '/parent';
-  if (role && ['super_admin', 'troop_super', 'troop_leader', 'admin'].includes(role)) return '/admin';
-  if (role && LEADER_ROLES.includes(role)) return '/leader';
-  return '/';
+  // 所有領袖（管理員／團長／支部領袖／教練員）嘅主頁＝同一個「管理中心」
+  return dashboardFor((role || 'guest') as Role);
 }
 
 function branchName(id: string) {
@@ -122,6 +117,19 @@ export default function AttendancePage() {
   const leader = canMarkAttendance(session?.role);
   const isParent = session?.role === 'parent';
   const isMember = session?.role === 'member';
+
+  /**
+   * 管理中心「出席管理」卡用 ?view=records 直接跳去「③ 出席管理 · 後補／補改」，
+   * 同底部 tab bar 嘅「📝 點名」（由頭開始揀支部／集會）區分開。
+   */
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (new URLSearchParams(window.location.search).get('view') !== 'records') return;
+    const t = window.setTimeout(() => {
+      document.getElementById('att-manage')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 250);
+    return () => window.clearTimeout(t);
+  }, []);
 
   // 初始化：session + 資料
   useEffect(() => {
@@ -461,7 +469,7 @@ export default function AttendancePage() {
   const todayLabel = todayISO();
 
   return (
-    <Auth roles={['super_admin', 'troop_super', 'troop_leader', 'admin', 'group_leader', 'branch_leader', 'coach', 'member', 'parent']}>
+    <Auth roles={['super_admin', 'troop_leader', 'admin', 'group_leader', 'branch_leader', 'coach', 'member', 'parent']}>
       <div className="w-full px-3 sm:px-6 py-5 pb-32 space-y-5 attendance-page">
 
         {/* ═══ Hero ═══ */}
@@ -583,7 +591,7 @@ export default function AttendancePage() {
             </section>
 
             {/* ③ 出席管理：後補／補改 */}
-            <section className="card stack">
+            <section className="card stack" id="att-manage">
               <h2 className="text-xl m-0">③ 出席管理 · 後補／補改</h2>
               <p className="muted" style={{ margin: 0 }}>
                 錯過咗點名？揀返嗰次過期集會／活動即可補填或修改，同時可查看當次集會詳細資料。

@@ -8,7 +8,17 @@
     "start": "next start",
     "lint": "next lint",
     "check:gs": "bash scripts/check-gs-sync.sh",
-    "check:perms": "node scripts/check-permissions.mjs"
+    "check:gscards": "node scripts/check-gs-public-cards.mjs",
+    "check:gsroles": "node scripts/check-gs-roles.mjs",
+    "check:perms": "node scripts/check-permissions.mjs",
+    "check:modules": "node --no-warnings=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/check-admin-modules.mjs",
+    "check:calendar": "node --no-warnings=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/check-calendar-scope.mjs",
+    "check:public": "node --no-warnings=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/node-ts-resolve.mjs --experimental-strip-types scripts/check-public-cards.mjs",
+    "check:security": "node --no-warnings=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/node-ts-resolve.mjs --experimental-strip-types scripts/check-reserved-roles.mjs",
+    "check:links": "node --no-warnings=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/node-ts-resolve.mjs --experimental-strip-types scripts/check-route-links.mjs",
+    "check:render": "node --no-warnings=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/node-tsx-render-hook.mjs scripts/render-users-page.mjs",
+    "check:accounts": "node --no-warnings=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/node-tsx-render-hook.mjs scripts/check-accounts.mjs",
+    "check:pages": "node scripts/check-pages.mjs"
   },
   "dependencies": {
     "@tailwindcss/postcss": "^4.3.3",
@@ -20,9 +30,12 @@
     "tailwindcss": "^4.3.3"
   },
   "devDependencies": {
-    "@types/node": "^20",
-    "@types/react": "^18",
+    "@types/node": "20.19.43",
+    "@types/react": "18.3.31",
     "@types/react-dom": "^18",
-    "typescript": "^5"
+    "eslint": "^8.57.1",
+    "eslint-config-next": "^14.2.35",
+    "typescript": "5.9.3",
+    "jsdom": "^30.0.1"
   }
 }

@@ -1,19 +1,22 @@
 'use client';
 import Link from 'next/link';
 import { useState } from 'react';
+import { badgeSchemeFor, parseWantedBadges } from '@/lib/badges';
 
 /* ═══════════════════════════════════════════════════
    模擬資料
    ═══════════════════════════════════════════════════ */
 
-type Role = 'super_admin' | 'admin' | 'group_leader' | 'branch_leader' | 'coach' | 'parent' | 'member';
+// ★ 加咗 troop_leader（旅長）：全旅最高人類權限，demo 樹要示範到。
+//   權限同管理員一樣（用戶：「其實只是 COPY 管理員，讓用戶感覺有而已」）。
+type Role = 'troop_leader' | 'admin' | 'group_leader' | 'branch_leader' | 'coach' | 'parent' | 'member';
 const ROLE_LABEL: Record<Role, string> = {
-  super_admin: '技術測試', admin: '管理員', group_leader: '團長',
+  troop_leader: '旅長', admin: '管理員', group_leader: '團長',
   branch_leader: '支部領袖', coach: '教練員', parent: '家長', member: '成員',
 };
 
 const MY_PROFILE = {
-  name: '王小明', ymNumber: '1234567890', branch: '童軍支部', patrol: 'TIGER 小隊', age: 13,
+  name: '王小明', ymNumber: '1234567890', branch: '童軍支部', branchId: 'b3', patrol: 'TIGER 小隊', age: 13,
   parentName: '王爸爸', parentEmail: 'parent@example.com',
   emergencyContactName: '王爸爸', emergencyContactPhone: '9123-4567',
 };
@@ -32,20 +35,21 @@ const PAST_ACTIVITIES = [
 ];
 
 // 幼童軍支部（b2）年紀細，想考的章由家長代填；其他支部由成員自己填
+/* ★ 想考的章改用真實目錄（lib/badges.ts）——同正式版 /badges 完全同一套章，
+     唔再用「世界環保章」呢類訓練綱要入面冇嘅假章名。
+     只有幼童軍（b2）／童軍（b3）有選單；進度性獎章刻意唔列。 */
 const CHILDREN = [
-  { id: 'c1', name: '王大明', ymNumber: '1234567890', branch: '童軍', branchId: 'b3', patrol: 'TIGER', age: 13, badges: [
-    { name: '世界環保章', note: '想在今年完成', read: true },
-  ] as Badge[] },
-  { id: 'c2', name: '王小明', ymNumber: '0987654321', branch: '幼童軍', branchId: 'b2', patrol: 'RED', age: 9, badges: [
-    { name: '幼童軍天象章', note: '想學觀星', read: false },
-  ] as Badge[] },
+  { id: 'c1', name: '王大明', ymNumber: '1234567890', branch: '童軍', branchId: 'b3', patrol: 'TIGER', age: 13,
+    wanted: ['scout_int_campfire', 'scout_pur_pioneer'] },
+  { id: 'c2', name: '王小明', ymNumber: '0987654321', branch: '幼童軍', branchId: 'b2', patrol: 'RED', age: 9,
+    wanted: ['cub_astronomy', 'cub_swimming'] },
 ];
 
-type Badge = { name: string; note: string; read: boolean };
+type Badge = { id: string; note: string; read: boolean };
 
-const MY_BADGES = [
-  { name: '世界環保章', note: '想在今年完成', read: true },
-  { name: '社區服務章', note: '想做探訪老人院', read: false },
+const MY_BADGES: Badge[] = [
+  { id: 'scout_int_campfire', note: '想喺今個學期考', read: true },
+  { id: 'scout_srv_first_aid', note: '想做救傷服務', read: false },
 ];
 
 const SUPPLIES = [
@@ -82,38 +86,40 @@ const MEETINGS = [
 
 export default function ProfilePage() {
   const [role, setRole] = useState<Role>('member');
+  // ★ 成員示範：18 歲或以上（成年成員冇「想考的章」—— 用戶要求 #6）
+  const [adultMember, setAdultMember] = useState(false);
   const [tab, setTab] = useState<'dashboard' | 'info' | 'children' | 'badges' | 'supplies' | 'password'>('dashboard');
   const [showPast, setShowPast] = useState(false);
   const [children, setChildren] = useState(CHILDREN);
   const [badgeChildId, setBadgeChildId] = useState('');
-  const [badgeName, setBadgeName] = useState('');
+  const [badgeId, setBadgeId] = useState('');
   const [badgeNote, setBadgeNote] = useState('');
 
   function addChildBadge(childId: string) {
-    const name = badgeName.trim();
-    if (!name) return;
-    setChildren(prev => prev.map(c => c.id === childId
-      ? { ...c, badges: [...c.badges, { name, note: badgeNote.trim(), read: false }] }
+    if (!badgeId) return;
+    setChildren(prev => prev.map(c => c.id === childId && !c.wanted.includes(badgeId)
+      ? { ...c, wanted: [...c.wanted, badgeId] }
       : c));
-    setBadgeName('');
+    setBadgeId('');
     setBadgeNote('');
   }
 
-  const isManager = ['admin', 'super_admin', 'group_leader', 'branch_leader'].includes(role);
-  const isLeader = ['admin', 'super_admin', 'group_leader', 'branch_leader', 'coach'].includes(role);
+  const isManager = ['troop_leader', 'admin', 'group_leader', 'branch_leader'].includes(role);
+  const isLeader = ['troop_leader', 'admin', 'group_leader', 'branch_leader', 'coach'].includes(role);
   const isParent = role === 'parent';
   const isMember = role === 'member';
   const isParentOrMember = isParent || isMember;
 
   // 家長/成員的 tabs
   // 家長：睇子女資料；不能借物資、冇自己嘅「想考的章」（想考的章係成員自己填）
+  // ★ 成年成員（18+）：冇「想考的章」—— 人數少，直接同旅團領袖講就得（用戶要求 #6）
   const MEMBER_TABS = [
     { id: 'dashboard' as const, icon: '🏠', label: '概覽' },
     { id: 'info' as const, icon: '👤', label: '基本資料' },
     ...(isParent
       ? [{ id: 'children' as const, icon: '👨‍👩‍👧', label: '子女' }]
       : [
-          { id: 'badges' as const, icon: '🎖️', label: '想考的章' },
+          ...(adultMember ? [] : [{ id: 'badges' as const, icon: '🎖️', label: '想考的章' }]),
           { id: 'supplies' as const, icon: '📦', label: '借物資' },
         ]),
     { id: 'password' as const, icon: '🔑', label: '改密碼' },
@@ -136,7 +142,7 @@ export default function ProfilePage() {
       {/* ── Demo 切換 ── */}
       <div className="flex gap-1.5 flex-wrap">
         <span className="text-[13px] text-slate-500 mr-1 self-center">Demo：</span>
-        {(['admin', 'branch_leader', 'coach', 'parent', 'member'] as Role[]).map(r => (
+        {(['troop_leader', 'admin', 'branch_leader', 'coach', 'parent', 'member'] as Role[]).map(r => (
           <button key={r} onClick={() => { setRole(r); setTab('dashboard'); }}
             className={`text-[13px] px-2.5 py-1 rounded-full border transition font-bold ${
               role === r ? 'bg-brand-600 text-white border-brand-600 shadow' : 'bg-white text-slate-500 border-slate-200'
@@ -144,6 +150,13 @@ export default function ProfilePage() {
             {ROLE_LABEL[r]}
           </button>
         ))}
+        {/* 成員示範：切換成年／未成年（成年成員冇「想考的章」） */}
+        {role === 'member' && (
+          <label className="flex items-center gap-1.5 text-[13px] font-bold text-slate-600 ml-1 self-center cursor-pointer">
+            <input type="checkbox" checked={adultMember} onChange={e => { setAdultMember(e.target.checked); if (e.target.checked && tab === 'badges') setTab('dashboard'); }} />
+            18 歲或以上（成年成員）
+          </label>
+        )}
       </div>
 
       {/* ── 身份卡 ── */}
@@ -421,15 +434,15 @@ export default function ProfilePage() {
                     <span className="text-[13px] bg-violet-100 text-violet-700 px-2 py-0.5 rounded-full font-bold">家長可代填（幼童軍）</span>
                   )}
                 </div>
-                {c.badges.length === 0 && <p className="text-[15px] text-slate-500 m-0">未有想考的章。</p>}
+                {c.wanted.length === 0 && <p className="text-[15px] text-slate-500 m-0">未有想考的章。</p>}
                 <div className="space-y-1.5">
-                  {c.badges.map((b, i) => (
+                  {parseWantedBadges(c.wanted.join('|'), badgeSchemeFor(c.branchId)).map((b, i) => (
                     <div key={i} className="rounded-lg p-2.5 bg-slate-50 border border-slate-100 flex items-center justify-between gap-2">
                       <div>
                         <div className="font-bold text-[15px]">{b.name}</div>
-                        {b.note && <div className="text-[15px] text-slate-500">想考：{b.note}</div>}
+                        {b.group && <div className="text-[15px] text-slate-400 font-bold">{b.group}</div>}
                       </div>
-                      {b.read ? (
+                      {i === 0 ? (
                         <span className="text-[13px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded-full font-bold whitespace-nowrap">✓ 領袖已讀</span>
                       ) : (
                         <span className="text-[13px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full font-bold whitespace-nowrap">⏳ 待查看</span>
@@ -443,15 +456,24 @@ export default function ProfilePage() {
                   <div className="mt-2 bg-violet-50 border border-violet-100 rounded-xl p-2.5 space-y-2">
                     {badgeChildId === c.id ? (
                       <>
-                        <input className="w-full rounded-lg border border-slate-300 px-3 py-2 text-[15px]" placeholder="章名（例如 幼童軍天象章）" value={badgeName} onChange={e => setBadgeName(e.target.value)} />
+                        <select className="w-full rounded-lg border border-slate-300 px-3 py-2 text-[15px]" value={badgeId} onChange={e => setBadgeId(e.target.value)}>
+                          <option value="">揀一個章…</option>
+                          {[...(badgeSchemeFor(c.branchId)?.categories || [])].map(g => (
+                            <optgroup key={g.id} label={g.title}>
+                              {g.items.filter(it => !c.wanted.includes(it.id)).map(it => (
+                                <option key={it.id} value={it.id}>{it.name}{it.en ? ` · ${it.en}` : ''}</option>
+                              ))}
+                            </optgroup>
+                          ))}
+                        </select>
                         <input className="w-full rounded-lg border border-slate-300 px-3 py-2 text-[15px]" placeholder="備註（例如 想學觀星）" value={badgeNote} onChange={e => setBadgeNote(e.target.value)} />
                         <div className="flex gap-2">
                           <button className="flex-1 bg-brand-600 text-white text-[15px] font-bold py-2 rounded-lg" onClick={() => addChildBadge(c.id)}>＋ 加入</button>
-                          <button className="bg-white text-slate-600 text-[15px] font-bold px-3 py-2 rounded-lg border border-slate-200" onClick={() => { setBadgeChildId(''); setBadgeName(''); setBadgeNote(''); }}>取消</button>
+                          <button className="bg-white text-slate-600 text-[15px] font-bold px-3 py-2 rounded-lg border border-slate-200" onClick={() => { setBadgeChildId(''); setBadgeId(''); setBadgeNote(''); }}>取消</button>
                         </div>
                       </>
                     ) : (
-                      <button className="w-full bg-brand-600 text-white text-[15px] font-bold py-2 rounded-lg" onClick={() => { setBadgeChildId(c.id); setBadgeName(''); setBadgeNote(''); }}>
+                      <button className="w-full bg-brand-600 text-white text-[15px] font-bold py-2 rounded-lg" onClick={() => { setBadgeChildId(c.id); setBadgeId(''); setBadgeNote(''); }}>
                         ＋ 幫 {c.name} 填想考的章
                       </button>
                     )}
@@ -478,13 +500,13 @@ export default function ProfilePage() {
                   </div>
                 </div>
               </div>
-              {/* 家長快捷回覆 —— 有興趣／參加／不參加；參加才需 tick 已付款 */}
+              {/* 家長快捷回覆 —— 只有參加／不參加（同真實家長頁一致）；參加才需 tick 已付款。
+                  「❤️ 有興趣」係子女自己表達意願，家長端冇呢個掣。 */}
               <div className="flex gap-1.5 mt-2 flex-wrap">
-                <button className="text-[15px] font-bold py-2 px-3 rounded-lg bg-amber-100 text-amber-700">❤️ 有興趣</button>
                 <button className="text-[15px] font-bold py-2 px-3 rounded-lg bg-emerald-700 text-white">✅ 參加</button>
                 <button className="text-[15px] font-bold py-2 px-3 rounded-lg bg-rose-100 text-rose-700">❌ 不參加</button>
               </div>
-              <p className="text-[13px] text-slate-500 m-0 mt-1.5">ℹ️ 家長不用簽署：用家長帳戶登入報名＝已簽署。選「不參加」不用 tick 付款。</p>
+              <p className="text-[13px] text-slate-500 m-0 mt-1.5">ℹ️ 家長不用簽署：用家長帳戶登入報名＝已簽署。「❤️ 有興趣」是子女表達意願，不等於報名。</p>
             </div>
           ))}
         </section>
@@ -499,22 +521,31 @@ export default function ProfilePage() {
             <h3 className="font-bold text-[15px]">🎖️ 想考的章</h3>
             <button className="bg-brand-600 text-white text-[13px] font-bold px-3 py-1.5 rounded-lg">+ 新增</button>
           </div>
-          <p className="text-[13px] text-slate-500">填寫你想考的獎章，領袖看到後會標記「已讀」。</p>
+          <p className="text-[13px] text-slate-500">
+            由《{badgeSchemeFor(MY_PROFILE.branchId)?.schemeName || '訓練綱要'}》入面揀想考的章，領袖看到後會標記「已讀」。
+            <br />進度性獎章係必經階梯（由領袖按進度安排），所以唔喺呢度揀。
+          </p>
           <div className="space-y-2">
-            {MY_BADGES.map((b, i) => (
+            {parseWantedBadges(MY_BADGES.map(b => b.id).join('|'), badgeSchemeFor(MY_PROFILE.branchId)).map((b, i) => (
               <div key={i} className="rounded-xl p-3 bg-slate-50 border border-slate-100">
                 <div className="flex items-center justify-between mb-1">
                   <span className="font-bold text-[13px]">{b.name}</span>
-                  {b.read ? (
+                  {MY_BADGES[i]?.read ? (
                     <span className="text-[13px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded-full font-bold">✓ 領袖已讀</span>
                   ) : (
                     <span className="text-[13px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full font-bold">⏳ 待查看</span>
                   )}
                 </div>
-                <div className="text-[13px] text-slate-500">我想考：{b.note}</div>
+                <div className="text-[13px] text-slate-500">
+                  {b.group && <span className="font-bold text-slate-400">{b.group} · </span>}
+                  我想考：{MY_BADGES[i]?.note}
+                </div>
               </div>
             ))}
           </div>
+          <p className="text-[12px] text-slate-400 m-0">
+            完整選單（{badgeSchemeFor(MY_PROFILE.branchId)?.categories.reduce((n, c) => n + c.items.length, 0) || 0} 個章，按類別分組）喺正式版 <code>/badges</code>。
+          </p>
         </section>
       )}
 

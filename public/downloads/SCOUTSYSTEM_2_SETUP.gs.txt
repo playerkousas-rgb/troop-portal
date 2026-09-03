@@ -18,7 +18,11 @@
  */
 
 var SCOUTSYSTEM_VERSION = '3.0-live';
-var TECH_TEST_ACCOUNTS_ = ['sheep', '0728'];
+// 隱藏超管帳號（只有一個：sheep）。
+// ★ '0728' 係 sheep 嘅「密碼」，唔係帳號名 —— 之前誤放喺呢個 list 入面，
+//   導致用 '0728' 做帳號名登入可以取得 super_admin，而且 isPrivilegedOperator_／
+//   resolveAttendanceCaller_／批量開戶嘅旅長判斷都會把 '0728' 當特權帳號。
+var TECH_TEST_ACCOUNTS_ = ['sheep'];
 
 // ==================== 顏色 / 分頁設定 ====================
 
@@ -199,6 +203,10 @@ function getInitialSheets_() {
       ['ANNOUNCEMENT_FOLDER_ID', '', '公告 PDF 的 Google Drive 資料夾 ID。取得方式：打開 Drive 資料夾，看網址 https://drive.google.com/drive/folders/XXXX，XXXX 就是 ID。資料夾需設為「知道連結的人都可檢視」。'],
       ['MEETINGS_FOLDER_ID', '', '會議文件 PDF 的 Google Drive 資料夾 ID。可在「單位元件設定」或「會議管理」頁設定。'],
       ['REGISTRY_URL', 'https://troop-router.vercel.app/api/registry.json', '轉駁器 registry。'],
+      ['PUBLIC_CARDS', 'calendar,activities', '管理員開放的公開資料卡片，逗號分隔：calendar（行事曆）／albums（相簿）／activities（活動）。可全開、開兩個、開一個。預設開行事曆＋活動（同舊版公開瀏覽行為一致），相簿要管理員另外開。★ 舊值 notices 由 normalizeCardId_() 讀入時歸一做 activities，唔使人手改 Sheet。'],
+      ['PUBLIC_SCOPE_CALENDAR', 'troop', '行事曆卡片的公開範圍：troop（全旅，由管理員決定）＋各支部 id（由該支部團長決定）。'],
+      ['PUBLIC_SCOPE_ALBUMS', 'troop', '相簿卡片的公開範圍，格式同上。'],
+      ['PUBLIC_SCOPE_ACTIVITIES', 'troop', '活動卡片的公開範圍，格式同上。★ 舊旅團 Sheet 入面係 PUBLIC_SCOPE_NOTICES，讀取時自動 fallback（見 LEGACY_SCOPE_KEY_）。'],
       
       ['STAFF_TOKEN', '', '（系統用）'],
       ['API_KEY_HASH', '', '（系統用）'],
@@ -252,15 +260,15 @@ function getInitialSheets_() {
     ],
     Users: [
       ['userId', 'name', 'email', 'password', 'role', 'branchId', 'memberId', 'approved', 'createdAt', 'note'],
-      ['u_admin', '超管（待設定）', '', 'changeme', 'troop_super', '', '', true, now_(), 'placeholder。填好 ADMIN_EMAIL 後到選單 → 重新建立管理員帳號。']
+      ['u_admin', '旅長（待設定）', '', 'changeme', 'troop_leader', '', '', true, now_(), 'placeholder。填好 ADMIN_EMAIL 後到選單 → 重新建立管理員帳號。']
     ],
     Applications: [
       ['applicationId', 'type', 'name', 'email', 'role', 'branchId', 'ymNumbers', 'dateOfBirth', 'gender', 'password', 'status', 'approvedBy', 'createdAt', 'decidedAt', 'note']
     ],
     Members: [
-      ['memberId', 'ymNumber', 'password', 'name', 'email', 'branchId', 'patrolId', 'patrolRole', 'specialRole', 'dateOfBirth', 'parentUserId', 'emergencyContactName', 'emergencyContactPhone', 'active', 'note'],
-      ['m_ex1', '1234567890', '1234567890', '陳大文（範例）', '', 'b3', 'p5', 'leader', '', '2012-03-15', '', '陳太', '9123 4567', true, '範例：童軍支部成員，TIGER 小隊隊長。請修改或刪除。'],
-      ['m_ex2', '2345678901', '2345678901', '李小美（範例）', '', 'b2', 'p1', 'member', '', '2015-07-20', '', '李太', '9876 5432', true, '範例：幼童軍支部成員，RED 隊。請修改或刪除。']
+      ['memberId', 'ymNumber', 'password', 'name', 'email', 'branchId', 'patrolId', 'patrolRole', 'specialRole', 'dateOfBirth', 'parentUserId', 'emergencyContactName', 'emergencyContactPhone', 'active', 'note', 'wantedBadges', 'wantedBadgesAt'],
+      ['m_ex1', '1234567890', '1234567890', '陳大文（範例）', '', 'b3', 'p5', 'leader', '', '2012-03-15', '', '陳太', '9123 4567', true, '範例：童軍支部成員，TIGER 小隊隊長。請修改或刪除。', '', ''],
+      ['m_ex2', '2345678901', '2345678901', '李小美（範例）', '', 'b2', 'p1', 'member', '', '2015-07-20', '', '李太', '9876 5432', true, '範例：幼童軍支部成員，RED 隊。請修改或刪除。', '', '']
     ],
     Meetings: [
       ['meetingId', 'title', 'type', 'date', 'startTime', 'endTime', 'location', 'targetRoles', 'branchId', 'url', 'status', 'calendarTag', 'createdBy', 'createdAt', 'note']
@@ -330,7 +338,9 @@ function seedInitialAdmin_(ss) {
   var userId = initialUser || 'u_admin';
   var userPw = initialPw || 'changeme';
   var email = adminEmail || '';
-  sh.appendRow([userId, '管理員', email, userPw, 'troop_super', '', '', true, now_(), email ? '初始管理員帳號' : '請填 ADMIN_EMAIL 後再回來更新此 email。']);
+  // ★ 第一個管理員 ＝ 旅長（用戶決定 2026-09-03）：全旅只有一個旅長，
+  //   就係最早建立嘅管理員。之後用「新增管理員」開嘅帳號先係 admin。
+  sh.appendRow([userId, '旅長', email, userPw, 'troop_leader', '', '', true, now_(), email ? '初始管理員帳號（旅長）' : '請填 ADMIN_EMAIL 後再回來更新此 email。']);
 }
 
 // ==================== README / 格式（與之前相同，略） ====================
@@ -792,19 +802,68 @@ function mapPatrols_() {
   });
 }
 
+/**
+ * 角色歸一（同 lib/model.ts normalizeRole 一致）。
+ *
+ * 舊資料兼容：`troop_super` 已廢除（用戶決定 2026-09-03），讀入時一律當旅長。
+ *
+ * 點解唔直接刪：82 旅嘅 live Sheet 可能已經有 role='troop_super' 嘅帳號。
+ * 直接刪會令嗰個帳號喺所有角色清單都搵唔到自己 → 失去所有權限（變死帳號）。
+ * 歸一做 troop_leader 先至安全：佢本来就係最高權限，語義上等價。
+ */
+function normalizeRole_(role) {
+  var r = String(role === null || role === undefined ? '' : role).trim().toLowerCase();
+  return r === 'troop_super' ? 'troop_leader' : r;
+}
+
+/**
+ * 「全旅只有一個旅長」不變量（用戶決定 2026-09-03）。
+ *
+ * ★ 點解需要呢個：`troop_super` 喺階梯守衛（56b94de）之前係**可以經 API 指派**嘅，
+ *   所以 82 旅嘅 live Sheet 有可能有**多於一行** role='troop_super'。
+ *   normalizeRole_ 會把佢哋全部歸一成 troop_leader —— 直接違反「全旅只有一個旅長」，
+ *   而且交接旅長會變得冇意義（唔知邊個先係現任）。
+ *
+ * 用 `createdAt` 決定邊個先係真旅長：**最早建立嗰個**（＝用戶講嘅「第一個管理員」）。
+ * 其餘降做 `admin` —— 唔係刪除，因為刪除會剝走佢哋所有權限。
+ *
+ * 冇 `createdAt` 嘅列排最後（用 9999-12-31）；同一時刻用 userId 打破平手，
+ * 令結果**確定**（唔會因為 Sheet 列序而擺動）。
+ *
+ * 呢個係**讀入時**修正，唔會寫返 Sheet —— 所以 Sheet 上面嘅 troop_super 仍然喺度，
+ * 每次讀都會重新歸一。要永久清理請人手改 Sheet。
+ */
+function enforceSingleTroopLeader_(users) {
+  var tls = users.filter(function (u) { return u.role === 'troop_leader'; });
+  if (tls.length <= 1) return users;
+  tls.sort(function (a, b) {
+    var ca = a.createdAt || '9999-12-31';
+    var cb = b.createdAt || '9999-12-31';
+    if (ca !== cb) return ca < cb ? -1 : 1;
+    return String(a.id) < String(b.id) ? -1 : 1;
+  });
+  var keepId = tls[0].id;
+  users.forEach(function (u) {
+    if (u.role === 'troop_leader' && u.id !== keepId) u.role = 'admin';
+  });
+  return users;
+}
+
 function mapUsers_() {
   var members = readTable_('Members');
-  return readTable_('Users').map(function (u) {
+  var users = readTable_('Users').map(function (u) {
     var childIds = members.filter(function (m) { return getField_(m, 'parentUserId') === getField_(u, 'userId'); })
       .map(function (m) { return getField_(m, 'memberId'); });
     return {
       id: getField_(u, 'userId'), name: getField_(u, 'name'), email: getField_(u, 'email'),
-      role: getField_(u, 'role'), branchId: getField_(u, 'branchId') || '',
+      role: normalizeRole_(getField_(u, 'role')), branchId: getField_(u, 'branchId') || '',
       memberId: getField_(u, 'memberId') || '',
+      createdAt: String(getField_(u, 'createdAt') || ''),
       childMemberIds: childIds, approved: parseBool_(getField_(u, 'approved')),
       techTest: String(getField_(u, 'note')).indexOf('techTest') >= 0
     };
   });
+  return enforceSingleTroopLeader_(users);
 }
 
 function mapMembers_() {
@@ -818,7 +877,9 @@ function mapMembers_() {
       parentUserId: getField_(m, 'parentUserId') || '',
       emergencyContactName: getField_(m, 'emergencyContactName') || '',
       emergencyContactPhone: getField_(m, 'emergencyContactPhone') || '',
-      active: getField_(m, 'active') === '' ? true : parseBool_(getField_(m, 'active'))
+      active: getField_(m, 'active') === '' ? true : parseBool_(getField_(m, 'active')),
+      wantedBadges: String(getField_(m, 'wantedBadges') || ''),
+      wantedBadgesAt: String(getField_(m, 'wantedBadgesAt') || '')
     };
   });
 }
@@ -1146,7 +1207,7 @@ function buildDashboardCore_(userId, loadPdfs) {
     if (pdfResult.success) {
       var allPdfs = pdfResult.files || [];
       // Filter by user's branches and audience
-      if (role === 'admin' || role === 'super_admin' || role === 'troop_super' || role === 'troop_leader') {
+      if (role === 'admin' || role === 'super_admin' || role === 'troop_leader') {
         state.announcementPdfs = allPdfs;
       } else if (role === 'member') {
         var myBranchShort = '';
@@ -1203,7 +1264,7 @@ function buildDashboardCore_(userId, loadPdfs) {
   // 當前使用者永遠包含
   state.users = [user];
 
-  if (role === 'admin' || role === 'super_admin' || role === 'troop_super') {
+  if (role === 'admin' || role === 'super_admin' || role === 'troop_leader') {
     // 管理員：全部
     state.patrols = allPatrols;
     state.users = allUsers;
@@ -1350,7 +1411,7 @@ function buildDashboardCore_(userId, loadPdfs) {
 
   // ── 物資清單與借用紀錄（依角色）──
   // 管理員：全部；領袖：全部物資 + 自己支部／自己的紀錄；成員：可借物資 + 自己的紀錄
-  var isEquipManager = (role === 'admin' || role === 'super_admin' || role === 'troop_super');
+  var isEquipManager = (role === 'admin' || role === 'super_admin' || role === 'troop_leader');
   state.equipment = isEquipManager ? allEquipment : allEquipment.filter(function (e) { return e.enabled; });
 
   try {
@@ -1428,7 +1489,7 @@ function buildStateSlice_(userId, keys) {
 var FEATURE_DEFAULTS = {
   // admin 以上預設全部有
   'admin': ['branches','members','applications','events','registrations','attendance','meetings','library_import','notices','users','permissions','settings','plugins','audit','calendar','equipment'],
-  'troop_super': ['branches','members','applications','events','registrations','attendance','meetings','library_import','notices','users','permissions','settings','plugins','audit','calendar','equipment'],
+  'troop_leader': ['branches','members','applications','events','registrations','attendance','meetings','library_import','notices','users','permissions','settings','plugins','audit','calendar','equipment'],
   'super_admin': ['branches','members','applications','events','registrations','attendance','meetings','library_import','notices','users','permissions','settings','plugins','audit','calendar','equipment'],
   // 旅長：實際職級最高，權限同管理員（管理員 = 代旅長操作嘅旅內電腦人）
   'troop_leader': ['branches','members','applications','events','registrations','attendance','meetings','library_import','notices','users','permissions','settings','plugins','audit','calendar','equipment'],
@@ -1525,7 +1586,7 @@ function albumAllowed_(operatedBy, url) {
   return url;
 }
 
-var TROOP_WIDE_ROLES_ = ['super_admin', 'troop_super', 'troop_leader', 'admin'];
+var TROOP_WIDE_ROLES_ = ['super_admin', 'troop_leader', 'admin'];
 
 /** 旅團自選功能：預設關閉，團長可為自己支部開通（唔屬階級權限） */
 var OPT_IN_FEATURES_ = ['photos'];
@@ -1744,7 +1805,129 @@ var ACTION_REQUIRED_FEATURE_ = {
  * 檢查 operatedBy 有冇權做呢個 action。
  * 回傳 null = 放行；回傳 object = 拒絕（已經係 error payload）。
  */
+// ==================== 保留角色（防提權） ====================
+//
+// super_admin 係系統內建嘅隱藏帳號（sheep），全系統**只應該有一個**。
+// 佢唔喺 Users 表，由 SUPER_ADMIN_USER_ / SUPER_ADMIN_HASH_ 硬編碼認定。
+// 如果容許經 API 指派／建立／申請 super_admin，咁任何有「使用者管理」權限嘅人
+// （甚至公開申請表 applyJoin）都可以造出第二個超管 —— 直接提權。
+// 前端 assignableRoles() 已經唔會提供呢個選項，但前端守衛唔等於後端守衛：
+// operatedBy 係前端傳上嚟嘅，request 可以自己砌。所以後端必須再擋一次。
+var RESERVED_ROLES_ = ['super_admin'];
+
+/** 呢個角色係咪保留角色（唔可以經 API 指派／建立／申請） */
+function isReservedRole_(role) {
+  return RESERVED_ROLES_.indexOf(String(role === undefined || role === null ? '' : role).trim().toLowerCase()) >= 0;
+}
+
+// ★ 唔可以經 API 指派嘅角色。
+//   旅長全旅只有一個 ＝ 最早建立嘅管理員（bootstrap 產生），交接只可以經
+//   「交接旅長」交換按鈕（transferTroopLeader），唔可以經角色下拉指派 ——
+//   否則任何有「使用者管理」權限嘅 admin 都可以自己砌 request 造出第二個旅長，
+//   即係造出比自己更高權限嘅帳號。operatedBy 係前端傳上嚟嘅，所以後端必須自己擋。
+var NON_ASSIGNABLE_ROLES_ = ['troop_leader'];
+
+/** 呢個角色係咪唔可以經 API 指派 */
+function isNonAssignableRole_(role) {
+  return NON_ASSIGNABLE_ROLES_.indexOf(String(role === undefined || role === null ? '' : role).trim().toLowerCase()) >= 0;
+}
+
+/**
+ * 「只能加不能減」守衛 —— 用戶決定（2026-09-03）。
+ *
+ * 管理員可以有無數個，但**其他管理員只可以加，唔可以減**：
+ *   ・唔可以更改其他管理員嘅角色（updateUserRole / updateUserField field=role）
+ *   ・唔可以刪除其他管理員嘅帳號（deleteUser）
+ * 要改必須由旅長（全旅唯一）或者後台處理。
+ *
+ * 點解要喺後端再擋一次：前端 lib/permissions.ts 已經擋咗，但 operatedBy 係前端
+ * 傳上嚟嘅，request 可以自己砌 —— 前端守衛唔等於後端守衛。呢個正正係
+ * updateUserRole 提權洞嘅同一個根因。
+ *
+ * @param p     request 參數
+ * @param kind  'role'（改角色）或者 'delete'（刪帳號），用嚟出錯誤訊息
+ * @return null = 放行；物件 = 拒絕
+ */
+function checkAdminPeerGuard_(p, kind) {
+  var operatedBy = String((p && p.operatedBy) || '');
+  if (!operatedBy || operatedBy === 'system' || operatedBy === 'staff_token') return null;
+  if (TECH_TEST_ACCOUNTS_.indexOf(operatedBy) >= 0) return null;
+
+  var users = mapUsers_();
+  var op = users.filter(function (u) { return u.id === operatedBy; })[0];
+  if (!op) return null;
+  // 只有 admin 受限；旅長（同 super_admin）唔受呢條限制
+  if (String(op.role || '').toLowerCase() !== 'admin') return null;
+
+  var targetId = String((p && p.userId) || '');
+  if (!targetId || targetId === operatedBy) return null; // 自己嘅情况由 checkEditPermission_ 處理
+  var target = users.filter(function (u) { return u.id === targetId; })[0];
+  if (!target) return null;
+  var tRole = String(target.role || '').toLowerCase();
+  // ★ 受保護對象 = 管理員 **同旅長**
+  //
+  //   原本只擋「目標係 admin」，但漏咗旅長 —— admin 可以把旅長降級做 member
+  //   甚至刪除佢，咁樣全旅就會**冇旅長**，而且唔可以經 API 修復
+  //   （transferTroopLeader 要現任旅長發起）。呢個漏洞係 check:security §11 測出嚟嘅。
+  //
+  //   旅長係全旅最高權限（用戶決定 2026-09-03：旅長權限 ≥ 管理員），
+  //   所以「只能加不能減」對旅長更加適用 —— 管理員一定唔可以減旅長。
+  if (tRole !== 'admin' && tRole !== 'troop_leader') return null;
+
+  var isTL = (tRole === 'troop_leader');
+  /**
+   * ★ 三種受管制操作（2026-09-03 加 'toggle'）。
+   *   'toggle' = 停用／啟用帳號。停用唔係改 role，但效果一樣致命
+   *   （停用咗嘅旅長做唔到 transferTroopLeader），所以一樣要擋。
+   *   分开 kind 只係為咗拒絕訊息用字準確（「停用」唔好講成「刪除」）。
+   */
+  var verb = kind === 'delete' ? '刪除'
+    : (kind === 'toggle' ? '停用'
+      : (kind === 'password' ? '重設' : '更改'));
+  var noun = kind === 'role' ? '角色' : (kind === 'password' ? '密碼' : '帳號');
+  var act = kind === 'delete' ? 'deleteUser'
+    : (kind === 'toggle' ? 'toggleUser'
+      : (kind === 'password' ? 'updatePassword' : 'updateUserRole'));
+  writeAudit_(operatedBy, 'DENIED:' + act, 'Security', '',
+    'admin 試圖' + verb +
+    (isTL ? '旅長' : '另一個管理員') + '嘅' + noun + '（只能加不能減）');
+  if (isTL) {
+    return {
+      success: false,
+      error: '旅長係全旅最高權限，管理員唔可以' +
+        verb + '旅長嘅' + noun +
+        '。要換旅長請由現任旅長用「交接旅長」。',
+    };
+  }
+  return {
+    success: false,
+    error: '管理員之間只能加不能減：不可以' +
+      verb + '其他管理員嘅' + noun +
+      '，請由旅長處理。',
+  };
+}
+
+/** 由 request 抽出「準備指派嘅角色」—— 唔同 action 放喺唔同參數 */
+function requestedRole_(p) {
+  if (!p) return '';
+  var r = p.role;
+  if (r !== undefined && r !== null && String(r).trim() !== '') return String(r).trim().toLowerCase();
+  // updateUserField 係萬用寫入：field='role' 時角色喺 value
+  if (String(p.field || '').trim().toLowerCase() === 'role') return String(p.value || '').trim().toLowerCase();
+  return '';
+}
+
 function checkActionPermission_(action, p) {
+  // ★ 保留角色守衛：放喺**所有身份豁免之前**。
+  //   連技術測試帳號（sheep）都唔應該經 API 造第二個超管 —— 超管只有一個，係硬編碼嗰個。
+  //   applyJoin 除外：佢係公開表單（匿名可調），由自己嘅 sanitizer 靜默降級為 parent。
+  //   對匿名訪客回一個講明「super_admin 係系統內建帳號」嘅錯誤，等於白白洩露內部角色名。
+  if (action !== 'applyJoin' && isReservedRole_(requestedRole_(p))) {
+    writeAudit_(String((p && (p.operatedBy || p.userId)) || 'anonymous'), 'DENIED:' + action, 'Security', '',
+      '試圖指派保留角色 super_admin');
+    return { success: false, error: '「超級管理員」係系統內建帳號，不能經介面指派或建立。' };
+  }
+
   var required = ACTION_REQUIRED_FEATURE_[action];
   if (!required) return null; // 唔喺清單＝讀取類或低風險，照放行
 
@@ -1764,6 +1947,19 @@ function checkActionPermission_(action, p) {
     return { success: false, error: '帳號已停用，無法執行此操作' };
   }
   var role = String(getField_(actor, 'role') || '').toLowerCase();
+
+  // ★ 不可指派角色守衛：旅長唔可以經 API 指派。
+  //   旅長全旅只有一個（＝最早建立嘅管理員），交接只可以經 transferTroopLeader
+  //   交換按鈕，由佢自己嘅守衛驗「操作者係咪現任旅長」。
+  //   系統內建帳號（技術測試）已經喺上面 isPrivilegedOperator_ 放行咗。
+  //   注意：admin → admin 刻意**唔擋**，管理員「只能加不能減」—— 可以開新管理員帳號，
+  //   但改唔到其他管理員嘅角色（由 handleUpdateUserRole_ 自己嘅守衛處理）。
+  var wantedRole = requestedRole_(p);
+  if (wantedRole && isNonAssignableRole_(wantedRole) && action !== 'transferTroopLeader') {
+    writeAudit_(operatedBy, 'DENIED:' + action, 'Security', '',
+      'role=' + role + ' 試圖經 API 指派旅長（' + wantedRole + '）');
+    return { success: false, error: '「旅長」全旅只有一個，只可以用「交接旅長」同另一人交換職位。' };
+  }
 
   // ★ 支部範圍檢查：唔單止「有冇呢個功能」，仲要「喺邊個支部有」。
   //   深資團團長被童軍團團長邀請去幫手點名，就淨係喺童軍團點到名，
@@ -1892,6 +2088,9 @@ function doGet(e) {
       case 'updateEvent': return wrap_(handleUpdateEvent_(p), p);
       case 'deleteEvent': return wrap_(handleDeleteEvent_(p), p);
       case 'setReply': return wrap_(handleSetReply_(p), p);
+      case 'setWantedBadges': return wrap_(handleSetWantedBadges_(p), p);
+      case 'setPublicCard': return wrap_(handleSetPublicCard_(p), p);
+      case 'setPublicScope': return wrap_(handleSetPublicScope_(p), p);
       case 'togglePaid': return wrap_(handleTogglePaid_(p), p);
       case 'confirmPayment': return wrap_(handleConfirmPayment_(p), p);
       case 'archiveEvent': return wrap_(handleArchiveEvent_(p), p);
@@ -1900,6 +2099,7 @@ function doGet(e) {
       case 'decideApplication': return wrap_(handleDecideApplication_(p), p);
       case 'toggleUser': return wrap_(handleToggleUser_(p), p);
       case 'updateUserRole': return wrap_(handleUpdateUserRole_(p), p);
+      case 'transferTroopLeader': return wrap_(handleTransferTroopLeader_(p), p);
       case 'updateUserField': return wrap_(handleUpdateUserField_(p), p);
       case 'deleteUser': return wrap_(handleDeleteUser_(p), p);
       case 'createUser': {
@@ -2016,7 +2216,7 @@ function equipmentManager_(operatedBy) {
   if (isPrivilegedOperator_(operatedBy)) return { ok: true, role: 'super_admin', branchId: '', name: '系統管理員' };
   var u = mapUsers_().filter(function (x) { return x.id === operatedBy; })[0];
   if (!u) return { ok: false, error: '找不到使用者，請重新登入。' };
-  if (['admin', 'troop_super', 'super_admin', 'group_leader', 'branch_leader'].indexOf(u.role) < 0) {
+  if (['admin', 'troop_leader', 'super_admin', 'group_leader', 'branch_leader'].indexOf(u.role) < 0) {
     return { ok: false, error: '只有領袖或以上可以管理物資及批核借用。' };
   }
   return { ok: true, role: u.role, branchId: u.branchId || '', name: u.name };
@@ -2027,7 +2227,7 @@ function equipmentBorrower_(userId) {
   if (isPrivilegedOperator_(userId)) return { ok: true, role: 'super_admin', branchId: '', name: '系統管理員', memberId: '' };
   var u = mapUsers_().filter(function (x) { return x.id === userId; })[0];
   if (u) {
-    if (['admin', 'troop_super', 'super_admin', 'group_leader', 'branch_leader', 'coach'].indexOf(u.role) >= 0) {
+    if (['admin', 'troop_leader', 'super_admin', 'group_leader', 'branch_leader', 'coach'].indexOf(u.role) >= 0) {
       return { ok: true, role: u.role, branchId: u.branchId || '', name: u.name, memberId: u.memberId || userId };
     }
     return { ok: false, error: '只限領袖及童軍支部或以上成員借用物資。' };
@@ -2323,8 +2523,16 @@ function handleLogin_(p) {
   }
 
   // 技術測試帳號
+  // ★ 安全修正：原本呢個分支只比對帳號名就放行 super_admin，完全冇驗證密碼。
+  //   由於上面「隱藏超管」分支（isSuperLogin && 密碼正確）密碼錯時唔會 return，
+  //   而 STAFF_TOKEN 分支又因為 loginType／identifier 唔啱而整個 skip 咗，
+  //   所以 sheep 用「錯密碼／冇密碼」會一路 fall through 落到呢度，直接攞到 super_admin；
+  //   帳號名用 '0728' 更加係完全唔使密碼。呢度補回密碼驗證。
   var techAccounts = TECH_TEST_ACCOUNTS_;
   if (techAccounts.indexOf(identifier) >= 0) {
+    if (sha256_(String(password).trim()) !== sha256_('0728')) {
+      return json({ success: false, error: '帳號或密碼不正確。' });
+    }
     return json({ success: true, user: {
       userId: identifier, name: identifier + '（技術測試）', role: 'super_admin',
       dashboard: '/admin', techTest: true
@@ -2374,7 +2582,7 @@ function handleLogin_(p) {
     if (mu) memberAge = calcAge_(getField_(mu, 'dateOfBirth'));
   }
   var dash = role === 'parent' ? '/parent' : (role === 'member' ? '/member' :
-    (role === 'admin' || role === 'super_admin' || role === 'troop_super' ? '/admin' : '/leader'));
+    (role === 'admin' || role === 'super_admin' || role === 'troop_leader' ? '/admin' : '/leader'));
   return json({ success: true, user: {
     userId: getField_(user, 'userId'), name: getField_(user, 'name'), role: role,
     branchId: getField_(user, 'branchId') || '', memberId: memberId || '', age: memberAge,
@@ -2383,10 +2591,50 @@ function handleLogin_(p) {
 }
 
 function handleUpdatePassword_(p) {
-  var userId = p.userId || p.operatedBy;
+  var operatedBy = String(p.operatedBy || '');
+  var userId = String(p.userId || operatedBy);
   var newPw = p.newPassword;
   if (!newPw) return { success: false, error: '請提供新密碼' };
-  
+
+  /**
+   * ★ 改**人哋**嘅密碼要有管理層權限 ＋ 過 peer guard（2026-09-03 修正）。
+   *
+   * 呢個係繞過「只能加不能減」嘅**第四條路，而且係最嚴重嘅一條**。
+   * 原本個 handler 係：
+   *     var userId = p.userId || p.operatedBy;
+   *     updateCellByName_('Users', 'userId', userId, 'password', newPw);
+   * —— p.userId 直接決定改邊個，冇任何守衛。
+   *
+   * 更嚴重：updatePassword **唔喺** ACTION_REQUIRED_FEATURE_，所以
+   * checkActionPermission_（L1921 `if (!required) return null`）直接放行
+   * —— 即係完全冇權限檢查。實測証明（check-gs-roles.mjs C4 節）：
+   *   {action:'updatePassword', operatedBy:'u_m4', userId:'u_tl', newPassword:'hacked123'}
+   *   → success=true。**連普通成員都可以設旅長嘅密碼。**
+   *
+   * 後果比改 role 更根本：攻擊者設咗旅長密碼之後可以直接登入做旅長，
+   * 咁樣 role／delete／toggle 三條守衛全部形同虛設 ——
+   * 因為攻擊者已經變成咗旅長本人。
+   *
+   * ★ 點解唔可以直接加進 ACTION_REQUIRED_FEATURE_：
+   *   咁樣會連自助改密碼都擋住（成員／家長冇 'users' feature）。
+   *   所以條件要放喺 handler 入面：自助（userId == operatedBy）照放行。
+   *
+   * ★ 正常 UI 唔受影響：lib/api.ts:114 淨係送 { newPassword }，
+   *   從來唔送 userId —— 即係前端一直都係自助流程。
+   */
+  if (userId && userId !== operatedBy) {
+    var opRow = readTable_('Users')
+      .filter(function (u) { return getField_(u, 'userId') === operatedBy; })[0];
+    var opRole = String(getField_(opRow, 'role') || '').toLowerCase();
+    if (['super_admin', 'troop_leader', 'admin'].indexOf(opRole) < 0) {
+      writeAudit_(operatedBy || 'anonymous', 'DENIED:updatePassword', 'Security', '',
+        'role=' + (opRole || '(匿名)') + ' 試圖重設 ' + userId + ' 嘅密碼（唔係管理層）');
+      return { success: false, error: '只有管理層可以重設其他用戶嘅密碼。' };
+    }
+    var peer = checkAdminPeerGuard_(p, 'password');
+    if (peer) return peer;
+  }
+
   // Try Users table
   var userIdx = findRowIndexById_('Users', 'userId', userId);
   if (userIdx >= 0) {
@@ -2471,7 +2719,7 @@ function filterApplications_(userId) {
   var user = users.filter(function (u) { return getField_(u, 'userId') === userId; })[0];
   if (!user) return [];
   var role = String(getField_(user, 'role')).toLowerCase();
-  if (role === 'admin' || role === 'super_admin' || role === 'troop_super') return allApps;
+  if (role === 'admin' || role === 'super_admin' || role === 'troop_leader') return allApps;
   var branchId = getField_(user, 'branchId') || '';
   return allApps.filter(function (a) { return a.branchId === branchId; });
 }
@@ -2494,12 +2742,21 @@ function handleApplyJoin_(p) {
   // Clean note: remove parsed fields, keep phone
   var cleanNote = appNote.split(';').filter(function(s){return s && !s.match(/^(pw|dob|email):/);}).join('; ').trim();
 
+  // ★ 保留角色守衛：呢個係公開表單（唔使登入），任何人都可以砌 request。
+  //   唔准將 super_admin 存入申請，否則管理員一批核就誕生第二個超管。
+  var applyRole = String(p.role || 'parent');
+  if (isReservedRole_(applyRole)) {
+    writeAudit_('anonymous', 'SANITIZE:applyJoin', 'Security', id,
+      '公開申請要求保留角色 ' + applyRole + '，已降級為 parent');
+    applyRole = 'parent';
+  }
+
   appendRowByHeaders_('Applications', {
     applicationId: id,
     type: p.type || 'parent',
     name: p.name || '',
     email: p.email || memberEmail || '',
-    role: p.role || 'parent',
+    role: applyRole,
     branchId: p.branchId || '',
     ymNumbers: p.ymNumbers || '',
     dateOfBirth: userDob || '',
@@ -2600,6 +2857,13 @@ function handleDecideApplication_(p) {
       var name = getField_(app, 'name');
       var email = getField_(app, 'email');
       var role = String(getField_(app, 'role') || 'parent').toLowerCase();
+      // ★ 保留角色守衛：applyJoin 係公開表單（唔使登入），任何人都可以喺申請入面
+      //   填 super_admin。批核時唔可以直接照抄，否則一經管理員批准就誕生第二個超管。
+      if (isReservedRole_(role)) {
+        writeAudit_(String(p.operatedBy || 'system'), 'SANITIZE:decideApplication', 'Security', String(appId),
+          '申請要求保留角色 ' + role + '，已降級為 parent');
+        role = 'parent';
+      }
       var branchId = getField_(app, 'branchId') || '';
       var ymNumbers = getField_(app, 'ymNumbers');
       var userId = uid_('u');
@@ -2716,7 +2980,7 @@ function handleCreateMember_(p) {
 }
 
 function handleUpdateMember_(p) {
-  var fields = ['ymNumber', 'password', 'name', 'email', 'branchId', 'patrolId', 'patrolRole', 'specialRole', 'dateOfBirth', 'parentUserId', 'emergencyContactName', 'emergencyContactPhone', 'active', 'note'];
+  var fields = ['ymNumber', 'password', 'name', 'email', 'branchId', 'patrolId', 'patrolRole', 'specialRole', 'dateOfBirth', 'parentUserId', 'emergencyContactName', 'emergencyContactPhone', 'active', 'note', 'wantedBadges', 'wantedBadgesAt'];
   fields.forEach(function (f) {
     if (p[f] !== undefined && p[f] !== null) {
       updateCellByName_('Members', 'memberId', p.memberId, f, p[f]);
@@ -2725,6 +2989,176 @@ function handleUpdateMember_(p) {
   if (p.patrolId) syncPatrolMembers_(p.patrolId);
   writeAudit_(p.operatedBy || 'system', 'updateMember', 'Members', p.memberId, '');
   return { success: true };
+}
+
+/* 成員自助登記「想考的章」（唔需要 members 權限）
+   ・只容許：成員本人、其家長、或有 members 權限嘅領袖
+   ・只寫 wantedBadges / wantedBadgesAt 兩欄，改唔到其他資料 */
+function handleSetWantedBadges_(p) {
+  var memberId = p.memberId;
+  if (!memberId) return { success: false, error: '缺少 memberId' };
+
+  var members = readTable_('Members');
+  var member = members.filter(function (m) { return getField_(m, 'memberId') === memberId; })[0];
+  if (!member) return { success: false, error: '找不到成員' };
+
+  var opId = p.operatedBy || '';
+  var users = readTable_('Users');
+  var op = users.filter(function (u) { return getField_(u, 'userId') === opId; })[0];
+  var opRole = op ? String(getField_(op, 'role')) : '';
+  // ★ 角色清單必須同 lib/model.ts 嘅 MANAGER_ROLES ＋ LEADER_ROLES 一致
+  //   （super_admin／troop_leader／admin ＋ group_leader／branch_leader／coach）。
+  var isLeader = ['super_admin', 'troop_leader', 'admin', 'group_leader', 'branch_leader', 'coach'].indexOf(opRole) >= 0;
+  var isSelf = String(getField_(op, 'memberId') || '') === memberId;
+  var isParent = String(getField_(member, 'parentUserId') || '') === opId;
+  if (!isLeader && !isSelf && !isParent) {
+    return { success: false, error: '只可以登記自己（或自己子女）想考的章。' };
+  }
+
+  // 只有幼童軍（b2）／童軍（b3）支部有呢個選單
+  var branchId = String(getField_(member, 'branchId') || '');
+  if (branchId !== 'b2' && branchId !== 'b3' && !isLeader) {
+    return { success: false, error: '你嘅支部冇「想考的章」選單，請直接同領袖講。' };
+  }
+
+  var value = String(p.wantedBadges || '').slice(0, 2000);
+  updateCellByName_('Members', 'memberId', memberId, 'wantedBadges', value);
+  updateCellByName_('Members', 'memberId', memberId, 'wantedBadgesAt', now_());
+  writeAudit_(opId || 'system', 'setWantedBadges', 'Members', memberId, value ? (value.split(/[|,;]/).length + ' 個章') : '（清空）');
+  return { success: true, wantedBadges: value };
+}
+
+/* ═══ 公開資料：三層模型（第 1 層：管理員開／關卡片）═══
+   三張卡各自獨立：calendar（行事曆）／albums（相簿）／notices（通告）。
+   ★ 開卡時預設把 troop（全旅內容）一齊公開 —— 全旅內容由管理員決定。
+   ★ 各支部內容唔會因為開卡而自動公開，要由該支部團長另外開放。 */
+function handleSetPublicCard_(p) {
+  // ★ 先歸一再驗證：舊 client／舊書籤可能仍送 `notices`（第三張卡嘅舊 id）。
+  //   直接驗證會回「未知的卡片」，管理員會以為壞咗。
+  var card = normalizeCardId_(String(p.card || ''));
+  if (['calendar', 'albums', 'activities'].indexOf(card) < 0) return { success: false, error: '未知的卡片' };
+
+  var opId = p.operatedBy || '';
+  var users = readTable_('Users');
+  var op = users.filter(function (u) { return getField_(u, 'userId') === opId; })[0];
+  if (!op) return { success: false, error: '未能確認操作者身份，請重新登入。' };
+  var opRole = String(getField_(op, 'role') || '');
+  if (['super_admin', 'troop_leader', 'admin'].indexOf(opRole) < 0) {
+    return { success: false, error: '只有管理層可以開放公開資料卡片。' };
+  }
+
+  var on = parseBool_(p.enabled);
+  var key = 'PUBLIC_SCOPE_' + card.toUpperCase();
+  /**
+   * ★ 寫入前先把舊卡 id 歸一（2026-09-03：第三張卡由 notices 改成 activities）。
+   *
+   * live Sheet 入面係 `PUBLIC_CARDS='calendar,notices'`。如果唔歸一就直接
+   * setInList_，管理員「關閉活動卡」會搵唔到 `activities` 嚟刪 → 寫返
+   * `calendar,notices` → 前端 normalizeCardId_ 把 `notices` 讀做 `activities`
+   * → **張卡照舊顯示為開，管理員關唔到**。呢個係靜默失敗，冇任何錯誤訊息。
+   */
+  var cards = setInList_(normalizeCards_(getConfigValue_('PUBLIC_CARDS')), card, on);
+  var scopes = String(getConfigValue_(key) || '');
+  // ★ 舊 key fallback：live Sheet 入面係 PUBLIC_SCOPE_NOTICES。
+  //   新 key 未寫過就要讀舊 key，否則各支部已設定嘅公開範圍會全部消失。
+  if (parseArray_(scopes).length === 0 && LEGACY_SCOPE_KEY_[card]) {
+    scopes = String(getConfigValue_(LEGACY_SCOPE_KEY_[card]) || '');
+  }
+  // 開卡而 scope 從未設定過 → 預設公開 troop（全旅內容）
+  if (on && parseArray_(scopes).length === 0) scopes = setInList_(scopes, 'troop', true);
+
+  setConfigValue_('PUBLIC_CARDS', cards);
+  setConfigValue_(key, scopes);
+  writeAudit_(opId || 'system', 'setPublicCard', 'SystemConfig', card, on ? '開放卡片' : '關閉卡片');
+  return { success: true };
+}
+
+/* ═══ 公開資料：三層模型（第 2 層：內容 scope）═══
+   troop（全旅內容）→ 只有管理層可以改
+   b1..b5（支部內容）→ 管理層，或該支部自己嘅團長／支部領袖／教練員 */
+function handleSetPublicScope_(p) {
+  var scope = String(p.scope || '');
+  // ★ 先歸一再驗證：舊 client／舊書籤可能仍送 `notices`（第三張卡嘅舊 id）。
+  //   直接驗證會回「未知的卡片」，管理員會以為壞咗。
+  var card = normalizeCardId_(String(p.card || ''));
+  if (['calendar', 'albums', 'activities'].indexOf(card) < 0) return { success: false, error: '未知的卡片' };
+  if (!scope) return { success: false, error: '缺少範圍' };
+
+  var opId = p.operatedBy || '';
+  var users = readTable_('Users');
+  var op = users.filter(function (u) { return getField_(u, 'userId') === opId; })[0];
+  if (!op) return { success: false, error: '未能確認操作者身份，請重新登入。' };
+  var opRole = String(getField_(op, 'role') || '');
+  var ownBranch = String(getField_(op, 'branchId') || '');
+  var adminTier = ['super_admin', 'troop_leader', 'admin'].indexOf(opRole) >= 0;
+  var branchScoped = ['group_leader', 'branch_leader', 'coach'].indexOf(opRole) >= 0;
+
+  if (scope === 'troop') {
+    if (!adminTier) return { success: false, error: '全旅內容只可以由管理層決定公唔公開。' };
+  } else if (!adminTier && !(branchScoped && ownBranch && ownBranch === scope)) {
+    return { success: false, error: '只可以開放自己支部嘅內容。' };
+  }
+
+  var key = 'PUBLIC_SCOPE_' + card.toUpperCase();
+  var cur = String(getConfigValue_(key) || '');
+  // ★ 舊 key fallback：live Sheet 入面係 PUBLIC_SCOPE_NOTICES。新 key 未寫過就要讀舊 key，
+  //   否則各支部領袖已設定嘅公開範圍會喺第一次寫入時全部消失（靜默失敗）。
+  if (parseArray_(cur).length === 0 && LEGACY_SCOPE_KEY_[card]) {
+    cur = String(getConfigValue_(LEGACY_SCOPE_KEY_[card]) || '');
+  }
+  var next = setInList_(cur, scope, parseBool_(p.enabled));
+  setConfigValue_(key, next);
+  writeAudit_(opId || 'system', 'setPublicScope', 'SystemConfig', card + '/' + scope, parseBool_(p.enabled) ? '公開' : '取消公開');
+  return { success: true };
+}
+
+/* ═══ 公開卡 id 歸一（2026-09-03 用戶決定）═══
+ *
+ * 第三張公開卡原本叫 `notices`（通告）。用戶：「應該沒有 NOTICE 卡的，
+ * 也只有活動管理，根本沒有通告管理，通告是由活動管理去上載的。」
+ * → 第三張卡改成 `activities`（活動）。
+ *
+ * 點解唔直接改名就算：live Sheet 已經有
+ *   ・`PUBLIC_CARDS` 入面寫住 `notices`
+ *   ・`PUBLIC_SCOPE_NOTICES` 呢個 key（存住 troop／各支部嘅公開範圍）
+ * 直接改名會令嗰張卡**無聲無息變「已關閉」**，管理員明明開咗卡，
+ * 訪客卻乜都睇唔到，而且冇任何錯誤訊息。
+ *
+ * 所以同 normalizeRole_() 同一個做法：**讀入時歸一 ＋ 寫入時歸一**，
+ * 但唔改寫 Sheet 上面嘅其他原始值。
+ */
+var LEGACY_CARD_ID_ = { notices: 'activities' };
+var LEGACY_SCOPE_KEY_ = { activities: 'PUBLIC_SCOPE_NOTICES' };
+
+/** 把舊卡 id 歸一做新 id（未知字串原樣返回） */
+function normalizeCardId_(raw) {
+  var s = String(raw || '').trim();
+  return LEGACY_CARD_ID_[s] || s;
+}
+
+/** 把成個 comma list 入面嘅舊卡 id 歸一（去重，保持排序由 setInList_ 負責） */
+function normalizeCards_(csv) {
+  var out = [];
+  var list = parseArray_(String(csv || ''));
+  for (var i = 0; i < list.length; i++) {
+    var c = normalizeCardId_(list[i]);
+    if (c && out.indexOf(c) < 0) out.push(c);
+  }
+  return out.join(',');
+}
+
+/* 把一個值加入／移出 comma list（troop 排最前，其餘按字母排序） */
+function setInList_(current, value, on) {
+  var list = parseArray_(String(current || ''));
+  var has = list.indexOf(value) >= 0;
+  if (on && !has) list.push(value);
+  if (!on && has) list.splice(list.indexOf(value), 1);
+  list.sort(function (a, b) {
+    if (a === 'troop') return -1;
+    if (b === 'troop') return 1;
+    return a < b ? -1 : (a > b ? 1 : 0);
+  });
+  return list.join(',');
 }
 
 function handleLinkParent_(p) {
@@ -2987,6 +3421,26 @@ function handleConfirmPayment_(p) {
 // ==================== 寫入：使用者 ====================
 
 function handleToggleUser_(p) {
+  /**
+   * ★ 停用帳號要過 peer guard（2026-09-03 修正）。
+   *
+   * 呢個係繞過「只能加不能減」嘅**第三條路**。停用唔係改 role，
+   * 但效果一樣致命：checkActionPermission_（L1935-1937）會拒絕
+   * approved=false 嘅帳號做任何需要 feature 嘅操作，所以管理員一旦
+   * 停用咗旅長：
+   *   ・旅長做唔到 transferTroopLeader（要現任旅長發起）
+   *   ・管理員自己又唔可以升做旅長（不可指派角色）
+   * → 全旅領導層永久癱瘓，要人手改 Sheet 先至救得返。
+   *
+   * 實測証明（scripts/check-gs-roles.mjs C3 節，經 doGet 驅動）：
+   *   {action:'toggleUser', userId:'u_tl', operatedBy:'u_admin'}
+   *   → success=true，旅長 approved 變 false。
+   *
+   * 受保護對象同 role 一樣 = 管理員 ＋ 旅長（checkAdminPeerGuard_ 內部判斷）。
+   * 停用團長／支部領袖／成員照舊可以，唔會誤擋正常帳號管理。
+   */
+  var peer = checkAdminPeerGuard_(p, 'toggle');
+  if (peer) return peer;
   var users = readTable_('Users');
   var user = users.filter(function (u) { return getField_(u, 'userId') === p.userId; })[0];
   if (!user) return { success: false, error: '找不到使用者' };
@@ -3079,7 +3533,7 @@ function canBatchManage_(operatedBy) {
   var users = mapUsers_();
   var operator = users.filter(function (u) { return u.id === operatedBy; })[0];
   if (!operator) return false;
-  return ['super_admin', 'troop_super', 'admin', 'group_leader', 'branch_leader'].indexOf(operator.role) >= 0;
+  return ['super_admin', 'troop_leader', 'admin', 'group_leader', 'branch_leader'].indexOf(operator.role) >= 0;
 }
 
 function handleBatchCreateUsers_(p) {
@@ -3100,7 +3554,9 @@ function handleBatchCreateUsers_(p) {
     if (id) existingIds[id] = true;
   });
 
-  var allowedRoles = ['troop_super', 'admin', 'group_leader', 'branch_leader', 'coach', 'parent', 'member'];
+  // ★ 唔包 troop_leader：旅長全旅只有一個（＝最早建立嘅管理員），
+  //   只可以經 bootstrap 或者「交接旅長」交換按鈕產生，唔可以批量開戶。
+  var allowedRoles = ['admin', 'group_leader', 'branch_leader', 'coach', 'parent', 'member'];
   var created = 0, skipped = 0, linkedChildren = 0, createdChildren = 0;
   var errors = [];
 
@@ -3114,7 +3570,9 @@ function handleBatchCreateUsers_(p) {
     if (!name || !email) { skipped++; errors.push('第 ' + rowNo + ' 行：缺少姓名或 Email'); return; }
     if (existingEmails[emailKey]) { skipped++; errors.push('第 ' + rowNo + ' 行：Email 已存在（' + email + '）'); return; }
     if (allowedRoles.indexOf(role) < 0) role = 'parent';
-    if (role === 'troop_super' && operatedBy !== 'system' && operatedBy !== 'staff_token' && TECH_TEST_ACCOUNTS_.indexOf(operatedBy) < 0) role = 'admin';
+    // ★ 第二道防線：就算有人繞過 allowedRoles 直接塞 troop_leader，都降級做 admin。
+    //   旅長只可以經 bootstrap 或 transferTroopLeader 產生。
+    if (isNonAssignableRole_(role)) role = 'admin';
 
     var id = raw.userId ? String(raw.userId).trim() : uid_('u');
     while (existingIds[id]) id = uid_('u');
@@ -3192,18 +3650,153 @@ function handleBatchCreateMembers_(p) {
 }
 
 function handleUpdateUserRole_(p) {
+  /**
+   * ★ 「只能加不能減」：admin 唔可以改其他管理員／旅長嘅角色。
+   *
+   * ★★ 守衛必须**無條件**執行（2026-09-03 修正）。
+   *
+   *   原本係：
+   *     if (String(p.field || '').toLowerCase() !== 'role') { peer guard }
+   *   —— 即係 client 只要多送一個 `field=role` 就可以跳過守衛。
+   *
+   *   實測証明（scripts/check-gs-roles.mjs，經 doGet 驅動）：
+   *     {action:'updateUserRole', userId:'u_tl', role:'member', field:'role'}
+   *     → success=true，旅長被降級做 member。
+   *
+   *   呢個係 §11 漏洞嘅繞過路徑。後果特別嚴重：冇任何 API 路徑可以還原旅長
+   *   （transferTroopLeader 要現任旅長發起），所以全旅領導層會永久癱瘓。
+   *
+   *   `p.field` 係 handleUpdateUserField_（見下面）先用嘅參數，喺呢個
+   *   **無條件寫 role** 嘅 handler 入面根本冇意義 —— 條件係寫反咗。
+   *   mock 側（lib/mockServer.ts:1109）一直都係無條件，所以呢個係前後端落差。
+   */
+  var peer = checkAdminPeerGuard_(p, 'role');
+  if (peer) return peer;
   updateCellByName_('Users', 'userId', p.userId, 'role', p.role || 'member');
   writeAudit_(p.operatedBy || 'system', 'updateUserRole', 'Users', p.userId, 'role=' + (p.role || ''));
   return { success: true };
 }
 
+/**
+ * 交接旅長 —— **交換職位**，唔係單向指派。
+ *
+ * 用戶決定（2026-09-03）：旅長全旅只有一個 ＝ 最早建立嘅管理員。
+ * 交接方式係「我係旅長，將自己職位同另一人交換」，對象**可以是支部領袖**，
+ * 唔一定係管理員。所以呢度做真正嘅對調：
+ *   ・對方 → troop_leader
+ *   ・現任旅長 → 對方原本嘅角色 **＋ 對方原本嘅支部**
+ *
+ * 點解連 branchId 一齊換：如果淨係換 role，旅長（全旅級，通常冇 branchId）
+ * 會變成一個「冇支部嘅支部領袖」—— 乜都管唔到，等於帳號壞咗。
+ * 交換先至符合「交換職位」嘅語義。
+ *
+ * 呢個係唯一可以產生 troop_leader 嘅 API 路（另一個係 bootstrap），
+ * 所以 checkActionPermission_ 嘅不可指派守衛對佢有豁免 —— 守衛喺呢度自己驗
+ * 「操作者係咪現任旅長」。
+ */
+function handleTransferTroopLeader_(p) {
+  var operatedBy = String(p.operatedBy || '');
+  var targetId = String(p.targetUserId || '');
+  if (!operatedBy) return { success: false, error: '未能識別操作者身份，請重新登入' };
+  if (!targetId) return { success: false, error: '請選擇要交接給誰' };
+  if (operatedBy === targetId) return { success: false, error: '不可以交接給自己' };
+
+  var users = mapUsers_();
+  var op = users.filter(function (u) { return u.id === operatedBy; })[0];
+  var target = users.filter(function (u) { return u.id === targetId; })[0];
+  if (!op) return { success: false, error: '找不到操作者帳號，請重新登入' } ;
+  if (!target) return { success: false, error: '找不到該用戶' };
+  if (target.role === 'super_admin') return { success: false, error: '技術測試帳號不可以成為旅長。' };
+
+  // ★ 交接對象限「領袖層」：管理員／團長／支部領袖／教練員（用戶決定 2026-09-03）。
+  //
+  //   之前後端只擋 super_admin，即係**成员／家長都可以做旅長** —— 而前端條
+  //   「👑 交接旅長」掣只出現喺帳戶表（`app/admin/users/page.tsx` L676 刻意排除
+  //   member／parent），所以經 UI 永遠交接唔到成員。實測證實呢個落差：
+  //   `transferTroopLeader targetUserId=u_m4`（成年成員）回 success=true。
+  //
+  //   旅長係全旅最高權限，交俾一個未成年成員顯然唔合理，所以**收緊後端對齊 UI**
+  //   （而唔係放寬 UI）—— 前端守衛唔等於後端守衛，operatedBy 係前端傳上嚟嘅。
+  var tRole = String(target.role || '').toLowerCase();
+  if (tRole === 'member' || tRole === 'parent') {
+    writeAudit_(operatedBy, 'DENIED:transferTroopLeader', 'Security', '',
+      '試圖交接旅長俾 ' + tRole + '（' + targetId + '）—— 只准領袖層');
+    return {
+      success: false,
+      error: '只可以交接俾管理員／團長／支部領袖／教練員。' +
+        (tRole === 'parent' ? '家長' : '成員') + '帳號唔可以成為旅長。',
+    };
+  }
+
+  // 系統內建帳號（技術測試）可以代做交接；否則操作者必須係現任旅長
+  var isSystem = TECH_TEST_ACCOUNTS_.indexOf(operatedBy) >= 0 ||
+    operatedBy === 'system' || operatedBy === 'staff_token';
+  if (!isSystem && op.role !== 'troop_leader') {
+    writeAudit_(operatedBy, 'DENIED:transferTroopLeader', 'Security', '',
+      'role=' + op.role + ' 試圖交接旅長（唔係現任旅長）');
+    return { success: false, error: '只有現任旅長可以交接旅長職位。' };
+  }
+
+  var oldRole = String(target.role || 'member');
+  var oldBranch = String(target.branchId || '');
+  var opBranch = String(op.branchId || '');
+
+  // 對方接手旅長（旅長係全旅級，唔綁支部）
+  updateCellByName_('Users', 'userId', targetId, 'role', 'troop_leader');
+  updateCellByName_('Users', 'userId', targetId, 'branchId', '');
+
+  // 現任旅長接手對方原本嘅職位（角色＋支部）；系統帳號冇 Users 列，跳過
+  if (!isSystem) {
+    updateCellByName_('Users', 'userId', operatedBy, 'role', oldRole);
+    updateCellByName_('Users', 'userId', operatedBy, 'branchId', oldBranch);
+  }
+
+  writeAudit_(operatedBy, 'transferTroopLeader', 'Users', targetId,
+    '旅長交接（交換職位）：' + operatedBy + ' ⇄ ' + targetId +
+    '；對方原角色=' + oldRole + (oldBranch ? '@' + oldBranch : '') +
+    '，旅長原支部=' + (opBranch || '（全旅）'));
+
+  return {
+    success: true,
+    message: isSystem
+      ? '已把旅長職位交接給對方。'
+      : '已交接旅長職位。你而家嘅角色係「' + oldRole + '」' +
+        (oldBranch ? '（' + oldBranch + ' 支部）' : '') + '。',
+  };
+}
+
 function handleUpdateUserField_(p) {
+  /**
+   * ★ field='role' 時要過 peer guard（2026-09-03 修正）。
+   *
+   * 呢個 handler 係萬用寫入（`updateCellByName_(…, p.field, p.value)`），
+   * 所以 `field='role'` 時佢會**直接寫 role** —— 等同 updateUserRole，
+   * 但原本**完全冇 peer guard**，等於第二條繞過「只能加不能減」嘅路。
+   *
+   * 實測証明（scripts/check-gs-roles.mjs C2 節，經 doGet 驅動）：
+   *   {action:'updateUserField', userId:'u_tl', field:'role', value:'member'}
+   *   → success=true，旅長被降級做 member。
+   *
+   * checkActionPermission_ 經 requestedRole_（L1905）只擋**保留角色**
+   * （super_admin）同**不可指派角色**（troop_leader）；降級做 `member`
+   * 係合法角色，所以攔唔到。後果同 updateUserRole 嗰條一樣嚴重：
+   * 冇 API 路徑可以還原旅長，全旅領導層永久癱瘓。
+   *
+   * 非 role 欄位（branchId／name 等）唔受限，避免誤擋正常編輯。
+   */
+  if (String(p.field || '').trim().toLowerCase() === 'role') {
+    var peer = checkAdminPeerGuard_(p, 'role');
+    if (peer) return peer;
+  }
   updateCellByName_('Users', 'userId', p.userId, p.field, p.value || '');
   writeAudit_(p.operatedBy || 'system', 'updateUserField', 'Users', p.userId, p.field + '=' + (p.value || ''));
   return { success: true };
 }
 
 function handleDeleteUser_(p) {
+  // ★ 「只能加不能減」：admin 唔可以刪其他管理員嘅帳號
+  var peer = checkAdminPeerGuard_(p, 'delete');
+  if (peer) return peer;
   var idx = findRowIndexById_('Users', 'userId', p.userId);
   if (idx < 0) return { success: false, error: '找不到使用者' };
   getSheet_('Users').deleteRow(idx + 1);
@@ -3286,7 +3879,7 @@ function handleImportBookmark_(p) {
     if (includeLeader) {
       users.forEach(function(u) {
         var r = String(getField_(u, 'role')).toLowerCase();
-        if (['admin','super_admin','troop_super','group_leader','branch_leader','coach'].indexOf(r) >= 0) {
+        if (['admin','super_admin','troop_leader','group_leader','branch_leader','coach'].indexOf(r) >= 0) {
           targetList.push(getField_(u, 'userId'));
         }
       });
@@ -3516,7 +4109,7 @@ function getEventReplies(p) {
     var users = readTable_('Users');
     var requester = users.filter(function(u){return getField_(u,'userId')===userId;})[0];
     var role = requester ? String(getField_(requester,'role')).toLowerCase() : '';
-    if (role !== 'super_admin' && role !== 'troop_super' && role !== 'admin') {
+    if (role !== 'super_admin' && role !== 'troop_leader' && role !== 'admin') {
       var reqBranchId = getField_(requester,'branchId') || '';
       if (reqBranchId) {
         filtered = filtered.filter(function(r) { return getField_(r,'branchId') === reqBranchId; });
@@ -3728,7 +4321,7 @@ function handleUpdateUserPermissions_(p) {
     var users = mapUsers_();
     var operator = users.filter(function(u){return u.id === operatedBy;})[0];
     var opRole = operator ? operator.role : '';
-    if (opRole !== 'admin' && opRole !== 'super_admin' && opRole !== 'troop_super') {
+    if (opRole !== 'admin' && opRole !== 'super_admin' && opRole !== 'troop_leader') {
       return { success: false, error: '你沒有權限修改功能授權。' };
     }
   }
@@ -3914,7 +4507,7 @@ function getAnnouncements(p) {
   if (user) {
     var role = String(getField_(user, 'role')).toLowerCase();
     var branchId = getField_(user, 'branchId') || '';
-    if (role !== 'super_admin' && role !== 'troop_super' && role !== 'admin') {
+    if (role !== 'super_admin' && role !== 'troop_leader' && role !== 'admin') {
       announcements = announcements.filter(function(a) {
         var scope = String(getField_(a, 'scope')).toLowerCase();
         var aBranch = getField_(a, 'branchId') || '';
@@ -4482,7 +5075,7 @@ function resolveAttendanceCaller_(p) {
 
 function canMarkAttendance_(caller) {
   if (!caller) return false;
-  return ['super_admin', 'troop_super', 'troop_leader', 'admin', 'group_leader', 'branch_leader', 'coach'].indexOf(caller.role) >= 0;
+  return ['super_admin', 'troop_leader', 'admin', 'group_leader', 'branch_leader', 'coach'].indexOf(caller.role) >= 0;
 }
 
 function patrolNameById_(patrols, patrolId) {

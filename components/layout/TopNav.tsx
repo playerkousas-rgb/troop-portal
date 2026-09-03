@@ -4,7 +4,7 @@ import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { isMockMode } from '@/lib/mock';
 import { isAdmin, ROLE_LABEL, Role } from '@/lib/model';
-import { clearSession, getSession } from '@/lib/session';
+import { clearSession, dashboardFor, getSession } from '@/lib/session';
 import { useConfirm, kv } from '@/components/ConfirmProvider';
 
 /**
@@ -31,12 +31,11 @@ export default function TopNav() {
   }, [pathname]);
 
   const admin = isAdmin(user?.role as Role);
-  const home =
-    user?.role === 'parent' ? '/parent' :
-    user?.role === 'member' ? '/member' :
-    admin ? '/admin' :
-    user?.role === 'group_leader' || user?.role === 'branch_leader' || user?.role === 'coach' ? '/leader' :
-    '/calendar';
+  // 所有領袖（管理員／團長／支部領袖／教練員）嘅主頁＝同一個「管理中心」（/admin）
+  const home = user ? dashboardFor(user.role as Role) : '/';
+  // ★ 家長／成員嘅底部 tab bar 已經有「🏠 主頁」直達自己嘅空間，
+  //   右上角再放一個「我的控制台」係重複（用戶要求 #2 #7 #8）→ 呢兩個角色唔顯示。
+  const consoleDup = user?.role === 'parent' || user?.role === 'member';
 
   const isMockPreview = pathname?.startsWith('/dashboard');
   const isHome = pathname === '/';
@@ -98,15 +97,17 @@ export default function TopNav() {
               <>
                 {user ? (
                   <>
-                    {/* 身份顯示（點擊回控制台） */}
-                    <Link href={home} title="我的控制台"
-                      className="flex items-center gap-1.5 no-underline text-slate-700 bg-slate-100 hover:bg-slate-200 border border-slate-200 px-2.5 py-2 rounded-xl transition">
-                      <span className="text-base" aria-hidden>👤</span>
-                      <span className="font-black text-sm max-w-[7.5rem] truncate">{user.name}</span>
-                    </Link>
-                    {/* 系統設定（右上小圖示，管理員） */}
+                    {/* 身份顯示（點擊回控制台）—— 家長／成員唔顯示，因為底部「🏠 主頁」已經係同一個位置 */}
+                    {!consoleDup && (
+                      <Link href={home} title="我的控制台"
+                        className="flex items-center gap-1.5 no-underline text-slate-700 bg-slate-100 hover:bg-slate-200 border border-slate-200 px-2.5 py-2 rounded-xl transition">
+                        <span className="text-base" aria-hidden>👤</span>
+                        <span className="font-black text-sm max-w-[7.5rem] truncate">{user.name}</span>
+                      </Link>
+                    )}
+                    {/* 系統管理（右上小圖示，只有管理員） */}
                     {admin && (
-                      <Link href="/admin/settings" title="系統設定"
+                      <Link href="/admin/system" title="系統管理（系統設定・操作紀錄・擴充元件）"
                         className="w-10 h-10 flex items-center justify-center rounded-xl text-slate-600 hover:bg-slate-100 hover:text-slate-800 transition">
                         <span className="text-lg" aria-hidden>⚙️</span>
                       </Link>
@@ -139,6 +140,11 @@ export default function TopNav() {
                             </Link>
                             {admin && (
                               <>
+                                {/* 擴充元件只屬管理員（用戶要求 #8 #10 #12）：
+                                    領袖／教練員嘅控制台唔再有「擴充元件」面板 */}
+                                <Link href="/admin/plugins" className="flex items-center gap-2 px-4 py-2.5 text-base text-slate-700 hover:bg-slate-50 no-underline" onClick={() => setShowMenu(false)}>
+                                  <span>🔌</span> 擴充元件
+                                </Link>
                                 <Link href="/marketplace" className="flex items-center gap-2 px-4 py-2.5 text-base text-slate-700 hover:bg-slate-50 no-underline" onClick={() => setShowMenu(false)}>
                                   <span>🧩</span> 元件市場
                                 </Link>
@@ -147,9 +153,12 @@ export default function TopNav() {
                                 </Link>
                               </>
                             )}
-                            <Link href={home} className="flex items-center gap-2 px-4 py-2.5 text-base text-slate-700 hover:bg-slate-50 no-underline" onClick={() => setShowMenu(false)}>
-                              <span>🏠</span> 我的控制台
-                            </Link>
+                            {/* 家長／成員：底部「🏠 主頁」已經係同一個位置，唔重複放（用戶要求 #2 #7 #8） */}
+                            {!consoleDup && (
+                              <Link href={home} className="flex items-center gap-2 px-4 py-2.5 text-base text-slate-700 hover:bg-slate-50 no-underline" onClick={() => setShowMenu(false)}>
+                                <span>🏠</span> 我的控制台
+                              </Link>
+                            )}
                             <div className="border-t border-slate-100 my-1" />
                             <button
                               onClick={logout}

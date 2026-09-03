@@ -6,7 +6,7 @@ import { apiAddLatestNews, apiDeleteLatestNews } from '@/lib/api';
 import { getSession } from '@/lib/session';
 import { useConfirm, kv } from '@/components/ConfirmProvider';
 
-const LEADER_ROLES = ['super_admin', 'troop_super', 'troop_leader', 'admin', 'group_leader', 'branch_leader', 'coach'];
+const LEADER_ROLES = ['super_admin', 'troop_leader', 'admin', 'group_leader', 'branch_leader', 'coach'];
 // 這些頁面不顯示最新消息（未登入／平台資訊頁／MOCK 展示樹）
 const HIDDEN_PATHS = ['/', '/login', '/setup', '/onboard', '/apply', '/downloads', '/troops', '/updates', '/marketplace', '/connectors'];
 
@@ -74,38 +74,57 @@ export default function LatestNewsBar() {
   return (
     <div className="px-3 sm:px-4 pt-2">
       <div className="max-w-6xl mx-auto rounded-2xl border border-amber-200 bg-amber-50/90 shadow-sm overflow-hidden">
+        {/* ★ 多過 1 條就一行一條（用戶要求 #7）：
+            舊版把所有消息塞在同一行做左右捲動，手機上根本睇唔到第 2、3 條。 */}
         <div
-          className="flex items-center gap-2 px-3 py-2 cursor-pointer select-none"
+          className={`flex gap-2 px-3 py-2 select-none ${news.length > 1 ? 'items-start' : 'items-center'} ${isLeader ? 'cursor-pointer' : ''}`}
           onClick={() => { if (isLeader) { setOpen(o => !o); setErr(''); } }}
           title={isLeader ? '點擊加入最新消息（最多 3 條）' : undefined}
         >
           <span className="text-lg leading-none flex-shrink-0" aria-hidden>📣</span>
-          <span className="font-black text-sm text-amber-800 flex-shrink-0 whitespace-nowrap">最新消息</span>
-          <div className="flex-1 min-w-0 flex gap-2 overflow-x-auto whitespace-nowrap [scrollbar-width:none]">
-            {news.length === 0 ? (
-              <span className="text-sm text-amber-700/80">
-                {isLeader ? '按一下條 BAR 加入第一條消息。' : '暫時沒有最新消息。'}
-              </span>
-            ) : (
-              news.map((n, i) => (
-                <span key={n.id} className="flex items-center gap-1 text-sm text-amber-900">
-                  {i > 0 && <span className="text-amber-300 font-bold" aria-hidden>｜</span>}
-                  <span>{n.text}</span>
+          <span className="font-black text-sm text-amber-800 flex-shrink-0 whitespace-nowrap">
+            最新消息{news.length > 1 ? ` · ${news.length} 條` : ''}
+          </span>
+
+          {news.length === 0 ? (
+            <span className="flex-1 min-w-0 text-sm text-amber-700/80">
+              {isLeader ? '按一下條 BAR 加入第一條消息。' : '暫時沒有最新消息。'}
+            </span>
+          ) : news.length === 1 ? (
+            <span className="flex-1 min-w-0 flex items-center gap-1 text-sm text-amber-900">
+              <span className="truncate">{news[0].text}</span>
+              {isLeader && (
+                <button
+                  type="button"
+                  onClick={e => { e.stopPropagation(); remove(news[0].id, news[0].text); }}
+                  className="text-amber-600 hover:text-rose-600 bg-transparent border-0 cursor-pointer px-0.5 flex-shrink-0"
+                  title="刪除"
+                  aria-label="刪除"
+                >✕</button>
+              )}
+            </span>
+          ) : (
+            <ul className="flex-1 min-w-0 m-0 p-0 grid gap-1">
+              {news.map(n => (
+                <li key={n.id} className="flex items-start gap-1.5 text-sm text-amber-900 leading-snug">
+                  <span className="text-amber-400 font-black flex-shrink-0" aria-hidden>•</span>
+                  <span className="flex-1 min-w-0 break-words">{n.text}</span>
                   {isLeader && (
                     <button
                       type="button"
                       onClick={e => { e.stopPropagation(); remove(n.id, n.text); }}
-                      className="text-amber-600 hover:text-rose-600 bg-transparent border-0 cursor-pointer px-0.5"
+                      className="text-amber-600 hover:text-rose-600 bg-transparent border-0 cursor-pointer px-0.5 flex-shrink-0"
                       title="刪除"
                       aria-label="刪除"
                     >✕</button>
                   )}
-                </span>
-              ))
-            )}
-          </div>
+                </li>
+              ))}
+            </ul>
+          )}
+
           {isLeader && (
-            <span className={`text-amber-700 flex-shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} aria-hidden>▼</span>
+            <span className={`text-amber-700 flex-shrink-0 transition-transform ${open ? 'rotate-180' : ''} ${news.length > 1 ? 'mt-0.5' : ''}`} aria-hidden>▼</span>
           )}
         </div>
 

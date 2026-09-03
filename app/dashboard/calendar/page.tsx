@@ -1,5 +1,5 @@
 'use client';
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useConfirm, kv } from '@/components/ConfirmProvider';
 
 /* ═══════════════════════════════════════════════════
@@ -56,7 +56,27 @@ export default function CalendarPage() {
   const [formErr, setFormErr] = useState('');
   const { confirm } = useConfirm();
 
-  const isLeader = ['admin', 'group_leader', 'branch_leader', 'coach'].includes(role);
+  const isLeader = ['troop_leader', 'admin', 'group_leader', 'branch_leader', 'coach'].includes(role);
+
+  /* ═════ 支部可見範圍（對照真實 /calendar・用戶要求 #3 #4）═════
+     管理員要管全旅 → 睇到所有支部；
+     家長／成員／支部領袖／團長 → 只睇到「全旅」＋自己（或子女）支部。
+     家長／成員亦唔需要「會議」（領袖會議）呢個分類。 */
+  const DEMO_MY_BRANCH: Record<string, string> = {
+    parent: '童軍', member: '童軍', group_leader: '深資', branch_leader: '童軍', coach: '童軍', admin: '', troop_leader: '',
+  };
+  // ★ 旅長同管理員一樣管全旅 → 睇到所有支部。
+  //   原本呢度係 `role === 'admin'`，會漏咗旅長（全 repo 審計 flag 咗嘅狹窄比較）。
+  const isAdminRole = role === 'admin' || role === 'troop_leader';
+  const myBranch = DEMO_MY_BRANCH[role] || '';
+  // useCallback：inScope 每次 render 都係新函數，直接放落 useMemo 嘅 deps 會令 memo 失效
+  const inScope = useCallback(
+    (branch: string) => isAdminRole || branch === '全旅' || branch === myBranch,
+    [isAdminRole, myBranch]
+  );
+  const visibleBranches = isAdminRole ? BRANCHES : BRANCHES.filter(b => b === '全旅' || b === myBranch);
+  const isFamily = role === 'parent' || role === 'member';
+  const visibleTags = isFamily ? tags.filter(t => t !== '會議') : tags;
 
   const [exportOpen, setExportOpen] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -110,9 +130,9 @@ export default function CalendarPage() {
   function itemsForDay(day: number) {
     const date = `${year}-${String(mo + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
     const items: { title: string; time?: string; branch: string; cancelled?: boolean }[] = [];
-    events.filter(e => e.date === date && (tagFilter === 'all' || e.tag === tagFilter)).forEach(e => items.push({ title: e.title, time: e.time, branch: e.branch }));
+    events.filter(e => e.date === date && inScope(e.branch) && (tagFilter === 'all' || e.tag === tagFilter) && (!isFamily || e.tag !== '會議')).forEach(e => items.push({ title: e.title, time: e.time, branch: e.branch }));
     if (tagFilter === 'all' || tagFilter === '恆常集會') {
-      meetingItems.filter(m => m.date === date).forEach(m => {
+      meetingItems.filter(m => m.date === date && inScope(m.branch)).forEach(m => {
         if (m.cancelled && !isLeader) return; // 成員唔會睇到已取消嘅集會
         items.push({ title: m.title, time: m.time, branch: m.branch, cancelled: m.cancelled });
       });
@@ -125,13 +145,13 @@ export default function CalendarPage() {
     const rows: { date: string; title: string; time?: string; branch: string; cancelled?: boolean; type: 'event' | 'meeting'; source: 'event' | 'regular'; id: string; location?: string; tag?: string; audience?: string }[] = [];
     for (let d = 1; d <= daysInMonth; d++) {
       const date = `${year}-${String(mo + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-      events.filter(e => e.date === date && (branchFilter === 'all' || e.branch === branchFilter) && (tagFilter === 'all' || e.tag === tagFilter))
+      events.filter(e => e.date === date && inScope(e.branch) && (!isFamily || e.tag !== '會議') && (branchFilter === 'all' || e.branch === branchFilter) && (tagFilter === 'all' || e.tag === tagFilter))
         .forEach(e => rows.push({ date, title: e.title, time: e.time, branch: e.branch, type: e.kind, source: 'event', id: e.id, location: e.location, tag: e.tag, audience: e.audience }));
-      meetingItems.filter(m => m.date === date && (branchFilter === 'all' || m.branch === branchFilter) && (tagFilter === 'all' || tagFilter === '恆常集會'))
+      meetingItems.filter(m => m.date === date && inScope(m.branch) && (branchFilter === 'all' || m.branch === branchFilter) && (tagFilter === 'all' || tagFilter === '恆常集會'))
         .forEach(m => { if (!m.cancelled || isLeader) rows.push({ date, title: m.title, time: m.time, branch: m.branch, type: 'meeting', source: 'regular', id: m.ruleId, cancelled: m.cancelled, tag: '恆常集會' }); });
     }
     return rows;
-  }, [events, meetingItems, branchFilter, tagFilter, year, mo, isLeader]);
+  }, [events, meetingItems, branchFilter, tagFilter, year, mo, isLeader, inScope, isFamily]);
 
   /* ══════════ 管理動作（有權限者先見到按鈕）══════════ */
 
@@ -259,10 +279,10 @@ export default function CalendarPage() {
       {/* Demo 角色切換 */}
       <div className="flex gap-1.5 flex-wrap items-center">
         <span className="text-[13px] text-slate-500 mr-1">Demo：</span>
-        {['parent', 'member', 'group_leader', 'branch_leader', 'admin'].map(r => (
+        {['troop_leader', 'admin', 'group_leader', 'branch_leader', 'parent', 'member'].map(r => (
           <button key={r} onClick={() => { setRole(r); setMsg(''); }}
             className={`text-[13px] px-2 py-0.5 rounded-full border font-bold ${role === r ? 'bg-brand-600 text-white border-brand-600' : 'bg-white text-slate-500 border-slate-200'}`}>
-            {r === 'parent' ? '家長' : r === 'member' ? '成員' : r === 'group_leader' ? '團長' : r === 'branch_leader' ? '支部領袖' : '管理員'}
+            {r === 'troop_leader' ? '旅長' : r === 'parent' ? '家長' : r === 'member' ? '成員' : r === 'group_leader' ? '團長' : r === 'branch_leader' ? '支部領袖' : '管理員'}
           </button>
         ))}
         {isLeader && <span className="text-[13px] text-emerald-700 font-bold">· 你可直接喺本頁管理</span>}
@@ -322,7 +342,7 @@ export default function CalendarPage() {
           className={`text-[13px] px-2.5 py-1 rounded-full font-bold whitespace-nowrap border ${tagFilter === 'all' ? 'bg-slate-700 text-white border-slate-700' : 'bg-white text-slate-600 border-slate-200'}`}>
           🏷️ 全部標籤
         </button>
-        {tags.map(t => (
+        {visibleTags.map(t => (
           <button key={t} onClick={() => setTagFilter(t)}
             className={`text-[13px] px-2.5 py-1 rounded-full font-bold whitespace-nowrap border ${tagFilter === t ? 'bg-slate-700 text-white border-slate-700' : 'bg-white text-slate-600 border-slate-200'}`}>
             {t}
@@ -330,9 +350,9 @@ export default function CalendarPage() {
         ))}
       </div>
 
-      {/* 支部 filter */}
+      {/* 支部 filter（家長／成員／支部領袖／團長：只列全旅＋自己支部） */}
       <div className="flex gap-1 overflow-x-auto pb-1 -mx-1 px-1">
-        {[{ id: 'all', label: '全部' }, ...BRANCHES.map(b => ({ id: b, label: b }))].map(b => (
+        {[{ id: 'all', label: '全部' }, ...visibleBranches.map(b => ({ id: b, label: b }))].map(b => (
           <button key={b.id} onClick={() => setBranchFilter(b.id)}
             className={`text-[13px] px-2.5 py-1 rounded-full font-bold whitespace-nowrap border ${branchFilter === b.id ? 'bg-brand-600 text-white border-brand-600' : 'bg-white text-slate-600 border-slate-200'}`}>
             {b.label}

@@ -15,8 +15,13 @@ const MODULES = [
   { icon: '🎫', title: '報名管理', subtitle: '回覆 · 名額 · 付款', detail: '按活動查看報名名單', href: '/dashboard/admin/registrations', tone: 'violet' },
   { icon: '🤝', title: '會議管理', subtitle: '議程 · 紀錄 · 文件', detail: '領袖會議及相關附件', href: '/dashboard/meetings', tone: 'amber' },
   { icon: '📦', title: '物資管理', subtitle: '清單 · 借用 · 庫存', detail: '審批借用及追蹤歸還', href: '/dashboard/admin/equipment', tone: 'orange' },
-  { icon: '📷', title: '相簿管理', subtitle: '相片 · 分支權限', detail: '查看及管理新加入的活動相簿', href: '/dashboard/admin/albums', tone: 'violet' },
-  { icon: '👤', title: '帳戶管理', subtitle: '成員 · 家長 · 權限', detail: '帳號、角色及支部資料', href: '/dashboard/admin/users', tone: 'slate' },
+  { icon: '📷', title: '相簿管理', subtitle: '相片 · 分支權限', detail: '活動完結後補上相簿連結（通告與相片分開處理）', href: '/dashboard/admin/albums', tone: 'violet' },
+  { icon: '👤', title: '帳戶管理', subtitle: '成員 · 家長 · 權限', detail: '帳號、角色、支部小隊資料及申請審核', href: '/dashboard/admin/users', tone: 'slate' },
+  // 系統管理：由舊版管理中心底部嘅「操作紀錄」小標籤升級而成（用戶要求 #6）
+  // ★ href 指去 hub 頁（同正式版 /admin/system 一致），唔好直指 /dashboard/admin/audit。
+  //   直指 leaf 頁會令 settings／plugins／branches／marketplace／connectors
+  //   全部冇入站連結（用戶永遠到唔到）—— check:links §5 會捉呢類孤兒頁。
+  { icon: '🛠️', title: '系統管理', subtitle: '設定 · 操作紀錄 · 元件', detail: '系統設定、操作紀錄（含審核紀錄）及擴充元件', href: '/dashboard/admin/system', tone: 'slate' },
 ] as const;
 
 const toneStyles: Record<string, string> = {
@@ -61,14 +66,14 @@ export default function MockAdminCenter() {
         </div>
       </section>
 
-      {/* 六大管理項目 */}
+      {/* 管理項目（管理員一共 8 個） */}
       <section className="bg-white rounded-2xl border border-slate-200 p-4 sm:p-5">
         <div className="flex items-start justify-between gap-3 mb-3">
           <div>
             <h2 className="font-bold text-sm text-slate-800 m-0">管理項目</h2>
             <p className="text-[13px] text-slate-500 m-0 mt-1">點擊卡片直接進入管理頁面</p>
           </div>
-          <span className="text-[13px] font-bold text-slate-400">7 個模組</span>
+          <span className="text-[13px] font-bold text-slate-400">{MODULES.length} 個管理項目</span>
         </div>
         <div className="grid grid-cols-2 lg:grid-cols-3 gap-2.5">
           {MODULES.map(module => (
@@ -89,18 +94,9 @@ export default function MockAdminCenter() {
         </div>
       </section>
 
-      {/* 低頻率入口，避免同六大管理混在一起 */}
-      <section className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-        <Link href="/dashboard/admin/applications" className="no-underline text-inherit bg-white border border-slate-200 rounded-xl px-3 py-2.5 hover:border-brand-300 transition">
-          <div className="text-sm">✅</div><div className="font-bold text-[13px] mt-1">批核中心</div><div className="text-[13px] text-slate-500">申請及審批</div>
-        </Link>
-        <Link href="/dashboard/admin/settings" className="no-underline text-inherit bg-white border border-slate-200 rounded-xl px-3 py-2.5 hover:border-brand-300 transition">
-          <div className="text-sm">⚙️</div><div className="font-bold text-[13px] mt-1">系統設定</div><div className="text-[13px] text-slate-500">公開瀏覽及接入</div>
-        </Link>
-        <Link href="/dashboard/admin/members" className="no-underline text-inherit bg-white border border-slate-200 rounded-xl px-3 py-2.5 hover:border-brand-300 transition">
-          <div className="text-sm">🏢</div><div className="font-bold text-[13px] mt-1">支部及小隊</div><div className="text-[13px] text-slate-500">成員分組</div>
-        </Link>
-      </section>
+      {/* ★ 底部嗰排小標籤已移除（用戶要求 #1 #4 #5 #6）：
+          「批核中心」已併入帳戶管理、「系統設定／操作紀錄」已併入系統管理、
+          「支部及小隊」已併入帳戶管理 —— 管理中心只保留清一色嘅管理卡。 */}
     </main>
   );
 }

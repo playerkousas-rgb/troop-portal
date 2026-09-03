@@ -19,7 +19,11 @@
  */
 import type { AppState, Equipment } from './store';
 import type { Role } from './model';
-import { branches as modelBranches } from './model';
+import { branches as modelBranches, MANAGER_ROLES, LEADER_ROLES, normalizeRole } from './model';
+// PublicCardId 係純 type，要用 `import type`：Node 嘅 --experimental-strip-types
+// （npm run check:* 用）唔會自動 elide 混喺 value import 入面嘅 type。
+import { PUBLIC_CARD_IDS, scopeKey, toggleCard, toggleScope, canToggleCard, canToggleScope, normalizeCardId } from './publicScope';
+import type { PublicCardId } from './publicScope';
 import { DEMO_TROOP_KEY, MOCK_TROOP } from './mockConstants';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import path from 'path';
@@ -70,6 +74,23 @@ const seed: AppState = {
     REGISTRY_URL: 'https://troop-router.vercel.app/api/registry.json',
     ANNOUNCEMENT_FOLDER_ID: '',
     MEETINGS_FOLDER_ID: '',
+    // ★ 公開資料三層模型（lib/publicScope.ts）
+    //   第 1 層：管理員開咗邊幾張卡（demo：行事曆＋通告開，相簿未開）
+    //   第 2 層：每張卡嘅內容 scope（troop＝全旅由管理員決定；b*＝各支部由團長決定）
+    /**
+     * ★ 刻意保留**舊** card id 同舊 scope key（2026-09-03 第三張卡由 notices 改成 activities）。
+     *
+     * demo 旅團故意用舊格式 seed，令佢真正行經 normalizeCardId()／openScopes() 嘅
+     * legacy fallback 路徑 —— 呢個正正係 82 旅 live Sheet 嘅實際狀態。
+     * 如果 demo 用新格式，歸一邏輯就永遠唔會被執行到，壞咗都唔會發現。
+     *
+     * 預期行為：前端讀到嘅第三張卡係 `activities`（唔係 `notices`），
+     * 而佢嘅 scope 係 `troop,b2`（由 PUBLIC_SCOPE_NOTICES fallback 讀到）。
+     */
+    PUBLIC_CARDS: 'calendar,notices',
+    PUBLIC_SCOPE_CALENDAR: 'troop,b2,b3',
+    PUBLIC_SCOPE_ALBUMS: 'troop',
+    PUBLIC_SCOPE_NOTICES: 'troop,b2',
   },
   patrols: [
     { id: 'p01', branchId: 'b1', name: 'BEE', short: 'B', memberIds: [], enabled: true, order: 1 },
@@ -85,7 +106,7 @@ const seed: AppState = {
     { id: 'p30', branchId: 'b5', name: 'ROVER', short: 'RV', memberIds: [], enabled: true, order: 1 },
   ],
   members: [
-    { id: 'm01', ymNumber: '3000000001', name: '陳大文', branchId: 'b3', patrolId: 'p12', patrolRole: 'leader', age: 16, dateOfBirth: '2010-06-12', parentUserId: 'u5', active: true },
+    { id: 'm01', ymNumber: '3000000001', name: '陳大文', branchId: 'b3', patrolId: 'p12', patrolRole: 'leader', age: 16, dateOfBirth: '2010-06-12', parentUserId: 'u5', active: true, wantedBadges: 'scout_int_campfire_host|scout_pur_pioneer|scout_srv_first_aider', wantedBadgesAt: '2026-08-28T10:12:00.000Z' },
     { id: 'm02', ymNumber: '3000000002', name: '王小名', branchId: 'b3', patrolId: 'p11', patrolRole: 'member', age: 13, dateOfBirth: '2013-03-01', active: true },
     { id: 'm03', ymNumber: '3000000003', name: '李浩浩', branchId: 'b3', patrolId: 'p10', patrolRole: 'member', age: 15, dateOfBirth: '2011-01-20', active: true },
     { id: 'm04', ymNumber: '3000000004', name: '張磊磊', branchId: 'b3', patrolId: 'p10', patrolRole: 'member', age: 18, dateOfBirth: '2008-11-05', active: true },
@@ -98,10 +119,15 @@ const seed: AppState = {
     { id: 'm11', ymNumber: '3000000011', name: '黃嘉怡', branchId: 'b4', patrolId: 'p21', patrolRole: 'member', age: 19, dateOfBirth: '2007-09-18', active: true },
     { id: 'm12', ymNumber: '3000000012', name: '陳俊傑', branchId: 'b5', patrolId: 'p30', patrolRole: 'member', age: 20, dateOfBirth: '2006-07-22', active: true },
     { id: 'm13', ymNumber: '3000000013', name: '蔡可可', branchId: 'b1', patrolId: 'p02', patrolRole: 'member', age: 7, dateOfBirth: '2019-04-08', parentUserId: 'u9', active: true },
+    // ★ 演示用：同一位家長（u5 王秀蘭）有兩名子女喺**不同支部** ——
+    //   陳大文（b3 童軍・16 歲・可自行報名）＋ 陳小美（b2 幼童軍・9 歲・要家長代報）。
+    //   用嚟示範「家長行事曆只睇到全旅＋子女支部」同「子女表達 ❤️ 有興趣」。
+    { id: 'm14', ymNumber: '3000000014', name: '陳小美', branchId: 'b2', patrolId: 'p2', patrolRole: 'member', age: 9, dateOfBirth: '2017-07-19', parentUserId: 'u5', active: true, wantedBadges: 'cub_astronomer|cub_swimmer|cub_artist', wantedBadgesAt: '2026-08-30T09:05:00.000Z' },
   ],
   users: [
+    // ★ 演示旅團刻意唔設 super_admin 帳戶：超管係系統層級嘅隱藏帳號（真實旅團 GS 先有），
+    //   demo 最高只到「管理員」。避免任何人對住 troop_demo 就攞到 super_admin session。
     { id: 'u_admin', name: '陳堅強', email: 'admin@demo.scout', role: 'admin', approved: true },
-    { id: 'u_super', name: '超級管理員', email: 'sheep@demo.scout', role: 'super_admin', approved: true },
     { id: 'u_tl', name: '周旅長', email: 'tl@demo.scout', role: 'troop_leader', approved: true },
     // 團長 = 某一個團／支部嘅負責人（李偉國 = 深資團 b4 團長）
     { id: 'u_gl', name: '李偉國', email: 'gl@demo.scout', role: 'group_leader', branchId: 'b4', approved: true },
@@ -109,11 +135,13 @@ const seed: AppState = {
     { id: 'u_gl3', name: '陳志明', email: 'gl3@demo.scout', role: 'group_leader', branchId: 'b3', approved: true },
     { id: 'u_bl', name: '黃志遠', email: 'bl@demo.scout', role: 'branch_leader', branchId: 'b3', approved: true },
     { id: 'u_coach', name: '何健', email: 'coach@demo.scout', role: 'coach', approved: true }, // 教練員冇固定支部
-    { id: 'u5', name: '王秀蘭', email: 'parent1@demo.scout', role: 'parent', childMemberIds: ['m01'], approved: true },
+    { id: 'u5', name: '王秀蘭', email: 'parent1@demo.scout', role: 'parent', childMemberIds: ['m01', 'm14'], approved: true },
     { id: 'u9', name: '林國雄', email: 'parent2@demo.scout', role: 'parent', childMemberIds: ['m05', 'm10', 'm13'], approved: true },
     { id: 'u_m1', name: '陳大文', email: 'm01@demo.scout', role: 'member', branchId: 'b3', memberId: 'm01', approved: true },
     { id: 'u_m2', name: '王小名', email: 'm02@demo.scout', role: 'member', branchId: 'b3', memberId: 'm02', approved: true },
     { id: 'u_m4', name: '張磊磊', email: 'm04@demo.scout', role: 'member', branchId: 'b3', memberId: 'm04', approved: true },
+    // 未成年成員（幼童軍）：同一位家長 u5 嘅第二名子女，支部同哥哥唔同（b2 vs b3）
+    { id: 'u_m14', name: '陳小美', email: 'm14@demo.scout', role: 'member', branchId: 'b2', memberId: 'm14', approved: true },
     { id: 'u_m8', name: '周嘉欣', email: 'm08@demo.scout', role: 'member', branchId: 'b4', memberId: 'm08', approved: true },
   ],
   events: [
@@ -125,6 +153,9 @@ const seed: AppState = {
     { id: 'e05', title: '樂行社區服務日', date: '2026-09-20', location: '觀塘邨', scope: 'branch', branchId: 'b5', kind: 'activity', status: 'published', source: '手動新增', targetMemberIds: ['m09', 'm12'], fee: '0' },
     { id: 'e06', title: '深資遠征(兩日一夜)', date: '2026-10-10', location: '西貢麥理浩徑', scope: 'branch', branchId: 'b4', kind: 'activity', status: 'published', source: '手動新增', targetMemberIds: ['m08', 'm11'], fee: '250', paymentUrl: 'https://pay.example.com/e06' },
     { id: 'e07', title: '小童軍親子日', date: '2026-09-13', location: '本中心園地', scope: 'branch', branchId: 'b1', kind: 'activity', status: 'published', source: '手動新增', targetMemberIds: ['m10', 'm13'], fee: '0' },
+    // ★ 全旅活動：同時涵蓋 u5 兩名子女（b3 陳大文 ＋ b2 陳小美），
+    //   示範「一名子女已報名、另一名子女只表達 ❤️ 有興趣」嘅家長視角。
+    { id: 'e08', title: '全旅親子遠足日', date: '2026-09-27', location: '城門水塘（主壩集合）', scope: 'troop', kind: 'activity', status: 'published', source: '手動新增', targetMemberIds: ['m01', 'm14'], fee: '20', noticeUrl: 'https://example.org/circular/troop-family-hike.pdf', noticeFileName: '全旅親子遠足日通告.docx', calendarTag: '遠足' },
   ],
   replies: [
     { id: 'e01_m01', eventId: 'e01', memberId: 'm01', memberName: '陳大文', branchId: 'b3', parentUserId: 'u5', type: 'registered', operatedBy: 'parent', paid: true, updatedAt: '2026-08-20' },
@@ -137,6 +168,10 @@ const seed: AppState = {
     { id: 'e06_m11', eventId: 'e06', memberId: 'm11', memberName: '黃嘉怡', branchId: 'b4', type: 'interested', operatedBy: 'member', updatedAt: '2026-08-26' },
     { id: 'e07_m10', eventId: 'e07', memberId: 'm10', memberName: '鄭蓓蓓', branchId: 'b1', parentUserId: 'u9', type: 'registered', operatedBy: 'parent', updatedAt: '2026-08-27' },
     { id: 'e07_m13', eventId: 'e07', memberId: 'm13', memberName: '蔡可可', branchId: 'b1', parentUserId: 'u9', type: 'registered', operatedBy: 'parent', paid: true, updatedAt: '2026-08-27' },
+    // ★ 子女表達「❤️ 有興趣」（非報名）：家長端會見到呢個狀態，但回覆 ✅／❌ 仍然係家長嘅決定
+    { id: 'e08_m14', eventId: 'e08', memberId: 'm14', memberName: '陳小美', branchId: 'b2', parentUserId: 'u5', type: 'interested', operatedBy: 'member', updatedAt: '2026-09-01' },
+    { id: 'e03_m14', eventId: 'e03', memberId: 'm14', memberName: '陳小美', branchId: 'b2', parentUserId: 'u5', type: 'interested', operatedBy: 'member', updatedAt: '2026-09-01' },
+    { id: 'e08_m01', eventId: 'e08', memberId: 'm01', memberName: '陳大文', branchId: 'b3', parentUserId: 'u5', type: 'registered', operatedBy: 'member', paid: false, updatedAt: '2026-09-01' },
   ],
   bookmarks: [
     { id: 'bm01', title: '第 118 周年童軍週', source: '香港童軍', mode: 'informational', branchTags: ['全旅'], audienceTags: ['全旅'], status: 'published', officialDeadline: '2026-09-01', targetText: '周年紀念活動,各旅自行報名。' },
@@ -264,7 +299,6 @@ function mockLinkChildren(parent: any, children: any): { linked: string[]; creat
 
 const FEATURES: Record<string, string[]> = {
   super_admin: ['branches', 'members', 'applications', 'events', 'registrations', 'attendance', 'meetings', 'library_import', 'notices', 'users', 'permissions', 'settings', 'plugins', 'audit', 'calendar', 'equipment'],
-  troop_super: ['branches', 'members', 'applications', 'events', 'registrations', 'attendance', 'meetings', 'library_import', 'notices', 'users', 'permissions', 'settings', 'plugins', 'audit', 'calendar', 'equipment'],
   admin: ['branches', 'members', 'applications', 'events', 'registrations', 'attendance', 'meetings', 'library_import', 'notices', 'users', 'permissions', 'settings', 'plugins', 'audit', 'calendar', 'equipment'],
   // 旅長：實際職級最高，權限同管理員（管理員 = 代旅長操作嘅「旅內電腦人」）
   troop_leader: ['branches', 'members', 'applications', 'events', 'registrations', 'attendance', 'meetings', 'library_import', 'notices', 'users', 'permissions', 'settings', 'plugins', 'audit', 'calendar', 'equipment'],
@@ -308,7 +342,7 @@ function grantsFor(userId: string) {
   return USER_SCOPED_GRANTS[userId] || [];
 }
 
-const TROOP_WIDE = ['super_admin', 'troop_super', 'troop_leader', 'admin'];
+const TROOP_WIDE = ['super_admin', 'troop_leader', 'admin'];
 
 /**
  * 「旅團自選功能」：預設關閉，由團長自己決定開唔開，唔屬階級權限。
@@ -330,11 +364,49 @@ function findUser(userId: string) {
   return store.users.find(u => u.id === userId) || null;
 }
 
+/**
+ * 「全旅只有一個旅長」不變量（鏡像 GS `enforceSingleTroopLeader_`）。
+ *
+ * ★ 點解 mock 都要有：MOCK 係示範頁，要跟真實行為。真實 82 旅嘅 live Sheet
+ *   可能有多於一行 `role='troop_super'`（喺階梯守衛 56b94de 之前佢係可以經 API
+ *   指派嘅），`normalizeRole()` 會把佢哋全部歸一成 `troop_leader`，
+ *   直接違反「全旅只有一個旅長」。
+ *
+ * 用 `createdAt` 決定邊個先係真旅長：**最早建立嗰個**（＝用戶講嘅「第一個管理員」）。
+ * 其餘降做 `admin` —— 唔係刪除，因為刪除會剝走佢哋所有權限。
+ * 冇 createdAt 嘅排最後；同一時刻用 id 打破平手，令結果**確定**。
+ *
+ * ⚠️ 呢個係**讀入時**修正，唔會寫返 store —— 所以原始資料唔會被靜默改寫。
+ */
+function enforceSingleTroopLeader<T extends { id: string; role: string; createdAt?: string }>(users: T[]): T[] {
+  const tls = users.filter(u => u.role === 'troop_leader');
+  if (tls.length <= 1) return users;
+  const sorted = [...tls].sort((a, b) => {
+    const ca = a.createdAt || '9999-12-31';
+    const cb = b.createdAt || '9999-12-31';
+    if (ca !== cb) return ca < cb ? -1 : 1;
+    return String(a.id) < String(b.id) ? -1 : 1;
+  });
+  const keepId = sorted[0].id;
+  return users.map(u =>
+    (u.role === 'troop_leader' && u.id !== keepId) ? { ...u, role: 'admin' } : u
+  );
+}
+
+/**
+ * 讀入 users 嘅唯一入口 —— 先歸一角色（`troop_super`→`troop_leader`），
+ * 再強制「全旅只有一個旅長」。所有讀 users 嘅位都要經呢度，唔好直接讀 `store.users`。
+ */
+function normalizedUsers() {
+  const mapped = store.users.map(u => ({ ...u, role: normalizeRole(u.role) as Role }));
+  return enforceSingleTroopLeader(mapped);
+}
+
 export function buildMockState(userId: string): AppState {
   const user = findUser(userId);
   const role: Role = (user?.role as Role) || 'guest';
   const branchId = user?.branchId || '';
-  const admin = ['super_admin', 'troop_super', 'troop_leader', 'admin'].includes(role);
+  const admin = ['super_admin', 'troop_leader', 'admin'].includes(role);
   // ★ 可見範圍必須同寫入權限一致：
   //   團長／支部領袖只管自己支部 → 亦只應該睇到自己支部嘅資料
   //   （之前團長 leaderAll=true，寫唔到別團但睇得曬別團成員同家長電話）。
@@ -380,18 +452,19 @@ export function buildMockState(userId: string): AppState {
   else if (isParent) out.equipmentLoans = store.equipmentLoans.filter(l => (user!.childMemberIds || []).includes(l.memberId));
 
   // 使用者
-  if (admin || leaderAll) out.users = [...store.users];
-  else if (leaderBranch) out.users = store.users.filter(u => inScope(u.branchId));
+  const users = normalizedUsers();
+  if (admin || leaderAll) out.users = [...users];
+  else if (leaderBranch) out.users = users.filter(u => inScope(u.branchId));
   // ★ 成員：除咗自己，亦回傳「已連結嘅家長」帳戶 —— 緊急聯絡資料要直接用家長資料
   //   （同 GS buildDashboardCore_ 嘅 member 分支一致）。
-  else if (isMember) out.users = store.users.filter(u =>
+  else if (isMember) out.users = users.filter(u =>
     u.id === user!.id ||
     (u.role === 'parent' && (
       (u.childMemberIds || []).includes(user!.memberId || '') ||
       store.members.some(m => m.id === user!.memberId && m.parentUserId === u.id)
     ))
   );
-  else if (isParent) out.users = store.users.filter(u => u.id === user!.id);
+  else if (isParent) out.users = users.filter(u => u.id === user!.id);
 
   // 活動
   const visibleEvents = (e: typeof store.events[number]) =>
@@ -459,7 +532,7 @@ export function buildMockState(userId: string): AppState {
   }
 
   // 審計
-  if (['super_admin', 'troop_super', 'troop_leader', 'admin'].includes(role)) out.audits = [...store.audits];
+  if (['super_admin', 'troop_leader', 'admin'].includes(role)) out.audits = [...store.audits];
 
   // 最新消息：登入後所有人都見到（最多 3 條）
   if (!guest) out.latestNews = [...store.latestNews];
@@ -584,7 +657,7 @@ function handleSaveAttendance(p: Record<string, any>) {
   //   家長／成員讀得自己嗰支部嘅紀錄，但絕對唔可以寫。
   const writer = findUser(String(p.operatedBy || p.userId || ''));
   const wRole = String((writer as any)?.role || '');
-  if (!['super_admin', 'troop_super', 'troop_leader', 'admin', 'group_leader', 'branch_leader', 'coach'].includes(wRole)) {
+  if (!['super_admin', 'troop_leader', 'admin', 'group_leader', 'branch_leader', 'coach'].includes(wRole)) {
     return { success: false, error: '只有領袖可以點名。' };
   }
   const scope = attendanceBranchScope(p, String(p.branchId || ''));
@@ -746,6 +819,60 @@ function handleRegistrationSummary(p: Record<string, any>) {
 
 const S = (operatedBy: string) => ({ success: true, state: buildMockState(String(operatedBy || '')) });
 
+/**
+ * 「只能加不能減」守衛（同 GS `checkAdminPeerGuard_` 一致）—— 用戶決定 2026-09-03。
+ *
+ * 管理員可以有無數個，但**其他管理員只可以加，唔可以減**：
+ *   ・唔可以更改其他管理員嘅角色
+ *   ・唔可以刪除其他管理員嘅帳號
+ * 要改必須由旅長（全旅唯一）處理。
+ *
+ * @return null = 放行；物件 = 拒絕
+ */
+function checkAdminPeerGuard(
+  operatedBy: string,
+  targetId: string,
+  kind: 'role' | 'delete' | 'toggle'
+): { success: false; error: string } | null {
+  if (!operatedBy) return null;
+  const op = store.users.find(u => u.id === operatedBy);
+  if (!op) return null;
+  // 只有 admin 受限；旅長唔受呢條限制
+  if (String(op.role || '').toLowerCase() !== 'admin') return null;
+  if (!targetId || targetId === operatedBy) return null;
+  const target = store.users.find(u => u.id === targetId);
+  if (!target) return null;
+  const tRole = String(target.role || '').toLowerCase();
+  // ★ 受保護對象 = 管理員 **同旅長**（同 GS checkAdminPeerGuard_ 一致）
+  //   原本只擋「目標係 admin」，但漏咗旅長 —— admin 可以把旅長降級／刪除，
+  //   咁樣全旅就會冇旅長，而且唔可以經 API 修復（交接要現任旅長發起）。
+  //   呢個漏洞係 check:security §11 測出嚟嘅。
+  if (tRole !== 'admin' && tRole !== 'troop_leader') return null;
+
+  const isTL = (tRole === 'troop_leader');
+  /**
+   * ★ 三種受管制操作（2026-09-03 加 'toggle'，同 GS checkAdminPeerGuard_ 一致）。
+   *   'toggle' = 停用／啟用帳號。停用唔係改 role，但效果一樣致命
+   *   （停用咗嘅旅長做唔到 transferTroopLeader），所以一樣要擋。
+   */
+  const verb = kind === 'delete' ? '刪除' : (kind === 'toggle' ? '停用' : '更改');
+  const noun = kind === 'role' ? '角色' : '帳號';
+  const act = kind === 'delete' ? 'deleteUser'
+    : (kind === 'toggle' ? 'toggleUser' : 'updateUserRole');
+  logAudit(operatedBy, 'DENIED:' + act, 'Security', '',
+    `admin 試圖${verb}${isTL ? '旅長' : '另一個管理員'}嘅${noun}（只能加不能減）`);
+  if (isTL) {
+    return {
+      success: false,
+      error: `旅長係全旅最高權限，管理員唔可以${verb}旅長嘅${noun}。要換旅長請由現任旅長用「交接旅長」。`,
+    };
+  }
+  return {
+    success: false,
+    error: `管理員之間只能加不能減：不可以${verb}其他管理員嘅${noun}，請由旅長處理。`,
+  };
+}
+
 /** 寫入操作紀錄（審核紀錄與操作紀錄合併在同一份，前端再分類） */
 function logAudit(userId: string, action: string, entity: string, entityId: string, detail: string) {
   store.audits.unshift({
@@ -870,6 +997,76 @@ function handleMutate(action: string, p: Record<string, any>) {
       if (i >= 0) Object.assign(store.members[i], Object.fromEntries(Object.entries(p).filter(([k]) => !['action', 'operatedBy', 'memberId'].includes(k))));
       return S(ob);
     }
+    case 'setWantedBadges': {
+      // 成員自助：只容許本人／其家長／有 members 權限嘅領袖（checkMockPermission 唔管呢個 action）
+      const i = findIdx(store.members, 'id', String(p.memberId || ''));
+      if (i < 0) return { success: false, error: '找不到成員' };
+      const me = store.members[i];
+      const opUser = store.users.find(u => u.id === String(p.operatedBy || ''));
+      const opRole = String(opUser?.role || '');
+      // ★ 用共用常數：MANAGER_ROLES（管理層）＋ LEADER_ROLES（團長／支部領袖／教練員）。
+      //   唔好手寫角色清單 —— 之前寫漏 group_leader／branch_leader 令支部領袖都登記唔到。
+      const isLeader = (MANAGER_ROLES as string[]).includes(opRole) || (LEADER_ROLES as string[]).includes(opRole);
+      const isSelf = String(opUser?.memberId || '') === me.id;
+      const isParent = String(me.parentUserId || '') === String(p.operatedBy || '');
+      if (!isLeader && !isSelf && !isParent) return { success: false, error: '只可以登記自己（或自己子女）想考的章。' };
+      if (me.branchId !== 'b2' && me.branchId !== 'b3' && !isLeader) {
+        return { success: false, error: '你嘅支部冇「想考的章」選單，請直接同領袖講。' };
+      }
+      me.wantedBadges = String(p.wantedBadges || '').slice(0, 2000);
+      me.wantedBadgesAt = new Date().toISOString();
+      logAudit(ob, 'setWantedBadges', '成員', me.id, me.wantedBadges ? (me.wantedBadges.split(/[|,;]/).filter(Boolean).length + ' 個章') : '（清空）');
+      return S(ob);
+    }
+    /* ═══ 公開資料：第 1 層（管理員開／關卡片）═══ */
+    case 'setPublicCard': {
+      // ★ 先歸一再驗證（鏡像 GS）：舊 client 可能仍送 `notices`（第三張卡嘅舊 id）。
+      const card = normalizeCardId(String(p.card || '')) as PublicCardId;
+      if (!PUBLIC_CARD_IDS.includes(card)) return { success: false, error: '未知的卡片' };
+      const opUser = store.users.find(u => u.id === String(p.operatedBy || ''));
+      if (!opUser) return { success: false, error: '未能確認操作者身份，請重新登入。' };
+      if (!canToggleCard(String(opUser.role || ''))) return { success: false, error: '只有管理層可以開放公開資料卡片。' };
+      const on = ['true', 'TRUE', '1', 'yes'].includes(String(p.enabled));
+      const key = scopeKey(card) as keyof typeof store.config;
+      // ★ 舊 card id 歸一：store 入面可能仍寫住 'calendar,notices'（demo seed 刻意保留舊格式，
+      //   82 旅 live Sheet 亦係咁）。唔歸一嘅話「關閉活動卡」會刪唔到 → 張卡關唔到。
+      const cardsNorm = store.config.PUBLIC_CARDS.split(',')
+        .map((c: string) => normalizeCardId(c.trim())).filter(Boolean)
+        .filter((c: string, i: number, a: string[]) => a.indexOf(c) === i).join(',');
+      let scopeCur = String(store.config[key] || '');
+      if (!scopeCur && card === 'activities' && (store.config as any).PUBLIC_SCOPE_NOTICES) {
+        scopeCur = String((store.config as any).PUBLIC_SCOPE_NOTICES);
+      }
+      const r = toggleCard(cardsNorm, scopeCur, card, on);
+      store.config.PUBLIC_CARDS = r.cards;
+      (store.config as any)[key] = r.scopes;
+      logAudit(ob, 'setPublicCard', 'SystemConfig', card, on ? '開放卡片' : '關閉卡片');
+      return S(ob);
+    }
+    /* ═══ 公開資料：第 2 層（內容 scope：troop 由管理員，支部由該支部團長）═══ */
+    case 'setPublicScope': {
+      const scope = String(p.scope || '');
+      // ★ 先歸一再驗證（鏡像 GS）：舊 client 可能仍送 `notices`（第三張卡嘅舊 id）。
+      const card = normalizeCardId(String(p.card || '')) as PublicCardId;
+      if (!PUBLIC_CARD_IDS.includes(card)) return { success: false, error: '未知的卡片' };
+      if (!scope) return { success: false, error: '缺少範圍' };
+      const opUser = store.users.find(u => u.id === String(p.operatedBy || ''));
+      if (!opUser) return { success: false, error: '未能確認操作者身份，請重新登入。' };
+      if (!canToggleScope(String(opUser.role || ''), opUser.branchId, scope)) {
+        return { success: false, error: scope === 'troop' ? '全旅內容只可以由管理層決定公唔公開。' : '只可以開放自己支部嘅內容。' };
+      }
+      const key = scopeKey(card);
+      const on = ['true', 'TRUE', '1', 'yes'].includes(String(p.enabled));
+      let cur = String((store.config as any)[key] || '');
+      // ★ 舊 key fallback（鏡像 GS）：live Sheet／demo seed 入面係 PUBLIC_SCOPE_NOTICES。
+      //   新 key 未寫過就要讀舊 key，否則各支部已設定嘅公開範圍會喺第一次寫入時全部消失。
+      if (!cur && card === 'activities' && (store.config as any).PUBLIC_SCOPE_NOTICES) {
+        cur = String((store.config as any).PUBLIC_SCOPE_NOTICES);
+      }
+      (store.config as any)[key] = toggleScope(cur, scope, on);
+      logAudit(ob, 'setPublicScope', 'SystemConfig', card + '/' + scope, on ? '公開' : '取消公開');
+      return S(ob);
+    }
     case 'deleteMember': store.members = store.members.filter(m => m.id !== p.memberId); return S(ob);
     case 'linkParent': {
       const i = findIdx(store.members, 'id', String(p.memberId || ''));
@@ -907,10 +1104,89 @@ function handleMutate(action: string, p: Record<string, any>) {
       });
       return S(ob);
     }
-    case 'deleteUser': store.users = store.users.filter(u => u.id !== p.userId); return S(ob);
-    case 'toggleUser': { const i = findIdx(store.users, 'id', String(p.userId || '')); if (i >= 0) store.users[i].approved = !store.users[i].approved; return S(ob); }
-    case 'updateUserRole': { const i = findIdx(store.users, 'id', String(p.userId || '')); if (i >= 0) store.users[i].role = p.role as Role; return S(ob); }
+    case 'deleteUser': {
+      // ★ 「只能加不能減」（同 GS checkAdminPeerGuard_ 一致）
+      const peer = checkAdminPeerGuard(ob, String(p.userId || ''), 'delete');
+      if (peer) return peer;
+      store.users = store.users.filter(u => u.id !== p.userId);
+      return S(ob);
+    }
+    case 'toggleUser': {
+      /**
+       * ★ 停用帳號要過 peer guard（2026-09-03 修正，同 GS handleToggleUser_ 一致）。
+       *
+       * 呢個係繞過「只能加不能減」嘅第三條路。停用唔係改 role，但效果一樣致命：
+       * 停用咗嘅帳號過唔到 checkActionPermission_ 嘅 approved 檢查，所以管理員
+       * 一旦停用咗旅長 → 旅長做唔到 transferTroopLeader、管理員又唔可以自己升做
+       * 旅長 → 全旅領導層永久癱瘓。
+       */
+      const peer = checkAdminPeerGuard(ob, String(p.userId || ''), 'toggle');
+      if (peer) return peer;
+      const i = findIdx(store.users, 'id', String(p.userId || ''));
+      if (i >= 0) store.users[i].approved = !store.users[i].approved;
+      return S(ob);
+    }
+    case 'updateUserRole': {
+      // ★ 「只能加不能減」（同 GS checkAdminPeerGuard_ 一致）
+      const peer = checkAdminPeerGuard(ob, String(p.userId || ''), 'role');
+      if (peer) return peer;
+      const i = findIdx(store.users, 'id', String(p.userId || ''));
+      if (i >= 0) store.users[i].role = p.role as Role;
+      return S(ob);
+    }
+    // ★ 交接旅長 —— **交換職位**（同 GS handleTransferTroopLeader_ 一致）
+    //   旅長全旅只有一個；交接係「我同另一人對調」，對象可以是支部領袖，
+    //   所以角色＋支部一齊換（否則旅長會變成冇支部嘅支部領袖）。
+    case 'transferTroopLeader': {
+      const opId = String(p.operatedBy || '');
+      const targetId = String(p.targetUserId || '');
+      if (!opId) return { success: false, error: '未能識別操作者身份，請重新登入' };
+      if (!targetId) return { success: false, error: '請選擇要交接給誰' };
+      if (opId === targetId) return { success: false, error: '不可以交接給自己' };
+      const op = store.users.find(u => u.id === opId);
+      const target = store.users.find(u => u.id === targetId);
+      if (!op) return { success: false, error: '找不到操作者帳號，請重新登入' };
+      if (!target) return { success: false, error: '找不到該用戶' };
+      if (target.role === 'super_admin') return { success: false, error: '技術測試帳號不可以成為旅長。' };
+      // ★ 交接對象限「領袖層」（同 GS handleTransferTroopLeader_ 一致，用戶決定 2026-09-03）
+      //   前端條掣只出現喺帳戶表（排除 member／parent），所以後端要對齊 ——
+      //   否則經 API 直接砌 request 就可以把旅長交俾一個未成年成員。
+      const tRole = String(target.role || '').toLowerCase();
+      if (tRole === 'member' || tRole === 'parent') {
+        logAudit(opId, 'DENIED:transferTroopLeader', 'Security', '',
+          `試圖交接旅長俾 ${tRole}（${targetId}）—— 只准領袖層`);
+        return {
+          success: false,
+          error: `只可以交接俾管理員／團長／支部領袖／教練員。${tRole === 'parent' ? '家長' : '成員'}帳號唔可以成為旅長。`,
+        };
+      }
+      if (op.role !== 'troop_leader') {
+        logAudit(opId, 'DENIED:transferTroopLeader', 'Security', '', `role=${op.role} 試圖交接旅長（唔係現任旅長）`);
+        return { success: false, error: '只有現任旅長可以交接旅長職位。' };
+      }
+      const oldRole = target.role;
+      const oldBranch = target.branchId || '';
+      target.role = 'troop_leader';
+      target.branchId = '';
+      op.role = oldRole;
+      op.branchId = oldBranch;
+      logAudit(opId, 'transferTroopLeader', 'Users', targetId,
+        `旅長交接（交換職位）：${opId} ⇄ ${targetId}；對方原角色=${oldRole}${oldBranch ? '@' + oldBranch : ''}`);
+      return { success: true, message: `已交接旅長職位。你而家嘅角色係「${oldRole}」${oldBranch ? `（${oldBranch} 支部）` : ''}。` };
+    }
     case 'updateUserField': {
+      /**
+       * ★ field='role' 時要過 peer guard（2026-09-03 修正，同 GS 一致）。
+       *
+       * 呢個 case 係萬用寫入，所以 field='role' 時佢會直接寫 role ——
+       * 等同 updateUserRole，但原本完全冇 peer guard，等於第二條繞過
+       * 「只能加不能減」嘅路（管理員可以把旅長／其他管理員降級做 member）。
+       * GS 側 handleUpdateUserField_ 同一個洞已一併修正。
+       */
+      if (String(p.field || '').trim().toLowerCase() === 'role') {
+        const peer = checkAdminPeerGuard(ob, String(p.userId || ''), 'role');
+        if (peer) return peer;
+      }
       const i = findIdx(store.users, 'id', String(p.userId || ''));
       if (i >= 0 && p.field) (store.users[i] as any)[p.field] = String(p.value ?? '');
       return S(ob);
@@ -1012,6 +1288,19 @@ function handleMutate(action: string, p: Record<string, any>) {
       }
       return S(ob);
     }
+    /**
+     * ★ MOCK 呢度係刻意 no-op（唔寫密碼）—— 亦正正係點解 GS 嗰個洞
+     *   隱形咗咁耐：demo 側永遠唔會觸發改密碼嘅行為。
+     *
+     * GS `handleUpdatePassword_` 原本用 `p.userId || p.operatedBy` 決定改邊個，
+     * 冇任何守衛，而且 updatePassword 唔喺 ACTION_REQUIRED_FEATURE_
+     * → 完全冇權限檢查 → 連普通成員都可以設旅長嘅密碼，
+     *   然後直接登入做旅長，令所有 peer guard 形同虛設。
+     * 已喺 GS 側修正（要求管理層 ＋ checkAdminPeerGuard_(p,'password')）。
+     * 驗證：scripts/check-gs-roles.mjs C4 節（經 doGet 真正執行 GS）。
+     *
+     * 如果日後要令 mock 真係寫密碼，**必须一併加返同一個守衛**。
+     */
     case 'updatePassword': return S(ob);
     case 'updateUserPermissions':
     case 'grantFeature':
@@ -1212,9 +1501,16 @@ function handleMutate(action: string, p: Record<string, any>) {
       }
       return S(ob);
     }
-    case 'applyJoin':
-      store.applications.unshift({ id: uid('ap'), type: (p.type || 'parent') as any, name: String(p.name || ''), email: String(p.email || ''), role: (p.role || 'parent') as Role, branchId: String(p.branchId || ''), ymNumbers: String(p.ymNumbers || ''), status: 'pending', createdAt: new Date().toISOString().slice(0, 10) });
+    case 'applyJoin': {
+      // ★ 保留角色守衛（同 GS handleApplyJoin_ 一致）：公開表單唔准存入 super_admin
+      let applyRole = String(p.role || 'parent');
+      if (isReservedRole(applyRole)) {
+        logAudit('anonymous', 'SANITIZE:applyJoin', 'Security', '', `公開申請要求保留角色 ${applyRole}，已降級為 parent`);
+        applyRole = 'parent';
+      }
+      store.applications.unshift({ id: uid('ap'), type: (p.type || 'parent') as any, name: String(p.name || ''), email: String(p.email || ''), role: applyRole as Role, branchId: String(p.branchId || ''), ymNumbers: String(p.ymNumbers || ''), status: 'pending', createdAt: new Date().toISOString().slice(0, 10) });
       return { success: true, message: '(演示) 申請已收到,管理員會在演示後台看到。' };
+    }
     // 圖書館
     case 'importBookmark':
       store.bookmarks.push({ id: uid('bm'), title: String(p.title || ''), source: String(p.source || ''), mode: (p.mode || 'informational') as any, status: 'published', branchTags: String(p.branchTags || '全旅').split(','), audienceTags: String(p.audienceTags || '全旅').split(','), fee: String(p.fee || ''), paymentUrl: String(p.paymentUrl || ''), officialDeadline: String(p.officialDeadline || ''), internalDeadline: String(p.internalDeadline || ''), activityType: String(p.activityType || ''), targetText: String(p.note || '') });
@@ -1317,10 +1613,62 @@ const READ_SLICES: Record<string, string> = {
   getLatestNews: 'latestNews',
 };
 
+// ==================== 保留角色（防提權） ====================
+//
+// 同 GS 後端一致：super_admin 係系統內建嘅隱藏帳號，全系統只應該有一個，
+// 唔可以經 API 指派／建立／申請。前端 assignableRoles() 唔會提供呢個選項，
+// 但 request 可以自己砌，所以後端要再擋一次。MOCK 亦要跟，先至 mirror 到現實。
+const RESERVED_ROLES = ['super_admin'];
+
+function isReservedRole(role: unknown): boolean {
+  return RESERVED_ROLES.includes(String(role ?? '').trim().toLowerCase());
+}
+
+// ★ 唔可以經 API 指派嘅角色（同 GS NON_ASSIGNABLE_ROLES_ 一致）。
+//   旅長全旅只有一個 ＝ 最早建立嘅管理員，只能由 bootstrap 或者「交接旅長」
+//   交換按鈕產生 —— 唔可以經角色下拉指派，否則又開返一條提權路。
+//   實測確認過漏洞：有「使用者管理」權限嘅 admin 可以自己砌 request，
+//   把別人升做 troop_leader —— 即係造出比自己更高權限嘅帳號。
+const NON_ASSIGNABLE_ROLES = ['troop_leader'];
+
+function isNonAssignableRole(role: unknown): boolean {
+  return NON_ASSIGNABLE_ROLES.includes(String(role ?? '').trim().toLowerCase());
+}
+
+/** 由 request 抽出「準備指派嘅角色」—— 唔同 action 放喺唔同參數 */
+function requestedRole(p: Record<string, any>): string {
+  const r = p.role;
+  if (r !== undefined && r !== null && String(r).trim() !== '') return String(r).trim().toLowerCase();
+  // updateUserField 係萬用寫入：field='role' 時角色喺 value
+  if (String(p.field || '').trim().toLowerCase() === 'role') return String(p.value || '').trim().toLowerCase();
+  return '';
+}
+
 export function handleMockRequest(action: string, params: Record<string, any> = {}): any {
   const p = { ...params };
   const userId = String(p.userId || '');
   let isWrite = false;
+
+  // ★ 保留角色守衛（同 GS checkActionPermission_ 同一位置：所有 action 之前）
+  //   applyJoin 除外：公開表單由自己嘅 sanitizer 靜默降級，唔好對匿名訪客洩露內部角色名。
+  if (action !== 'applyJoin' && isReservedRole(requestedRole(p))) {
+    logAudit(String(p.operatedBy || p.userId || 'anonymous'), 'DENIED:' + action, 'Security', '', '試圖指派保留角色 super_admin');
+    return { success: false, error: '「超級管理員」係系統內建帳號，不能經介面指派或建立。' };
+  }
+
+  // ★ 不可指派角色守衛（同 GS checkActionPermission_ 一致）：旅長唔可以經 API 指派。
+  //   applyJoin 除外：公開表單由自己嘅 sanitizer 靜默降級。
+  //   transferTroopLeader 除外：佢係「交接旅長」交換按鈕專用 action，
+  //   由自己嘅守衛驗「操作者係咪現任旅長」。
+  //   注意：admin → admin 刻意唔擋，管理員「只能加不能減」—— 可以開新管理員帳號。
+  {
+    const wanted = requestedRole(p);
+    if (action !== 'applyJoin' && action !== 'transferTroopLeader' && wanted && isNonAssignableRole(wanted)) {
+      const opId = String(p.operatedBy || p.userId || '');
+      logAudit(opId || 'anonymous', 'DENIED:' + action, 'Security', '', `試圖經 API 指派旅長（${wanted}）`);
+      return { success: false, error: '「旅長」全旅只有一個，只可以用「交接旅長」同另一人交換職位。' };
+    }
+  }
 
   if (action === 'health') return { success: true, version: MOCK_BACKEND_VERSION, action: 'health', ready: true };
   if (action === 'login') return handleMockLogin(p);

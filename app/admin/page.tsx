@@ -4,53 +4,62 @@ import Link from 'next/link';
 import Auth from '@/components/Auth';
 import ConsoleHeader from '@/components/ui/ConsoleHeader';
 import StatStrip from '@/components/ui/StatStrip';
+import MyEventReplies from '@/components/ui/MyEventReplies';
 import { AppState, loadStateSlice, computeStats } from '@/lib/store';
-import { ROLE_LABEL } from '@/lib/model';
+import { ROLE_LABEL, Role, isAdmin } from '@/lib/model';
 import { getSession } from '@/lib/session';
 import { hasFeature } from '@/lib/permissions';
+import { ADMIN_MODULES, ADMIN_MODULE_TOTAL, SYSTEM_MODULE } from '@/lib/adminModules';
 
 /**
- * 管理中心 —— 統一為 6 張卡：
- *   支部管理・使用者管理（合併成員資料庫＋審核申請）・行事曆管理・
- *   出席管理・活動管理（旅團活動＋區地域總會活動）・物資管理・會議管理。
- * 系統設定改放右上小圖示（TopNav ⚙️）；操作紀錄經系統設定進入。
+ * 管理中心 —— 管理員／團長／支部領袖／教練員共用同一個版面（用戶要求 #9 #11 #13）。
+ *
+ * 管理員一共 8 個管理項目：
+ *   支部管理・使用者管理・行事曆管理・出席管理・活動管理・物資管理・會議管理・系統管理
+ *
+ * 團長／支部領袖／教練員版面完全一樣，只係：
+ *   ・顯示嘅管理項目按權限多寡不同（冇權限嘅項目唔會出現）
+ *   ・冇「系統管理」（系統設定／操作紀錄／擴充元件只屬管理員）
+ *
+ * ★ 已移除底部嗰排小標籤（用戶要求 #1 #4 #5）：
+ *   ・「簽到／點名」→ 底部 tab bar 已經有個大按鈕，重複
+ *   ・「通告文件（PDF）」→ 通告喺「活動管理」處理
+ *   ・「活動統計」→ 統計喺「活動管理」逐個活動入面
+ *   ・「操作紀錄」→ 併入「系統管理」（用戶要求 #6）
+ * ★ 擴充元件唔再喺領袖控制台顯示，只留管理員右上角（用戶要求 #8 #10 #12）。
  */
-// feature：對應後台 UserPermissions 的權限鍵。
-// 卡片顯示與否由「使用者管理 → 授權」決定（管理員／團長可逐個帳號開關），
-// 唔再 hardcode 角色 —— 例如可以單獨開「物資管理」畀某位教練員。
-const FEATURES: { id: string; icon: string; title: string; text: string; href: string; tone: string; feature: string }[] = [
-  { id: 'branches',  icon: '🏢', title: '支部管理',     text: '管理支部、小隊及啟用狀態。', href: '/admin/branches', tone: 'from-emerald-700 to-emerald-500', feature: 'branches' },
-  { id: 'users',     icon: '👥', title: '使用者管理',   text: '帳號、成員資料庫與審核申請（合併）。', href: '/admin/users', tone: 'from-brand-800 to-brand-500', feature: 'users' },
-  { id: 'calendar',  icon: '📅', title: '行事曆管理',   text: '恆常集會、特別集會及取消；亦可在行事曆直接修改。', href: '/admin/calendar', tone: 'from-sky-700 to-sky-500', feature: 'calendar' },
-  { id: 'attendance', icon: '📝', title: '出席管理',   text: '簽到／點名、出席紀錄及統計報表。', href: '/attendance', tone: 'from-teal-700 to-teal-500', feature: 'attendance' },
-  { id: 'events',    icon: '🎯', title: '活動管理',     text: '旅團活動（內部）及 區地域總會活動（外部）。', href: '/admin/events', tone: 'from-violet-700 to-violet-500', feature: 'events' },
-  { id: 'equipment', icon: '📦', title: '物資管理',     text: '物資清單、庫存調整、借用批核及歸還。', href: '/admin/equipment', tone: 'from-amber-700 to-amber-500', feature: 'equipment' },
-  { id: 'meetings',  icon: '🤝', title: '會議管理',     text: '會議議程、紀錄及文件連結。', href: '/admin/meetings', tone: 'from-rose-700 to-rose-500', feature: 'meetings' },
-];
+// 管理項目清單（含 feature 對照）抽咗去 lib/adminModules.ts，
+// 方便 scripts/check-admin-modules.mjs 用後台真實權限驗證每個角色見到邊几张卡。
+const FEATURES = ADMIN_MODULES;
 
 export default function Admin() {
   const [s, setS] = useState<AppState | null>(null);
   const [err, setErr] = useState('');
-  useEffect(() => { loadStateSlice(['users', 'applications', 'events', 'bookmarks', 'userFeatures']).then(setS).catch(e => setErr(e.message)) }, []);
+  useEffect(() => {
+    loadStateSlice(['users', 'applications', 'events', 'bookmarks', 'userFeatures', 'replies'])
+      .then(setS)
+      .catch(e => setErr(e.message));
+  }, []);
   const stats = s ? computeStats(s) : { users: 0, pending: 0, activities: 0, selfActivities: 0, districtActivities: 0, notices: 0 };
 
   const session = typeof window === 'undefined' ? null : getSession();
   const emptyData = !!s && !err && (s.users || []).length === 0;
-  const role = session?.role || '';
+  const role = (session?.role || '') as Role;
+  const admin = isAdmin(role);
   const visibleFeatures = FEATURES.filter(f => hasFeature(s?.userFeatures, f.feature, role));
   const canUsers = hasFeature(s?.userFeatures, 'users', role);
   const canApplications = hasFeature(s?.userFeatures, 'applications', role);
   const canEvents = hasFeature(s?.userFeatures, 'events', role);
-  const canAudit = hasFeature(s?.userFeatures, 'audit', role);
-  const canRegistrations = hasFeature(s?.userFeatures, 'registrations', role);
 
-  return <Auth roles={['super_admin', 'troop_super', 'troop_leader', 'admin', 'group_leader', 'branch_leader', 'coach']}><div className="max-w-5xl mx-auto space-y-4">
+  return <Auth roles={['super_admin', 'troop_leader', 'admin', 'group_leader', 'branch_leader', 'coach']}><div className="max-w-5xl mx-auto space-y-4">
     <ConsoleHeader
-      icon="🛡️"
+      icon={admin ? '🛡️' : '🧭'}
       name={session?.name || '管理員'}
       roleLabel={ROLE_LABEL[(session?.role as any) || 'admin']}
-      tone="amber"
-      tagline="管理中心：功能卡按你的權限動態顯示。系統設定喺右上角 ⚙️ 小圖示；操作紀錄亦可由系統設定進入。"
+      tone={admin ? 'amber' : 'blue'}
+      tagline={admin
+        ? `管理中心：管理員一共 ${ADMIN_MODULE_TOTAL} 個管理項目。擴充元件喺右上角「⋯」選單。`
+        : `管理中心：顯示嘅管理項目按你獲得嘅授權而定；如需其他管理功能，請聯絡旅團管理員或所屬支部團長開啟。`}
     />
 
     {err && (
@@ -81,7 +90,7 @@ export default function Admin() {
       ...(canUsers ? [{ label: '用戶', value: stats.users, desc: '總登記人數', tone: 'blue' as const, href: '/admin/users' }] : []),
     ]} />
 
-    {/* 功能卡 */}
+    {/* 管理項目（管理員 8 個；其他領袖按權限顯示） */}
     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
       {visibleFeatures.map(f => (
         <Link key={f.id} href={f.href} className="no-underline text-inherit block group">
@@ -95,26 +104,34 @@ export default function Admin() {
           </div>
         </Link>
       ))}
+
+      {/* 系統管理：只有管理員可見（團長／支部領袖／教練員冇呢張卡） */}
+      {admin && (
+        <Link href={SYSTEM_MODULE.href} className="no-underline text-inherit block group">
+          <div className="h-full bg-white rounded-2xl border border-slate-300 shadow-sm p-4 flex items-center gap-3.5 transition group-hover:border-brand-300 group-hover:shadow-md">
+            <span className={`w-14 h-14 bg-gradient-to-br ${SYSTEM_MODULE.tone} text-white rounded-2xl flex items-center justify-center text-3xl flex-shrink-0 shadow`} aria-hidden>{SYSTEM_MODULE.icon}</span>
+            <span className="flex-1 min-w-0">
+              <span className="block font-black text-lg text-slate-800 leading-tight">{SYSTEM_MODULE.title}</span>
+              <span className="block text-sm text-slate-500 leading-snug mt-0.5">{SYSTEM_MODULE.text}</span>
+            </span>
+            <span className="text-slate-300 group-hover:text-brand-500 font-black text-2xl flex-shrink-0">→</span>
+          </div>
+        </Link>
+      )}
     </div>
 
-    {/* 工具捷徑：活動統計（統一）・操作紀錄（含審核紀錄）・點名・通告 */}
-    <div className="flex flex-wrap gap-2">
-      {canRegistrations && (
-        <Link href="/admin/registrations" className="no-underline text-sm font-bold text-slate-700 bg-white border border-slate-200 rounded-xl px-3.5 py-2.5 hover:border-brand-300 hover:shadow-sm transition">
-          📊 活動統計（只計旅團活動）
-        </Link>
-      )}
-      {canAudit && (
-        <Link href="/admin/audit" className="no-underline text-sm font-bold text-slate-700 bg-white border border-slate-200 rounded-xl px-3.5 py-2.5 hover:border-brand-300 hover:shadow-sm transition">
-          📜 操作紀錄（含審核紀錄）
-        </Link>
-      )}
-      <Link href="/attendance" className="no-underline text-sm font-bold text-slate-700 bg-white border border-slate-200 rounded-xl px-3.5 py-2.5 hover:border-brand-300 hover:shadow-sm transition">
-        📝 簽到／點名
-      </Link>
-      <Link href="/notices" className="no-underline text-sm font-bold text-slate-700 bg-white border border-slate-200 rounded-xl px-3.5 py-2.5 hover:border-brand-300 hover:shadow-sm transition">
-        📄 通告文件（PDF）
-      </Link>
-    </div>
+    {/* 完全冇管理權限（例如未獲授權嘅教練員）：講清楚要搵邊個，唔好留一片空白 */}
+    {visibleFeatures.length === 0 && !admin && (
+      <section className="bg-white rounded-2xl border border-dashed border-slate-300 p-4">
+        <h3 className="text-sm font-black text-slate-800 mt-0 mb-1.5">🔒 你目前未獲授權任何管理項目</h3>
+        <p className="text-sm text-slate-600 leading-relaxed m-0">
+          管理項目由旅團管理員或所屬支部團長逐項授權（例如活動管理、出席管理、物資管理）。
+          獲授權後，對應嘅管理卡會自動出現在這裡。日常點名仍可用底部「📝 點名」。
+        </p>
+      </section>
+    )}
+
+    {/* 我自己嘅出席回覆（收合式，唔搶管理項目嘅位置） */}
+    <MyEventReplies state={s} onState={setS} onError={setErr} />
   </div></Auth>;
 }

@@ -140,7 +140,7 @@ export default function ActivitiesPage() {
   const [libraryNoticeId, setLibraryNoticeId] = useState(LIBRARY_NOTICES[0].id);
   const { confirm } = useConfirm();
 
-  const isLeader = ['admin', 'group_leader', 'branch_leader', 'coach'].includes(role);
+  const isLeader = ['troop_leader', 'admin', 'group_leader', 'branch_leader', 'coach'].includes(role);
   const activeList = (filter === 'all' ? items : items.filter(a => a.kind === filter)).filter(a => !a.expired);
   // 過期區：由新至舊排列（日期近嘅放最上）
   const expiredList = items.filter(a => a.expired).sort((a, b) => b.date.localeCompare(a.date));
@@ -287,10 +287,10 @@ export default function ActivitiesPage() {
       {/* Demo 角色 */}
       <div className="flex gap-1.5 flex-wrap items-center">
         <span className="text-[13px] text-slate-500 mr-1">Demo：</span>
-        {['parent', 'member', 'branch_leader', 'admin'].map(r => (
+        {['troop_leader', 'admin', 'branch_leader', 'parent', 'member'].map(r => (
           <button key={r} onClick={() => { setRole(r); setMsg(''); }}
             className={`text-[13px] px-2 py-0.5 rounded-full border font-bold ${role === r ? 'bg-brand-600 text-white border-brand-600' : 'bg-white text-slate-500 border-slate-200'}`}>
-            {r === 'parent' ? '家長' : r === 'member' ? '成員' : r === 'branch_leader' ? '支部領袖' : '管理員'}
+            {r === 'troop_leader' ? '旅長' : r === 'parent' ? '家長' : r === 'member' ? '成員' : r === 'branch_leader' ? '支部領袖' : '管理員'}
           </button>
         ))}
         {isLeader && <span className="text-[13px] text-emerald-700 font-bold">· 你可直接喺本頁管理</span>}
@@ -477,8 +477,9 @@ export default function ActivitiesPage() {
               <div className="space-y-2">
                 {current.registerWay === 'app' ? (
                   <div className="flex gap-2 flex-wrap">
-                    {/* ❤️ 有興趣＝成員向家長及領袖表達意願，唔等於報名 → 家長端冇呢個掣 */}
-                    {role !== 'parent' && (
+                    {/* ❤️ 有興趣＝未成年成員向家長及領袖表達意願，唔等於報名 → 家長端冇呢個掣。
+                        ★ 成年成員已經可以自己報名，「有興趣」冇意思 → 唔顯示（用戶要求 #5） */}
+                    {role !== 'parent' && !adult && (
                       <button onClick={() => respond(current.id, 'interested')} className="flex-1 text-[12px] font-bold bg-amber-500 text-white py-2 rounded-xl">❤️ 有興趣（非報名）</button>
                     )}
                     {(role === 'parent' || adult) && (
@@ -491,13 +492,15 @@ export default function ActivitiesPage() {
                 ) : role === 'parent' ? (
                   <p className="text-[13px] text-slate-500 m-0">ℹ️ 區地域總會活動由子女／家長自行報名，旅團不代收報名及費用。</p>
                 ) : (
-                  <button onClick={() => respond(current.id, 'interested')} className="w-full text-[12px] font-bold bg-violet-600 text-white py-2 rounded-xl">❤️ 我有興趣（搵領袖報名）</button>
+                  <button onClick={() => respond(current.id, 'interested')} className="w-full text-[12px] font-bold bg-violet-600 text-white py-2 rounded-xl">
+                    {adult ? '📩 我想參加（自己聯絡領袖報名）' : '❤️ 我有興趣（搵領袖報名）'}
+                  </button>
                 )}
                 <p className="text-[13px] text-slate-500 m-0 leading-relaxed">
                   {role === 'parent'
                     ? 'ℹ️ 家長只回覆：參加／不參加。「❤️ 有興趣」是子女用來話畀家長及領袖知佢想去（只表達意見，不等於報名）。選「參加」才需標記已付款。'
                     : adult
-                    ? 'ℹ️ 你已 18 歲或以上，可自行報名。❤️ 有興趣只係表達意見，唔等於報名。'
+                    ? 'ℹ️ 你已 18 歲或以上，可以直接報名 ✅／❌，唔使再標「有興趣」。'
                     : 'ℹ️ 你未滿 18 歲，可按「❤️ 有興趣」話畀家長及領袖知（不等於報名）；參加／不參加由家長用家長帳戶回覆。'}
                 </p>
                 <button onClick={() => setDetail(null)} className="w-full text-[12px] font-bold bg-slate-100 text-slate-600 py-2 rounded-xl">關閉</button>

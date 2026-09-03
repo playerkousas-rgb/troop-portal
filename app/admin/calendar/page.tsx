@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { AppState, loadState, loadStateSlice } from '@/lib/store';
 import { apiToggleRegularMeeting, apiCreateRegularMeeting, apiCreateEvent, apiDeleteRegularMeeting, apiUpdateRegularMeeting } from '@/lib/api';
 import { branches } from '@/lib/model';
+import PublicScopePanel from '@/components/ui/PublicScopePanel';
 import { getSession } from '@/lib/session';
 import { useConfirm, kv } from '@/components/ConfirmProvider';
 import Auth from '@/components/Auth';
@@ -170,9 +171,17 @@ export default function Page(){
     }catch(e:any){setErr(e.message)}
   }
 
+  /* ═══ 公開行事曆範圍（三張公開資料卡之一）═══
+     管理員嘅總掣 PUBLIC_VIEW 只係「開放呢個功能」；每張卡入面嘅內容仲要各自開放：
+     全旅內容由管理層決定，各支部內容由該支部團長／支部領袖決定。
+     實際掣喺共用組件 components/ui/PublicScopePanel.tsx（行事曆／相簿／通告 三張卡共用）。 */
+  const session = getSession();
+  const adminTier = ['super_admin', 'troop_leader', 'admin'].includes(session?.role || '');
+  const ownBranch = session?.branchId || '';
+
   if(!s)return <div className="card">{err||'載入中...'}</div>;
 
-  return <Auth roles={['super_admin', 'troop_super', 'troop_leader', 'admin', 'group_leader', 'branch_leader', 'coach']}><div className="stack">
+  return <Auth roles={['super_admin', 'troop_leader', 'admin', 'group_leader', 'branch_leader', 'coach']}><div className="stack">
     <section className="hero">
       <span className="badge gold">行事曆設定</span>
       <h1>行事曆管理</h1>
@@ -180,6 +189,15 @@ export default function Page(){
     </section>
     {err&&<p className="badge red">{err}</p>}
     {okMsg&&<p className="badge green">{okMsg}</p>}
+
+    {/* ═══ 公開行事曆範圍（三張公開資料卡之一，共用 PublicScopePanel）═══ */}
+    <PublicScopePanel
+      card="calendar"
+      s={s}
+      adminTier={adminTier}
+      ownBranchId={ownBranch}
+      onSaved={f => { setS(f); setOkMsg('✅ 已更新公開範圍'); }}
+    />
 
     {/* Regular meetings */}
     <section className="card">
