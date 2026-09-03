@@ -919,12 +919,90 @@ group_leader / branch_leader / coach / parent / member
 - **`lib/permissions.ts:111-113`**：掃描命中但係**假陽性** —— 個陣列係
   `assignableRoles()` 嘅**回傳值**（可指派邊啲角色），唔係權限檢查；L112 已經有 `troop_leader`。
 - **`app/dashboard/calendar/page.tsx:68`** `role === 'admin'`：係唯一一處狹窄比較，
-  會漏 `troop_leader`。但 `/dashboard/**` demo 樹嘅角色選擇器（L280）只提供
-  5 個角色、**冇 `troop_leader`**，而 `role` 係本地 state → **唔可達**，
-  屬 latent 不一致而唔係 live bug。**未修**（要修就要連 demo 樹一齊加旅長選項）。
+  會漏 `troop_leader`。審計當時判定為 latent（demo 樹選擇器冇 `troop_leader`，唔可達）；
+  **後已一併修正** —— 見下一節「demo 樹加旅長」。
 
 ### 仍需人手做（呢個環境做唔到）
 
 - **82 旅重新部署 GS** —— 上面所有 GS 修正**喺重新部署之前全部係 inert**。
 - **人手清理 live Sheet 入面殘留嘅 `role='troop_super'` 列** —— 讀入時會自動歸一
   ＋ 只留最早嗰個做旅長，但 Sheet 上面嘅原始值唔會被改寫。
+
+---
+
+## 2026-09-03 用戶決定：交接對象收緊 ＋ demo 樹加旅長
+
+重構後全 repo 重新審計（8 個角色 × 所有卡片）發現兩件事，用戶已決定處理方式。
+
+### 1. 「交接旅長」對象收緊到領袖層（後端）
+
+**發現嘅落差：**前端 `app/admin/users/page.tsx:693` 嘅交接掣條件係
+`myRole==='troop_leader' && u.id!==myUserId && u.role!=='super_admin'` ——
+但 L676 個帳戶表已經濾走咗 `member`／`parent`，所以 UI **永遠唔可能**提供呢兩種目標。
+後端（GS `handleTransferTroopLeader_` ＋ mock `case 'transferTroopLeader'`）
+**冇任何對象角色檢查** → 前後端能力落差。
+
+**實測證據（真實 HTTP）：**
+`?action=transferTroopLeader&targetUserId=u_m4&operatedBy=u_tl`
+→ `success=true`，而 `u_m4` 係 `member`（未成年成員）—— 旅長職位成功交咗俾一個細路。
+
+**修法：**GS ＋ mock 兩邊都加對象角色檢查，同 UI 一致。
+
+```js
+// GS handleTransferTroopLeader_
+var ELIGIBLE_ = { admin: true, troop_leader: true, group_leader: true,
+                  branch_leader: true, coach: true };
+if (!ELIGIBLE_[target.role]) return { error: '只可以交接俾管理員／團長／支部領袖／教練員。' +
+  (target.role === 'member' ? '成員' : '家長') + '帳號唔可以成為旅長。' };
+```
+
+**實測（修正後，真實 HTTP）：**
+
+| 目標 | 結果 |
+|---|---|
+| `u_m4`（member 未成年） | ❌ 拒絕 |
+| `u_m1`（member） | ❌ 拒絕 |
+| `u5`（parent） | ❌ 拒絕 |
+| `u_bl`（branch_leader） | ✅ 成功（之後還原狀態） |
+
+`check:security` §11 已加入呢啲斷言（GS ＋ MOCK 兩邊）→ **114 項全過**。
+
+### 2. `/dashboard/**` demo 樹加返旅長
+
+**背景：**demo 樹有 3 個檔案各自宣告 local `type Role`，全部都冇 `troop_leader`
+（原本有 `super_admin`，喺 `88c783f` 用戶要求「demo 唔應該存在超管」時一齊移走咗）。
+結果係 demo 樹**冇辦法展示旅長呢個角色**。
+
+**用戶決定：**「多加1個旅長（其實只是 COPY 管理員）讓用戶感覺有而已。」
+
+**改咗乜（9 個檔案，全部 `/dashboard/**`）：**
+
+| 改動 | 處數 |
+|---|---|
+| local `type Role` 加 `'troop_leader'` | 3 |
+| `Record<Role, string>` 加 `troop_leader` entry（`ROLE_LABEL`／`ROLE_COLOR`） | 4 |
+| `isLeader`／`isManager`／`isPrivileged`／`isBranchLeader`／`isStaffRole`／`isParentOrMember` 陣列 | 11 |
+| 角色選擇器加旅長按鈕 ＋ label | 6 |
+| `DEMO_MY_BRANCH` 加 `troop_leader: ''` | 1 |
+| `isAdminRole = role === 'admin'` → `‖ role === 'troop_leader'` | 1 |
+
+旅長用**金色**徽章（`bg-amber-100 text-amber-800`），同真實 `/admin/users:681`
+嘅「旅長」金徽章一致。
+
+**順手修正咗審計 flag 嘅狹窄比較：**`app/dashboard/calendar/page.tsx:68` 原本
+`role === 'admin'`，令旅長睇唔到其他支部。而家旅長同管理員一樣睇到全部支部：
+
+```
+troop_leader   isAdminRole=True   myBranch=(空)  → ['全旅','幼童軍','童軍','深資','樂行']
+admin          isAdminRole=True   myBranch=(空)  → ['全旅','幼童軍','童軍','深資','樂行']
+```
+
+> **呢個改動只影響 `/dashboard/**` demo 樹**，唔影響真實 UI／GS／mock。
+> 真實系統嘅旅長一直係唯一一個，由 `/admin/users` 嘅「👑 交接旅長」管理。
+
+### 驗證
+
+`tsc` 0 error · `next build` exit 0 / 63 routes · `npm run lint` 9 warnings / 0 errors（同基線一致）
+· 8 個 check 全綠（`check:gs` · `check:perms` 47/47/18 · `check:public` 46 ·
+`check:security` **114** · `check:links` **141** · `check:modules` · `check:calendar` · `check:render`）。
+GS 模板 244,654 bytes，同 `public/downloads/` 副本 `cmp` 一致。

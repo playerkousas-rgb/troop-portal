@@ -6,9 +6,11 @@ import { useEffect, useState } from 'react';
    類型 & 模擬資料
    ═══════════════════════════════════════════════════ */
 
-type Role = 'admin' | 'group_leader' | 'branch_leader' | 'coach' | 'parent' | 'member';
+// ★ 加咗 troop_leader（旅長）：全旅最高人類權限，demo 樹要示範到。
+//   權限同管理員一樣（用戶：「其實只是 COPY 管理員，讓用戶感覺有而已」）。
+type Role = 'troop_leader' | 'admin' | 'group_leader' | 'branch_leader' | 'coach' | 'parent' | 'member';
 const ROLE_LABEL: Record<Role, string> = {
-  admin: '管理員', group_leader: '團長',
+  troop_leader: '旅長', admin: '管理員', group_leader: '團長',
   branch_leader: '支部領袖', coach: '教練員', parent: '家長', member: '成員',
 };
 
@@ -57,8 +59,8 @@ const APPROVALS = [
 export default function DashboardPage() {
   const [role, setRole] = useState<Role>('admin');
 
-  const isManager = ['admin', 'group_leader', 'branch_leader'].includes(role);
-  const isLeader = ['admin', 'group_leader', 'branch_leader', 'coach'].includes(role);
+  const isManager = ['troop_leader', 'admin', 'group_leader', 'branch_leader'].includes(role);
+  const isLeader = ['troop_leader', 'admin', 'group_leader', 'branch_leader', 'coach'].includes(role);
   const isParentOrMember = role === 'parent' || role === 'member';
 
   return (
@@ -90,7 +92,7 @@ export default function DashboardPage() {
       {/* ── Demo 切換 ── */}
       <div className="flex gap-1.5 flex-wrap">
         <span className="text-[13px] text-slate-500 mr-1 self-center">Demo：</span>
-        {(['admin', 'group_leader', 'branch_leader', 'coach', 'parent', 'member'] as Role[]).map(r => (
+        {(['troop_leader', 'admin', 'group_leader', 'branch_leader', 'coach', 'parent', 'member'] as Role[]).map(r => (
           <button key={r} onClick={() => setRole(r)}
             className={`text-[13px] px-2.5 py-1 rounded-full border transition font-bold ${
               role === r ? 'bg-brand-600 text-white border-brand-600 shadow' : 'bg-white text-slate-500 border-slate-200 hover:border-brand-300'

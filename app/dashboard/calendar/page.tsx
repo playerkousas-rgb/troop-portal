@@ -56,16 +56,18 @@ export default function CalendarPage() {
   const [formErr, setFormErr] = useState('');
   const { confirm } = useConfirm();
 
-  const isLeader = ['admin', 'group_leader', 'branch_leader', 'coach'].includes(role);
+  const isLeader = ['troop_leader', 'admin', 'group_leader', 'branch_leader', 'coach'].includes(role);
 
   /* ═════ 支部可見範圍（對照真實 /calendar・用戶要求 #3 #4）═════
      管理員要管全旅 → 睇到所有支部；
      家長／成員／支部領袖／團長 → 只睇到「全旅」＋自己（或子女）支部。
      家長／成員亦唔需要「會議」（領袖會議）呢個分類。 */
   const DEMO_MY_BRANCH: Record<string, string> = {
-    parent: '童軍', member: '童軍', group_leader: '深資', branch_leader: '童軍', coach: '童軍', admin: '',
+    parent: '童軍', member: '童軍', group_leader: '深資', branch_leader: '童軍', coach: '童軍', admin: '', troop_leader: '',
   };
-  const isAdminRole = role === 'admin';
+  // ★ 旅長同管理員一樣管全旅 → 睇到所有支部。
+  //   原本呢度係 `role === 'admin'`，會漏咗旅長（全 repo 審計 flag 咗嘅狹窄比較）。
+  const isAdminRole = role === 'admin' || role === 'troop_leader';
   const myBranch = DEMO_MY_BRANCH[role] || '';
   // useCallback：inScope 每次 render 都係新函數，直接放落 useMemo 嘅 deps 會令 memo 失效
   const inScope = useCallback(
@@ -277,10 +279,10 @@ export default function CalendarPage() {
       {/* Demo 角色切換 */}
       <div className="flex gap-1.5 flex-wrap items-center">
         <span className="text-[13px] text-slate-500 mr-1">Demo：</span>
-        {['parent', 'member', 'group_leader', 'branch_leader', 'admin'].map(r => (
+        {['troop_leader', 'admin', 'group_leader', 'branch_leader', 'parent', 'member'].map(r => (
           <button key={r} onClick={() => { setRole(r); setMsg(''); }}
             className={`text-[13px] px-2 py-0.5 rounded-full border font-bold ${role === r ? 'bg-brand-600 text-white border-brand-600' : 'bg-white text-slate-500 border-slate-200'}`}>
-            {r === 'parent' ? '家長' : r === 'member' ? '成員' : r === 'group_leader' ? '團長' : r === 'branch_leader' ? '支部領袖' : '管理員'}
+            {r === 'troop_leader' ? '旅長' : r === 'parent' ? '家長' : r === 'member' ? '成員' : r === 'group_leader' ? '團長' : r === 'branch_leader' ? '支部領袖' : '管理員'}
           </button>
         ))}
         {isLeader && <span className="text-[13px] text-emerald-700 font-bold">· 你可直接喺本頁管理</span>}

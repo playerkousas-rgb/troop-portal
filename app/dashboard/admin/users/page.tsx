@@ -5,13 +5,16 @@ import { useState } from 'react';
    模擬資料
    ═══════════════════════════════════════════════════ */
 
-type Role = 'admin' | 'group_leader' | 'branch_leader' | 'coach' | 'parent' | 'member';
+// ★ 加咗 troop_leader（旅長）：全旅最高人類權限，demo 樹要示範到。
+//   權限同管理員一樣（用戶：「其實只是 COPY 管理員，讓用戶感覺有而已」）。
+type Role = 'troop_leader' | 'admin' | 'group_leader' | 'branch_leader' | 'coach' | 'parent' | 'member';
 const ROLE_LABEL: Record<Role, string> = {
-  admin: '管理員', group_leader: '團長', branch_leader: '支部領袖',
+  troop_leader: '旅長', admin: '管理員', group_leader: '團長', branch_leader: '支部領袖',
   coach: '教練員', parent: '家長', member: '成員',
 };
 const ROLE_COLOR: Record<Role, string> = {
-  admin: 'bg-rose-100 text-rose-700', group_leader: 'bg-purple-100 text-purple-700',
+  // 旅長用金色（同真實 /admin/users 嘅「旅長」金徽章一致）
+  troop_leader: 'bg-amber-100 text-amber-800', admin: 'bg-rose-100 text-rose-700', group_leader: 'bg-purple-100 text-purple-700',
   branch_leader: 'bg-blue-100 text-blue-700', coach: 'bg-amber-100 text-amber-700',
   parent: 'bg-emerald-100 text-emerald-700', member: 'bg-slate-100 text-slate-600',
 };

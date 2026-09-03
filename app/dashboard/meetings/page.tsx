@@ -23,7 +23,7 @@ const SEED: Meeting[] = [
 ];
 
 const ROLE_LABELS: Record<string, string> = {
-  parent: '家長', member: '成員', group_leader: '團長', branch_leader: '支部領袖', admin: '管理員',
+  troop_leader: '旅長', parent: '家長', member: '成員', group_leader: '團長', branch_leader: '支部領袖', admin: '管理員',
 };
 
 type MeetingForm = { id: string; title: string; date: string; time: string; location: string };
@@ -38,7 +38,7 @@ export default function MeetingsPage() {
   const [formErr, setFormErr] = useState('');
   const { confirm } = useConfirm();
 
-  const isLeader = ['admin', 'group_leader', 'branch_leader'].includes(role);
+  const isLeader = ['troop_leader', 'admin', 'group_leader', 'branch_leader'].includes(role);
   const meeting = items.find(m => m.id === selected);
 
   function openNew() {
@@ -105,7 +105,7 @@ export default function MeetingsPage() {
     <main className="max-w-2xl mx-auto px-4 py-4 pb-24 space-y-4">
       <div className="flex gap-1.5 flex-wrap items-center">
         <span className="text-[13px] text-slate-500 mr-1">Demo：</span>
-        {['parent', 'member', 'group_leader', 'branch_leader', 'admin'].map(r => (
+        {['troop_leader', 'admin', 'group_leader', 'branch_leader', 'parent', 'member'].map(r => (
           <button key={r} onClick={() => { setRole(r); setMsg(''); }} className={`text-[13px] px-2 py-0.5 rounded-full border font-bold ${role === r ? 'bg-brand-600 text-white border-brand-600' : 'bg-white text-slate-500 border-slate-200'}`}>
             {ROLE_LABELS[r]}
           </button>
