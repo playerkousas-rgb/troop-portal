@@ -1239,3 +1239,49 @@ GS 模板 247,944 bytes，同 `public/downloads/` 副本 `cmp` 一致。
 重新部署後 live Sheet 入面嘅 `PUBLIC_CARDS='calendar,notices'` 同
 `PUBLIC_SCOPE_NOTICES` **唔使人手改**，讀入時自動歸一；
 管理員第一次撳「開／關活動卡」時先會寫成新格式。
+
+### ★ 補做：`/activities` 嘅真正 client render 驗證
+
+上面嘅驗證全部係**函數層**（`isItemPublic` 嘅回傳值）。但我改咗嘅係
+`app/activities/page.tsx` 嘅 render 邏輯，**函數啱唔代表頁面對**。
+HTTP 200 同 SSR 都證明唔到 client render（呢頁 state 由 `useEffect` 載入）。
+
+已併入永久 `check:render`（`scripts/render-users-page.mjs`），用 jsdom 行 `useEffect`：
+
+```
+── /activities：未登入訪客（活動卡 scope = troop,b2）──
+  ✅ 頁面有 render 出內容（唔係「載入中」）
+  ✅ e02「童軍週末營」睇到          ← troop
+  ✅ e08「全旅親子遠足日」睇到      ← troop
+  ✅ e03「十一區運動會」睇到        ← b2
+  ✅ e00「八月童軍技能日」睇唔到    ← b3（未同意公開）
+  ✅ e01「九月山徑健行」睇唔到      ← b3
+  ✅ e05「樂行社區服務日」睇唔到    ← b5
+  ✅ e06「深資遠征」睇唔到          ← b4
+  ✅ e07「小童軍親子日」睇唔到      ← b1
+  ✅ 訪客淨係睇到 3 個活動（唔係改動前嘅 8 個）
+```
+
+數據由 curl 核實：`troop_demo` 有 8 個已發佈活動，
+按支部 b3×2／troop×2／b2×1／b5×1／b4×1／b1×1；
+「活動」卡 scope = `troop,b2`（經舊 key fallback）→ 預期 3 個。
+
+**Negative control（第 12 個）：**攞走 `app/activities/page.tsx:48` 嘅
+`isItemPublic` 過濾 → 訪客見到 **8 個**活動（正正係改動前嘅行為）、
+**6 項斷言變紅**。還原後 `grep -c NEGCTRL` → 0，`check:render` 全綠。
+
+### ★ 呢個驗證第一版係空轉嘅（記錄以免重犯）
+
+第一次寫嘅 harness 用 `localStorage.clear()` 扮「訪客」，結果 10 項斷言
+**全部空轉**：頁面永遠停喺「載入中...」（`text 長度=6`）。
+
+原因：`getTroopKey()`（`lib/api.ts:8-14`）讀
+`localStorage['scoutsystem2_selected_troop']` 嚟砌 API URL，
+`clear()` 連**已選旅團**一齊清走 → API 回 `troopKey=unknown` → 400 →
+`loadStateSlice` reject → 但 `err` 係空字串所以連錯誤都顯示唔出。
+
+**教訓：「訪客」≠「乜都冇」。** 正確做法係淨係
+`removeItem('scoutsystem2_current_user')` ＋ 保留已選旅團。
+（dev server log 見到 `troopKey=unknown … 400` 先至搵到原因。）
+
+**推廣：任何「未登入」嘅 jsdom render 測試都要咁做。**

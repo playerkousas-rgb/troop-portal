@@ -179,5 +179,74 @@ ok('  支部領袖仍只睇到全旅＋自己支部（旅長改動冇波及）',
   `實際 ${JSON.stringify(demoBl.chips)}`);
 console.log('');
 
+/* ══════════════════════════════════════════════════════════════════════
+ * 【真正 client render：/activities（底欄「🎯 活動」）】
+ *
+ * 驗證未登入訪客真係按「活動」公開卡過濾。
+ *
+ * ★ 點解要 jsdom：呢頁係 client component，state 由 useEffect 載入。
+ *   HTTP 200 同 SSR 都證明唔到 client render（同上）。
+ *
+ * ★ 數據（troop_demo 原始 seed，已用 curl 核實）：
+ *   8 個已發佈活動 → b3×2, troop×2, b2×1, b5×1, b4×1, b1×1
+ *   「活動」卡 scope = troop,b2（由舊 key PUBLIC_SCOPE_NOTICES fallback 讀到）
+ *   → 訪客應該只睇到 3 個：e02（troop）、e08（troop）、e03（b2）
+ *   → 2026-09-03 改動之前係 8 個全部（呢頁當時完全冇消費任何公開卡）
+ *
+ * ★ 已用 negative control 証明呢一節咬得住：攞走 L48 嘅 isItemPublic
+ *   過濾 → 訪客見到 8 個、6 項斷言變紅。
+ * ══════════════════════════════════════════════════════════════════════ */
+const ACT_TITLES = [
+  ['e02', '童軍週末營', true],      // troop → 睇到
+  ['e08', '全旅親子遠足日', true],  // troop → 睇到
+  ['e03', '十一區運動會', true],    // b2    → 睇到
+  ['e00', '八月童軍技能日', false], // b3    → 睇唔到
+  ['e01', '九月山徑健行', false],   // b3    → 睇唔到
+  ['e05', '樂行社區服務日', false], // b5    → 睇唔到
+  ['e06', '深資遠征', false],       // b4    → 睇唔到
+  ['e07', '小童軍親子日', false],   // b1    → 睇唔到
+];
+
+async function renderActivitiesAsGuest() {
+  // ★「訪客」= 有選定旅團、但冇 session。
+  //   唔可以直接 localStorage.clear()：getTroopKey()（lib/api.ts:8-14）讀
+  //   'scoutsystem2_selected_troop' 嚟砌 API URL，清咗佢 API 會攞唔到嘢，
+  //   頁面會永遠停喺「載入中...」→ 要驗證嘅過濾 code path 根本行唔到。
+  //   （第一版就中咗：text 長度=6，即係「載入中...」，10 項斷言全係空轉。）
+  localStorage.removeItem('scoutsystem2_current_user');   // ← 呢個先係「未登入」
+  localStorage.setItem('scoutsystem2_selected_troop',
+    JSON.stringify({ key: 'troop_demo', id: '0088', name: '演示旅團' }));
+  const Page2 = (await import('@/app/activities/page.tsx')).default;
+  const host = document.createElement('div');
+  document.body.appendChild(host);
+  const root = createRoot(host);
+  await act(async () => { root.render(React.createElement(Page2)); });
+  for (let i = 0; i < 30; i++) {
+    await act(async () => { await new Promise((r) => setTimeout(r, 50)); });
+    if (!/載入中/.test(host.textContent || '')) break;
+  }
+  const text = host.textContent || '';
+  root.unmount();
+  host.remove();
+  return text;
+}
+
+console.log('── /activities：未登入訪客（活動卡 scope = troop,b2）──');
+const actText = await renderActivitiesAsGuest();
+
+ok('  頁面有 render 出內容（唔係「載入中」）',
+  !/載入中/.test(actText) && actText.length > 100, `text 長度=${actText.length}`);
+
+let actSeen = 0;
+for (const [id, title, shouldSee] of ACT_TITLES) {
+  const visible = actText.includes(title);
+  if (visible) actSeen++;
+  ok(`  ${id}「${title}」${shouldSee ? '睇到' : '睇唔到'}`, visible === shouldSee,
+    `實際=${visible ? '睇到' : '睇唔到'}`);
+}
+ok('  訪客淨係睇到 3 個活動（唔係改動前嘅 8 個）', actSeen === 3,
+  `實際睇到 ${actSeen} 個`);
+console.log('');
+
 console.log(bad === 0 ? '✅ 全部通過' : `❌ ${bad} 項失敗`);
 process.exit(bad === 0 ? 0 : 1);
