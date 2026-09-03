@@ -534,6 +534,50 @@ live preview 嘅 sandbox 網址對外攞唔到，所以一鍵加入喺 preview �
    u_gl group_leader、u_admin admin）。
    `troop_demo` 仍然冇 env 開關、恆常可選 —— 用戶揀咗保持現狀，而家最高只係 admin，
    而且攞到嘅係 seed 假資料，碰唔到真實旅團數據。
+
+   **✅ 已修：提權洞 —— 後端冇限制「目標角色」，可造出第二個超管。**
+   用戶要求「應該只有 1 個超管 account」。前端 `assignableRoles()` 確實唔會提供
+   `super_admin`（`lib/permissions.ts` 93–98 行，連 `super_admin` 自己都得 `troop_super` 做頂），
+   但**前端守衛唔等於後端守衛**：`operatedBy` 係前端傳上嚟嘅，request 可以自己砌。
+   用 `node vm` 載入真實 GS 實測，確認三條提權路全部暢通：
+   ・`updateUserRole` → 授權層 `checkActionPermission_` 回 `null`（放行），
+     `handleUpdateUserRole_` 真的寫入 `role=super_admin`
+   ・`updateUserField`（萬用寫入）→ `field='role', value='super_admin'` 同樣寫入成功
+   ・`applyJoin`（**公開表單，唔使登入**）→ 申請人自填 `role=super_admin`，
+     管理員一經 `decideApplication` 批核（2656 行讀申請人 role → 2651 行直接建帳號）
+     就誕生第二個超管
+   根因：`ACTION_REQUIRED_FEATURE_` 只驗操作者**有冇 `users` feature**（註解自己都寫住
+   「最高危：可提權」），完全冇驗**目標角色係咪佢權限範圍內**。
+
+   修法（`super_admin` 係硬編碼嘅系統帳號，全系統只應該有一個，所以一律唔准經 API 指派）：
+   ・GS 新增 `RESERVED_ROLES_`／`isReservedRole_`／`requestedRole_`（1765–1780 行）
+   ・**中央守衛**放喺 `checkActionPermission_` 最前面（1785 行）—— 喺**所有身份豁免之前**，
+     連 `sheep` 都唔可以經 API 造第二個超管；dispatch 1853–1854 行會 early-return
+   ・`applyJoin`（2554 行）靜默降級為 `parent` 並留審計。**刻意排除**喺中央守衛之外
+     （`action !== 'applyJoin'`）：佢係匿名可調嘅公開端點，對匿名訪客回一個講明
+     「super_admin 係系統內建帳號」嘅錯誤等於白白洩露內部角色名
+   ・`decideApplication`（2668 行）第二道守衛：就算 Applications 表被直接植入
+     `super_admin`（繞過 applyJoin），批核時都會降級並留審計
+   ・`lib/mockServer.ts` 鏡像同一套守衛（`RESERVED_ROLES`／`isReservedRole`／`requestedRole`
+     ＋ dispatch 最前面嘅中央守衛＋ `applyJoin` 例外），保持 MOCK mirror 現實
+   ・`batchCreateUsers` **本身已經安全**，唔使改：`allowedRoles`（GS 3285 行）唔包
+     `super_admin`，3298 行會將白名單以外嘅角色降級為 `parent`
+
+   實測（全部行**真實 `doGet` dispatch**，唔係直接調 handler）：
+   ・GS 端到端 8/8 ✅：三條 API 路全擋（錯誤訊息「「超級管理員」係系統內建帳號，
+     不能經介面指派或建立。」）；`sheep` 都被擋；對照組 `role=branch_leader`
+     同 `field=name` 照常放行且有寫入
+   ・GS 第三條路 8/8 ✅：`applyJoin(role=super_admin)` → `success:true` 且存入
+     Applications 嘅 role 已降級為 `parent`；Applications 表被直接植入 `super_admin`
+     再批核 → 新帳號 role 仍係 `parent`；正常申請（`role=parent`）全程冇受影響
+   ・MOCK live HTTP 6/6 ✅：三條路全擋、`applyJoin` 靜默降級（存入 `parent`，
+     回應訊息冇出現 `super_admin` 字樣）、兩個對照組正常
+
+   ⚠️ 陷阱（我自己踩过）：**直接調 `handleXxx_` 測試會繞過 `checkActionPermission_`**，
+   睇落似「守衛冇效」。要驗證守衛就必須經 `doGet`／`handleMockRequest` 呢層 dispatch。
+   另外 stub `getConfigValue_('API_KEY_HASH')` 時，`sha256_` 回傳嘅係**小寫** hex
+   （GS 148 行 `toString(16)`），用 `.toUpperCase()` 會令所有請求死喺 API key 檢查，
+   然後所有「應該被擋」嘅斷言假陽性通過 —— 呢種測試比冇測試更危險。
 2. **/onboard 第 6 步實測** — 走一次表單提交，確認管理員 Sheet「申請記錄」有新記錄 + 收到通知 email
 3. **旅團部署** — 新旅團接入流程（收到自動寄信 → `DEPLOY_ADMIN_GUIDE.md` 五步）
 4. **`/dashboard/*` demo 樹** — 仍是內嵌 mock 的展示頁（帶 Demo 角色切換），非真實登入頁。**用戶已決定保留**（2026-09-03），繼續作展示用途；已一併清走佢嘅 `super_admin` 角色，最高只到管理員。

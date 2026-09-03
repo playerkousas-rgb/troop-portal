@@ -1287,9 +1287,16 @@ function handleMutate(action: string, p: Record<string, any>) {
       }
       return S(ob);
     }
-    case 'applyJoin':
-      store.applications.unshift({ id: uid('ap'), type: (p.type || 'parent') as any, name: String(p.name || ''), email: String(p.email || ''), role: (p.role || 'parent') as Role, branchId: String(p.branchId || ''), ymNumbers: String(p.ymNumbers || ''), status: 'pending', createdAt: new Date().toISOString().slice(0, 10) });
+    case 'applyJoin': {
+      // ★ 保留角色守衛（同 GS handleApplyJoin_ 一致）：公開表單唔准存入 super_admin
+      let applyRole = String(p.role || 'parent');
+      if (isReservedRole(applyRole)) {
+        logAudit('anonymous', 'SANITIZE:applyJoin', 'Security', '', `公開申請要求保留角色 ${applyRole}，已降級為 parent`);
+        applyRole = 'parent';
+      }
+      store.applications.unshift({ id: uid('ap'), type: (p.type || 'parent') as any, name: String(p.name || ''), email: String(p.email || ''), role: applyRole as Role, branchId: String(p.branchId || ''), ymNumbers: String(p.ymNumbers || ''), status: 'pending', createdAt: new Date().toISOString().slice(0, 10) });
       return { success: true, message: '(演示) 申請已收到,管理員會在演示後台看到。' };
+    }
     // 圖書館
     case 'importBookmark':
       store.bookmarks.push({ id: uid('bm'), title: String(p.title || ''), source: String(p.source || ''), mode: (p.mode || 'informational') as any, status: 'published', branchTags: String(p.branchTags || '全旅').split(','), audienceTags: String(p.audienceTags || '全旅').split(','), fee: String(p.fee || ''), paymentUrl: String(p.paymentUrl || ''), officialDeadline: String(p.officialDeadline || ''), internalDeadline: String(p.internalDeadline || ''), activityType: String(p.activityType || ''), targetText: String(p.note || '') });
@@ -1392,10 +1399,37 @@ const READ_SLICES: Record<string, string> = {
   getLatestNews: 'latestNews',
 };
 
+// ==================== 保留角色（防提權） ====================
+//
+// 同 GS 後端一致：super_admin 係系統內建嘅隱藏帳號，全系統只應該有一個，
+// 唔可以經 API 指派／建立／申請。前端 assignableRoles() 唔會提供呢個選項，
+// 但 request 可以自己砌，所以後端要再擋一次。MOCK 亦要跟，先至 mirror 到現實。
+const RESERVED_ROLES = ['super_admin'];
+
+function isReservedRole(role: unknown): boolean {
+  return RESERVED_ROLES.includes(String(role ?? '').trim().toLowerCase());
+}
+
+/** 由 request 抽出「準備指派嘅角色」—— 唔同 action 放喺唔同參數 */
+function requestedRole(p: Record<string, any>): string {
+  const r = p.role;
+  if (r !== undefined && r !== null && String(r).trim() !== '') return String(r).trim().toLowerCase();
+  // updateUserField 係萬用寫入：field='role' 時角色喺 value
+  if (String(p.field || '').trim().toLowerCase() === 'role') return String(p.value || '').trim().toLowerCase();
+  return '';
+}
+
 export function handleMockRequest(action: string, params: Record<string, any> = {}): any {
   const p = { ...params };
   const userId = String(p.userId || '');
   let isWrite = false;
+
+  // ★ 保留角色守衛（同 GS checkActionPermission_ 同一位置：所有 action 之前）
+  //   applyJoin 除外：公開表單由自己嘅 sanitizer 靜默降級，唔好對匿名訪客洩露內部角色名。
+  if (action !== 'applyJoin' && isReservedRole(requestedRole(p))) {
+    logAudit(String(p.operatedBy || p.userId || 'anonymous'), 'DENIED:' + action, 'Security', '', '試圖指派保留角色 super_admin');
+    return { success: false, error: '「超級管理員」係系統內建帳號，不能經介面指派或建立。' };
+  }
 
   if (action === 'health') return { success: true, version: MOCK_BACKEND_VERSION, action: 'health', ready: true };
   if (action === 'login') return handleMockLogin(p);

@@ -1754,7 +1754,42 @@ var ACTION_REQUIRED_FEATURE_ = {
  * 檢查 operatedBy 有冇權做呢個 action。
  * 回傳 null = 放行；回傳 object = 拒絕（已經係 error payload）。
  */
+// ==================== 保留角色（防提權） ====================
+//
+// super_admin 係系統內建嘅隱藏帳號（sheep），全系統**只應該有一個**。
+// 佢唔喺 Users 表，由 SUPER_ADMIN_USER_ / SUPER_ADMIN_HASH_ 硬編碼認定。
+// 如果容許經 API 指派／建立／申請 super_admin，咁任何有「使用者管理」權限嘅人
+// （甚至公開申請表 applyJoin）都可以造出第二個超管 —— 直接提權。
+// 前端 assignableRoles() 已經唔會提供呢個選項，但前端守衛唔等於後端守衛：
+// operatedBy 係前端傳上嚟嘅，request 可以自己砌。所以後端必須再擋一次。
+var RESERVED_ROLES_ = ['super_admin'];
+
+/** 呢個角色係咪保留角色（唔可以經 API 指派／建立／申請） */
+function isReservedRole_(role) {
+  return RESERVED_ROLES_.indexOf(String(role === undefined || role === null ? '' : role).trim().toLowerCase()) >= 0;
+}
+
+/** 由 request 抽出「準備指派嘅角色」—— 唔同 action 放喺唔同參數 */
+function requestedRole_(p) {
+  if (!p) return '';
+  var r = p.role;
+  if (r !== undefined && r !== null && String(r).trim() !== '') return String(r).trim().toLowerCase();
+  // updateUserField 係萬用寫入：field='role' 時角色喺 value
+  if (String(p.field || '').trim().toLowerCase() === 'role') return String(p.value || '').trim().toLowerCase();
+  return '';
+}
+
 function checkActionPermission_(action, p) {
+  // ★ 保留角色守衛：放喺**所有身份豁免之前**。
+  //   連技術測試帳號（sheep）都唔應該經 API 造第二個超管 —— 超管只有一個，係硬編碼嗰個。
+  //   applyJoin 除外：佢係公開表單（匿名可調），由自己嘅 sanitizer 靜默降級為 parent。
+  //   對匿名訪客回一個講明「super_admin 係系統內建帳號」嘅錯誤，等於白白洩露內部角色名。
+  if (action !== 'applyJoin' && isReservedRole_(requestedRole_(p))) {
+    writeAudit_(String((p && (p.operatedBy || p.userId)) || 'anonymous'), 'DENIED:' + action, 'Security', '',
+      '試圖指派保留角色 super_admin');
+    return { success: false, error: '「超級管理員」係系統內建帳號，不能經介面指派或建立。' };
+  }
+
   var required = ACTION_REQUIRED_FEATURE_[action];
   if (!required) return null; // 唔喺清單＝讀取類或低風險，照放行
 
@@ -2515,12 +2550,21 @@ function handleApplyJoin_(p) {
   // Clean note: remove parsed fields, keep phone
   var cleanNote = appNote.split(';').filter(function(s){return s && !s.match(/^(pw|dob|email):/);}).join('; ').trim();
 
+  // ★ 保留角色守衛：呢個係公開表單（唔使登入），任何人都可以砌 request。
+  //   唔准將 super_admin 存入申請，否則管理員一批核就誕生第二個超管。
+  var applyRole = String(p.role || 'parent');
+  if (isReservedRole_(applyRole)) {
+    writeAudit_('anonymous', 'SANITIZE:applyJoin', 'Security', id,
+      '公開申請要求保留角色 ' + applyRole + '，已降級為 parent');
+    applyRole = 'parent';
+  }
+
   appendRowByHeaders_('Applications', {
     applicationId: id,
     type: p.type || 'parent',
     name: p.name || '',
     email: p.email || memberEmail || '',
-    role: p.role || 'parent',
+    role: applyRole,
     branchId: p.branchId || '',
     ymNumbers: p.ymNumbers || '',
     dateOfBirth: userDob || '',
@@ -2621,6 +2665,13 @@ function handleDecideApplication_(p) {
       var name = getField_(app, 'name');
       var email = getField_(app, 'email');
       var role = String(getField_(app, 'role') || 'parent').toLowerCase();
+      // ★ 保留角色守衛：applyJoin 係公開表單（唔使登入），任何人都可以喺申請入面
+      //   填 super_admin。批核時唔可以直接照抄，否則一經管理員批准就誕生第二個超管。
+      if (isReservedRole_(role)) {
+        writeAudit_(String(p.operatedBy || 'system'), 'SANITIZE:decideApplication', 'Security', String(appId),
+          '申請要求保留角色 ' + role + '，已降級為 parent');
+        role = 'parent';
+      }
       var branchId = getField_(app, 'branchId') || '';
       var ymNumbers = getField_(app, 'ymNumbers');
       var userId = uid_('u');
