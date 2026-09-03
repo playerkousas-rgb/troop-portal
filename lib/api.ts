@@ -292,13 +292,13 @@ export function apiSetWantedBadges(p: { memberId: string; wantedBadges: string }
 
 /** 公開資料第 1 層：管理員開／關卡片（行事曆／相簿／通告）。
  *  開卡時後端會預設把 troop（全旅內容）一齊公開。 */
-export function apiSetPublicCard(p: { card: 'calendar' | 'albums' | 'notices'; enabled: boolean }) {
+export function apiSetPublicCard(p: { card: 'calendar' | 'albums' | 'activities'; enabled: boolean }) {
   return apiMutate('setPublicCard', { card: p.card, enabled: p.enabled ? 'TRUE' : 'FALSE' });
 }
 
 /** 公開資料第 2 層：內容 scope。
  *  `troop`（全旅內容）只可以由管理層改；支部 scope 由該支部團長／支部領袖改（後端會檢查）。 */
-export function apiSetPublicScope(p: { card: 'calendar' | 'albums' | 'notices'; scope: string; enabled: boolean }) {
+export function apiSetPublicScope(p: { card: 'calendar' | 'albums' | 'activities'; scope: string; enabled: boolean }) {
   return apiMutate('setPublicScope', { card: p.card, scope: p.scope, enabled: p.enabled ? 'TRUE' : 'FALSE' });
 }
 

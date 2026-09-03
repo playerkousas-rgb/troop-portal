@@ -43,15 +43,19 @@ const CARD_COPY: Record<PublicCardId, {
     scope: '只限已發佈／已封存活動嘅相簿連結（領袖手動貼上嘅 URL）',
     exclude: '未發佈活動、相簿內嘅成員姓名／照片以外的系統資料、報名名單',
   },
-  notices: {
-    icon: '📄', name: '通告',
-    troopOn: '🟢 已公開 —— 訪客睇到全旅通告',
-    troopOff: '🔒 未公開 —— 全旅通告唔會顯示畀未登入訪客',
-    branchOn: '🟢 已公開 —— 訪客睇到本支部通告',
-    branchOff: '🔒 未公開 —— 本支部通告唔會顯示畀未登入訪客',
-    openLabel: '公開本支部通告', closeLabel: '取消公開',
-    scope: '只限「已設為可見」嘅通告 PDF（逐份發佈時已篩過一次）',
-    exclude: '未設為可見嘅通告、報名表格、成員名單、內部紀錄',
+  // ★ 第三張卡由「通告 📄」改成「活動 🎯」（2026-09-03 用戶決定）：
+  //   「應該沒有 NOTICE 卡的，也只有活動管理，根本沒有通告管理，
+  //     通告是由活動管理去上載的。」
+  //   舊 id `notices` 由 lib/publicScope.ts 嘅 normalizeCardId() 讀入時歸一。
+  activities: {
+    icon: '🎯', name: '活動',
+    troopOn: '🟢 已公開 —— 訪客睇到全旅活動（含活動通告文件）',
+    troopOff: '🔒 未公開 —— 全旅活動唔會顯示畀未登入訪客',
+    branchOn: '🟢 已公開 —— 訪客睇到本支部活動',
+    branchOff: '🔒 未公開 —— 本支部活動唔會顯示畀未登入訪客',
+    openLabel: '公開本支部活動', closeLabel: '取消公開',
+    scope: '只限「已發佈」嘅活動，以及「已設為可見」嘅通告 PDF',
+    exclude: '草稿活動、報名名單、成員名單、內部紀錄',
   },
 };
 

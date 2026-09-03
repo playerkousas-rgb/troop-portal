@@ -203,10 +203,10 @@ function getInitialSheets_() {
       ['ANNOUNCEMENT_FOLDER_ID', '', '公告 PDF 的 Google Drive 資料夾 ID。取得方式：打開 Drive 資料夾，看網址 https://drive.google.com/drive/folders/XXXX，XXXX 就是 ID。資料夾需設為「知道連結的人都可檢視」。'],
       ['MEETINGS_FOLDER_ID', '', '會議文件 PDF 的 Google Drive 資料夾 ID。可在「單位元件設定」或「會議管理」頁設定。'],
       ['REGISTRY_URL', 'https://troop-router.vercel.app/api/registry.json', '轉駁器 registry。'],
-      ['PUBLIC_CARDS', 'calendar,notices', '管理員開放的公開資料卡片，逗號分隔：calendar（行事曆）／albums（相簿）／notices（通告）。可全開、開兩個、開一個。預設開行事曆＋通告（同舊版公開瀏覽行為一致），相簿要管理員另外開。'],
+      ['PUBLIC_CARDS', 'calendar,activities', '管理員開放的公開資料卡片，逗號分隔：calendar（行事曆）／albums（相簿）／activities（活動）。可全開、開兩個、開一個。預設開行事曆＋活動（同舊版公開瀏覽行為一致），相簿要管理員另外開。★ 舊值 notices 由 normalizeCardId_() 讀入時歸一做 activities，唔使人手改 Sheet。'],
       ['PUBLIC_SCOPE_CALENDAR', 'troop', '行事曆卡片的公開範圍：troop（全旅，由管理員決定）＋各支部 id（由該支部團長決定）。'],
       ['PUBLIC_SCOPE_ALBUMS', 'troop', '相簿卡片的公開範圍，格式同上。'],
-      ['PUBLIC_SCOPE_NOTICES', 'troop', '通告卡片的公開範圍，格式同上。'],
+      ['PUBLIC_SCOPE_ACTIVITIES', 'troop', '活動卡片的公開範圍，格式同上。★ 舊旅團 Sheet 入面係 PUBLIC_SCOPE_NOTICES，讀取時自動 fallback（見 LEGACY_SCOPE_KEY_）。'],
       
       ['STAFF_TOKEN', '', '（系統用）'],
       ['API_KEY_HASH', '', '（系統用）'],
@@ -2982,8 +2982,10 @@ function handleSetWantedBadges_(p) {
    ★ 開卡時預設把 troop（全旅內容）一齊公開 —— 全旅內容由管理員決定。
    ★ 各支部內容唔會因為開卡而自動公開，要由該支部團長另外開放。 */
 function handleSetPublicCard_(p) {
-  var card = String(p.card || '');
-  if (['calendar', 'albums', 'notices'].indexOf(card) < 0) return { success: false, error: '未知的卡片' };
+  // ★ 先歸一再驗證：舊 client／舊書籤可能仍送 `notices`（第三張卡嘅舊 id）。
+  //   直接驗證會回「未知的卡片」，管理員會以為壞咗。
+  var card = normalizeCardId_(String(p.card || ''));
+  if (['calendar', 'albums', 'activities'].indexOf(card) < 0) return { success: false, error: '未知的卡片' };
 
   var opId = p.operatedBy || '';
   var users = readTable_('Users');
@@ -2996,8 +2998,21 @@ function handleSetPublicCard_(p) {
 
   var on = parseBool_(p.enabled);
   var key = 'PUBLIC_SCOPE_' + card.toUpperCase();
-  var cards = setInList_(getConfigValue_('PUBLIC_CARDS'), card, on);
+  /**
+   * ★ 寫入前先把舊卡 id 歸一（2026-09-03：第三張卡由 notices 改成 activities）。
+   *
+   * live Sheet 入面係 `PUBLIC_CARDS='calendar,notices'`。如果唔歸一就直接
+   * setInList_，管理員「關閉活動卡」會搵唔到 `activities` 嚟刪 → 寫返
+   * `calendar,notices` → 前端 normalizeCardId_ 把 `notices` 讀做 `activities`
+   * → **張卡照舊顯示為開，管理員關唔到**。呢個係靜默失敗，冇任何錯誤訊息。
+   */
+  var cards = setInList_(normalizeCards_(getConfigValue_('PUBLIC_CARDS')), card, on);
   var scopes = String(getConfigValue_(key) || '');
+  // ★ 舊 key fallback：live Sheet 入面係 PUBLIC_SCOPE_NOTICES。
+  //   新 key 未寫過就要讀舊 key，否則各支部已設定嘅公開範圍會全部消失。
+  if (parseArray_(scopes).length === 0 && LEGACY_SCOPE_KEY_[card]) {
+    scopes = String(getConfigValue_(LEGACY_SCOPE_KEY_[card]) || '');
+  }
   // 開卡而 scope 從未設定過 → 預設公開 troop（全旅內容）
   if (on && parseArray_(scopes).length === 0) scopes = setInList_(scopes, 'troop', true);
 
@@ -3011,9 +3026,11 @@ function handleSetPublicCard_(p) {
    troop（全旅內容）→ 只有管理層可以改
    b1..b5（支部內容）→ 管理層，或該支部自己嘅團長／支部領袖／教練員 */
 function handleSetPublicScope_(p) {
-  var card = String(p.card || '');
   var scope = String(p.scope || '');
-  if (['calendar', 'albums', 'notices'].indexOf(card) < 0) return { success: false, error: '未知的卡片' };
+  // ★ 先歸一再驗證：舊 client／舊書籤可能仍送 `notices`（第三張卡嘅舊 id）。
+  //   直接驗證會回「未知的卡片」，管理員會以為壞咗。
+  var card = normalizeCardId_(String(p.card || ''));
+  if (['calendar', 'albums', 'activities'].indexOf(card) < 0) return { success: false, error: '未知的卡片' };
   if (!scope) return { success: false, error: '缺少範圍' };
 
   var opId = p.operatedBy || '';
@@ -3032,10 +3049,51 @@ function handleSetPublicScope_(p) {
   }
 
   var key = 'PUBLIC_SCOPE_' + card.toUpperCase();
-  var next = setInList_(getConfigValue_(key), scope, parseBool_(p.enabled));
+  var cur = String(getConfigValue_(key) || '');
+  // ★ 舊 key fallback：live Sheet 入面係 PUBLIC_SCOPE_NOTICES。新 key 未寫過就要讀舊 key，
+  //   否則各支部領袖已設定嘅公開範圍會喺第一次寫入時全部消失（靜默失敗）。
+  if (parseArray_(cur).length === 0 && LEGACY_SCOPE_KEY_[card]) {
+    cur = String(getConfigValue_(LEGACY_SCOPE_KEY_[card]) || '');
+  }
+  var next = setInList_(cur, scope, parseBool_(p.enabled));
   setConfigValue_(key, next);
   writeAudit_(opId || 'system', 'setPublicScope', 'SystemConfig', card + '/' + scope, parseBool_(p.enabled) ? '公開' : '取消公開');
   return { success: true };
+}
+
+/* ═══ 公開卡 id 歸一（2026-09-03 用戶決定）═══
+ *
+ * 第三張公開卡原本叫 `notices`（通告）。用戶：「應該沒有 NOTICE 卡的，
+ * 也只有活動管理，根本沒有通告管理，通告是由活動管理去上載的。」
+ * → 第三張卡改成 `activities`（活動）。
+ *
+ * 點解唔直接改名就算：live Sheet 已經有
+ *   ・`PUBLIC_CARDS` 入面寫住 `notices`
+ *   ・`PUBLIC_SCOPE_NOTICES` 呢個 key（存住 troop／各支部嘅公開範圍）
+ * 直接改名會令嗰張卡**無聲無息變「已關閉」**，管理員明明開咗卡，
+ * 訪客卻乜都睇唔到，而且冇任何錯誤訊息。
+ *
+ * 所以同 normalizeRole_() 同一個做法：**讀入時歸一 ＋ 寫入時歸一**，
+ * 但唔改寫 Sheet 上面嘅其他原始值。
+ */
+var LEGACY_CARD_ID_ = { notices: 'activities' };
+var LEGACY_SCOPE_KEY_ = { activities: 'PUBLIC_SCOPE_NOTICES' };
+
+/** 把舊卡 id 歸一做新 id（未知字串原樣返回） */
+function normalizeCardId_(raw) {
+  var s = String(raw || '').trim();
+  return LEGACY_CARD_ID_[s] || s;
+}
+
+/** 把成個 comma list 入面嘅舊卡 id 歸一（去重，保持排序由 setInList_ 負責） */
+function normalizeCards_(csv) {
+  var out = [];
+  var list = parseArray_(String(csv || ''));
+  for (var i = 0; i < list.length; i++) {
+    var c = normalizeCardId_(list[i]);
+    if (c && out.indexOf(c) < 0) out.push(c);
+  }
+  return out.join(',');
 }
 
 /* 把一個值加入／移出 comma list（troop 排最前，其餘按字母排序） */

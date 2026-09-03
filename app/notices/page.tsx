@@ -148,7 +148,7 @@ export default function Notices() {
   const allPdfs = s.announcementPdfs || [];
   const pdfs = isGuest
     ? allPdfs.filter(p => p.visible !== false
-        && (p.branchTags || ['全旅']).some(t => isItemPublic(s.config, 'notices', tagToScope(t))))
+        && (p.branchTags || ['全旅']).some(t => isItemPublic(s.config, 'activities', tagToScope(t))))
     : allPdfs;
 
   return (
@@ -156,7 +156,7 @@ export default function Notices() {
 
       {/* 公開通告範圍 —— 全旅內容由管理層決定，各支部內容由該支部團長決定 */}
       {canSetScope && (
-        <PublicScopePanel card="notices" s={s} adminTier={adminTier}
+        <PublicScopePanel card="activities" s={s} adminTier={adminTier}
           ownBranchId={session?.branchId || ''} onSaved={setS} />
       )}
 

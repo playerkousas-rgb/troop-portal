@@ -5,7 +5,7 @@
  * │   管理員：「未登入可唔可以睇公開資料」。關 → 乜都唔公開。
  * │
  * ├ 第 1 層：卡片 `PUBLIC_CARDS`（管理員）
- * │   三張卡各自獨立：**行事曆 📅 / 相簿 📷 / 通告 📄**
+ * │   三張卡各自獨立：**行事曆 📅 / 相簿 📷 / 活動 🎯**
  * │   可以全開、開兩張、開一張。
  * │
  * └ 第 2 層：內容 `PUBLIC_SCOPE_<card>`
@@ -14,10 +14,10 @@
  *       ・`b1..b5`（各支部內容）→ 由**該支部團長／支部領袖**自己決定。
  *     ★ 當 troop ＋ 所有支部都關晒 → 該張卡等於重新關閉，要再由管理員開返。
  *
- * 例：管理員開咗「行事曆」＋「通告」兩張卡；行事曆入面 troop＋b2＋b4 開、b3 關
+ * 例：管理員開咗「行事曆」＋「活動」兩張卡；行事曆入面 troop＋b2＋b4 開、b3 關
  *   → 訪客睇到：全旅行事曆 ＋ b2 ＋ b4 行事曆；b3 行事曆睇唔到
  *   → 相簿完全睇唔到（卡未開）
- *   → 通告按通告卡自己嘅 scope
+ *   → 活動按活動卡自己嘅 scope
  */
 
 import { publicViewEnabled } from './model';
@@ -27,13 +27,36 @@ import { publicViewEnabled } from './model';
    ══════════════════════════════════════════════════════════ */
 
 export const PUBLIC_CARDS = [
-  { id: 'calendar', icon: '📅', name: '行事曆', desc: '已公佈活動＋恆常集會' },
-  { id: 'albums',   icon: '📷', name: '相簿',   desc: '活動相簿連結' },
-  { id: 'notices',  icon: '📄', name: '通告',   desc: '活動通告 PDF' },
+  { id: 'calendar',   icon: '📅', name: '行事曆', desc: '已公佈活動＋恆常集會' },
+  { id: 'albums',     icon: '📷', name: '相簿',   desc: '活動相簿連結' },
+  { id: 'activities', icon: '🎯', name: '活動',   desc: '活動詳情＋通告文件' },
 ] as const;
 
-export type PublicCardId = 'calendar' | 'albums' | 'notices';
-export const PUBLIC_CARD_IDS: PublicCardId[] = ['calendar', 'albums', 'notices'];
+export type PublicCardId = 'calendar' | 'albums' | 'activities';
+export const PUBLIC_CARD_IDS: PublicCardId[] = ['calendar', 'albums', 'activities'];
+
+/**
+ * ★ 舊卡 id 歸一（2026-09-03 用戶決定）。
+ *
+ * 第三張卡原本叫 `notices`（通告）。用戶：「應該沒有 NOTICE 卡的，
+ * 也只有活動管理，根本沒有通告管理，通告是由活動管理去上載的。」
+ * → 第三張卡改成 `activities`（活動）。
+ *
+ * 點解唔直接改名就算：82 旅嘅 live Sheet 已經有
+ *   ・`PUBLIC_CARDS` 入面寫住 `notices`
+ *   ・`PUBLIC_SCOPE_NOTICES` 呢個 key（存住 troop／各支部嘅公開範圍）
+ * 直接改名會令嗰張卡**無聲無息變「已關閉」**（openCards 認唔到 `notices`，
+ * scopeKey 亦會去搵一個唔存在嘅 `PUBLIC_SCOPE_ACTIVITIES`）——
+ * 管理員明明開咗卡，訪客卻乜都睇唔到，而且冇任何錯誤訊息。
+ *
+ * 所以同 `normalizeRole()` 同一個做法：**讀入時歸一，唔改寫原始資料**。
+ */
+const LEGACY_CARD_ID: Record<string, PublicCardId> = { notices: 'activities' };
+
+/** 把舊卡 id 歸一做新 id（未知字串原樣返回，交由 PUBLIC_CARD_IDS 過濾） */
+export function normalizeCardId(raw: string): PublicCardId | string {
+  return LEGACY_CARD_ID[raw] || raw;
+}
 
 /** 全旅內容喺 scope 清單入面嘅代號 */
 export const TROOP_SCOPE = 'troop';
@@ -46,6 +69,13 @@ export const TROOP_SCOPE = 'troop';
 export const PUBLIC_CARDS_KEY = 'PUBLIC_CARDS';
 /** 每張卡嘅內容 scope（comma list：`troop` 及／或 branchId） */
 export const scopeKey = (card: PublicCardId) => `PUBLIC_SCOPE_${card.toUpperCase()}`;
+/**
+ * 舊 key —— 讀入時 fallback 用（見上面 LEGACY_CARD_ID 嘅說明）。
+ * 寫入一律用新 key；舊 key 只讀唔寫，所以 Sheet 上面嘅原始值唔會被改寫。
+ */
+const LEGACY_SCOPE_KEY: Partial<Record<PublicCardId, string>> = {
+  activities: 'PUBLIC_SCOPE_NOTICES',
+};
 
 /* ══════════════════════════════════════════════════════════
    讀取
@@ -57,9 +87,9 @@ function csv(v: any): string[] {
 
 /** 管理員開咗邊幾張卡 */
 export function openCards(config: any): PublicCardId[] {
-  return csv(config?.[PUBLIC_CARDS_KEY]).filter((c): c is PublicCardId =>
-    (PUBLIC_CARD_IDS as string[]).includes(c)
-  );
+  return csv(config?.[PUBLIC_CARDS_KEY])
+    .map((c) => normalizeCardId(c))          // ★ 舊 `notices` → `activities`
+    .filter((c): c is PublicCardId => (PUBLIC_CARD_IDS as string[]).includes(c));
 }
 
 /** 某張卡管理員開咗未 */
@@ -69,7 +99,12 @@ export function cardOpen(config: any, card: PublicCardId): boolean {
 
 /** 某張卡入面，邊啲 scope 開咗 */
 export function openScopes(config: any, card: PublicCardId): string[] {
-  return csv(config?.[scopeKey(card)]);
+  const own = csv(config?.[scopeKey(card)]);
+  if (own.length) return own;
+  // ★ 舊 key fallback：82 旅 live Sheet 入面係 PUBLIC_SCOPE_NOTICES。
+  //   新 key 未寫過就要讀舊 key，否則嗰張卡會無聲無息變「全部 scope 關晒」。
+  const legacy = LEGACY_SCOPE_KEY[card];
+  return legacy ? csv(config?.[legacy]) : [];
 }
 
 /** 某張卡嘅某個 scope 開咗未 */

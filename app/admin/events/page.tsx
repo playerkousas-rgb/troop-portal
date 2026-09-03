@@ -301,11 +301,18 @@ export default function Page() {
         {/*
           ★ 通告PDF 入口（用戶要求：「通告PDF 和 活動統計 不屬於 管理中心；
             兩者都屬於 活動管理」）。活動統計嗰條一直喺度，但通告PDF 嗰條從來冇加過
-            → 令 /notices 變成孤兒頁（全 repo 零入站連結），而 /notices 係
-            三張公開卡入面 `notices` 卡嘅**唯一**管理面
-            （PublicScopePanel card="notices" ＋ 全 repo 唯一用 apiUpdatePdfTags 嘅頁）。
-            冇呢條 link，管理員就冇辦法管「活動通告 PDF」嗰張公開卡。
-            check:links §5 會捉呢類孤兒頁。
+            → 令 /notices 變成孤兒頁（全 repo 零入站連結）。
+
+            /notices 係「活動」公開卡（card="activities"）嘅 PDF 管理面，
+            亦係全 repo 唯一用 apiUpdatePdfTags 嘅頁。冇呢條 link，
+            管理員就冇辦法管活動通告 PDF 嘅標籤同公開範圍。
+            check:links §5（BFS 可達性）會捉呢類孤兒頁。
+
+            ★ 2026-09-03：第三張公開卡由「通告 📄」改成「活動 🎯」
+              （用戶：「應該沒有 NOTICE 卡的，也只有活動管理，
+                根本沒有通告管理，通告是由活動管理去上載的」）。
+              所以呢頁（活動管理）就係通告嘅唯一上載入口，
+              /notices 淨係管已上載咗嘅 PDF 標籤／公開範圍。
         */}
         <Link href="/notices" className="btn">📄 通告PDF（活動通告文件・標籤・公開範圍）→</Link>
       </div>

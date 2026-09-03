@@ -1122,3 +1122,120 @@ marketplace／connectors）。但 demo 樹嘅同一張卡**直接指去 leaf 頁
 **Negative control（第 10 個）：**管理中心張卡由 hub 改指 leaf 頁 →
 BFS 版咬到 6 個不可達（hub ＋ 5 下游頁），舊「數入站連結」版只咬到 1 個。
 還原後 0 殘留、210 項全綠。
+
+---
+
+## 2026-09-03 第三張公開卡：`notices`（通告）→ `activities`（活動）
+
+### 用戶決定
+
+審計發現三張公開卡同底欄三個公開掣**錯位**：
+
+| 底欄公開掣 | 頁面 | `isItemPublic` | 用邊張卡 |
+|---|---|---|---|
+| 📅 行事曆 | `/calendar` | 4 | `calendar` |
+| 📷 相簿 | `/albums` | 2 | `albums` |
+| 🎯 活動 | `/activities` | **0** | **一張都冇** |
+
+而第三張卡 `notices` 嘅消費面係 `/notices` —— 佢唔喺底欄。即係有一張卡
+完全冇效力：管理員關咗佢，訪客喺「🎯 活動」掣一樣睇到晒。
+
+**用戶答覆：**「1，但其實應該沒有 NOTICE 卡的，也只有活動管理，
+根本沒有通告管理，通告是由活動管理去上載的。」
+
+核實：`/admin/events:33-34` 確實有三種加入方法
+（`1️⃣ 純在 APP 打入資料`／`2️⃣ 上載通告（.docx/.txt 自動讀資料）`／`3️⃣ 加入通告連結`）
+—— 通告確實由活動管理上載，冇獨立嘅通告管理。
+
+### 改咗乜
+
+| 檔案 | 改動 |
+|---|---|
+| `lib/publicScope.ts` | 第三張卡 `notices`→`activities`（🎯 活動）；新增 `normalizeCardId()`＋`LEGACY_SCOPE_KEY`；`openCards()`／`openScopes()` 讀入時歸一 |
+| `lib/api.ts` | 2 個 card 型別 union |
+| `components/ui/PublicScopePanel.tsx` | `CARD_COPY` 第三張卡文案 |
+| `app/activities/page.tsx` | **新增 `isItemPublic(s.config,'activities',e.branchId)` 過濾**（未登入訪客） |
+| `app/notices/page.tsx` | 2 處 card id |
+| `app/dashboard/admin/settings/page.tsx` | demo 樹卡片清單 |
+| `app/admin/events/page.tsx` | 註解更新（通告PDF link 保留） |
+| `lib/mockServer.ts` | import ＋ 2 處 card 驗證（先歸一再驗證）＋ 2 處 legacy fallback |
+| `gs/SCOUTSYSTEM_2_SETUP.gs` | `normalizeCardId_()`／`normalizeCards_()`／`LEGACY_CARD_ID_`／`LEGACY_SCOPE_KEY_`；2 個 handler 先歸一再驗證；2 處 config seed；2 處 legacy fallback |
+
+### ★ 點解必須做讀入時歸一（唔可以直接改名）
+
+82 旅 live Sheet 已經有：
+```
+PUBLIC_CARDS       = 'calendar,notices'
+PUBLIC_SCOPE_NOTICES = 'troop'
+```
+
+直接改名會有**兩個靜默失敗**（冇任何錯誤訊息）：
+
+1. **讀取**：`openCards` 認唔到 `notices` → 第三張卡無聲無息變「已關閉」；
+   `scopeKey('activities')` 去搵 `PUBLIC_SCOPE_ACTIVITIES`（唔存在）
+   → 各支部領袖已設定嘅公開範圍全部消失。
+2. **寫入**：管理員「關閉活動卡」→ `setInList_` 搵唔到 `activities` 嚟刪
+   → 寫返 `calendar,notices` → 前端歸一之後**張卡照舊顯示為開，管理員關唔到**。
+
+所以同 `normalizeRole()` 同一個做法：**讀入時歸一 ＋ 寫入時歸一**，
+但唔改寫 Sheet 上面嘅其他原始值。新 key 存在時優先用新 key。
+
+### 驗證
+
+**讀路徑（真實 HTTP 攞返嚟嘅 live config，舊格式）—— 9/9：**
+```
+live config: {"PUBLIC_CARDS":"calendar,notices","PUBLIC_SCOPE_NOTICES":"troop,b2"}
+  ✅ openCards 讀出新 id                     got=["calendar","activities"]
+  ✅ 第三張卡仍係「開」（唔會無聲無息變關）   got=true
+  ✅ openScopes 由舊 key fallback 讀到        got=["troop","b2"]
+  ✅ b2 內容公開（支部領袖之前同意過）        got=true
+  ✅ b3 內容唔公開（之前冇同意）              got=false
+  ✅ albums 卡未開（唔受 fallback 污染）      got=false
+```
+
+**寫路徑（靜默失敗風險嘅直接証明）：**
+```
+起點   PUBLIC_CARDS = "calendar,notices"
+關閉「活動」卡（card=activities）→ success=true
+結果   PUBLIC_CARDS = "calendar"
+  ★ 舊 id notices 已刪走 = true
+  ★ 張卡真係關咗       = true
+```
+
+**Negative control（第 11 個）：**癱瘓 `normalizeCardId` ＋ scope fallback
+→ `check:public` **7/60 失敗**；還原後 0 殘留、60 全綠。
+
+**`check:public` 由 46 升到 60 項斷言**（新增第 9 節：舊卡 id 歸一，14 個斷言）。
+
+### ★ 過程中被驗證否定咗嘅三個假設
+
+記錄喺呢度，因為三個都係「睇落好合理但實測唔成立」：
+
+1. **「`/badges` 係死碼」** —— 錯。佢有 `app/member/page.tsx:42`（物件屬性形式）
+   同 `app/parent/page.tsx:201`（模板字串形式）兩條入站連結。我個 grep 只配精確字串。
+2. **「`/activities` 攞唔到 `config` → 過濾會靜默放行」** —— 前半啱後半錯。
+   實測 `isItemPublic(undefined, …)` 回 **`false`**（靜默**隱藏**全部，唔係放行）。
+   但再查 GS `buildStateSlice_:1466-1482`：`config` 同 `userFeatures` 係
+   **寫死喺 `out` 初始化**、唔理 `keyList`，所以 `/activities` 淨係請求
+   `keys=events` 一樣攞到 `config`。mock 同 GS 兩邊行為一致 → 冇問題。
+3. **「交接掣有 6 個」** —— 錯，實際 **5 個**。我之前報嘅 6 係量度自一個被
+   測試污染咗嘅 `.mockdata`（`u_m2` 當時係 `branch_leader`）。
+   原始 seed（`lib/mockServer.ts:131`）`u_m2` 係 `member`：
+   admin 1 / troop_leader 1 / group_leader 2 / branch_leader 1 / coach 1
+   / parent 2 / member 5 → 帳戶表 6 行 − 自己 = **5**。
+   （`check:render` 嘅斷言係 `>0` 同 `<13`，所以冇被呢個錯數影響。）
+
+### 驗證（全套）
+
+`tsc` 0 error · `next build` exit 0 / 64 routes · `npm run lint` 9 warnings / 0 errors
+（同基線一致）· 8 個 check 全綠：`check:gs` · `check:perms` 47/47/18 ·
+`check:public` **60** · `check:security` **114** · `check:links` **210** ·
+`check:modules` · `check:calendar` · `check:render`。
+GS 模板 247,944 bytes，同 `public/downloads/` 副本 `cmp` 一致。
+
+### 仍需人手做
+
+**82 旅重新部署 GS** —— 上面所有 GS 修正喺重新部署之前全部係 inert。
+重新部署後 live Sheet 入面嘅 `PUBLIC_CARDS='calendar,notices'` 同
+`PUBLIC_SCOPE_NOTICES` **唔使人手改**，讀入時自動歸一；
+管理員第一次撳「開／關活動卡」時先會寫成新格式。

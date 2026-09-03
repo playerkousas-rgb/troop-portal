@@ -12,7 +12,7 @@ export default function SettingsPage() {
   const CARD_LIST = [
     { id: 'calendar', icon: '📅', name: '行事曆', desc: '已公佈活動＋恆常集會（訂閱版跟住呢張卡）' },
     { id: 'albums', icon: '📷', name: '相簿', desc: '活動相簿連結' },
-    { id: 'notices', icon: '📄', name: '通告', desc: '已設為可見嘅通告 PDF' },
+    { id: 'activities', icon: '🎯', name: '活動', desc: '已發佈活動＋已設為可見嘅通告 PDF' },
   ];
   const SCOPE_LIST = [{ id: 'troop', name: '全旅' }, { id: 'b2', name: '幼童軍' }, { id: 'b3', name: '童軍' }];
 

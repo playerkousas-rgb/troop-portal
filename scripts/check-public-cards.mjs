@@ -18,6 +18,7 @@ import {
   toggleCard, toggleScope,
   cardOpen, cardEffective, scopeOpen, isItemPublic,
   canToggleCard, canToggleScope,
+  normalizeCardId, openScopes, openCards,
 } from '../lib/publicScope.ts';
 
 const errors = [];
@@ -29,7 +30,7 @@ const t = (name, got, want) => {
 };
 
 /* ── 1. 三張卡 ── */
-t('三張公開資料卡', PUBLIC_CARD_IDS, ['calendar', 'albums', 'notices']);
+t('三張公開資料卡', PUBLIC_CARD_IDS, ['calendar', 'albums', 'activities']);
 
 /* ── 2. 卡片開咗默認全旅內容公開（scope 為空時自動加 troop）── */
 let r = toggleCard('', '', 'albums', true);
@@ -39,20 +40,20 @@ t('  → 卡片即時有效', cardEffective({ PUBLIC_CARDS: r.cards, PUBLIC_SCOP
 /* ── 3. 三張卡獨立：可全開／開兩個／開一個 ── */
 let cards = '';
 for (const c of PUBLIC_CARD_IDS) cards = toggleCard(cards, TROOP_SCOPE, c, true).cards;
-t('三張全開', cards, 'albums,calendar,notices');          // setInList 刻意排序
+t('三張全開', cards, 'activities,albums,calendar');          // setInList 刻意排序
 const two = toggleCard(cards, TROOP_SCOPE, 'albums', false).cards;
-t('關相簿 → 剩兩張', two, 'calendar,notices');
+t('關相簿 → 剩兩張', two, 'activities,calendar');
 t('  相簿卡已關', cardOpen({ PUBLIC_CARDS: two }, 'albums'), false);
-t('  其餘兩張照開', [cardOpen({ PUBLIC_CARDS: two }, 'calendar'), cardOpen({ PUBLIC_CARDS: two }, 'notices')], [true, true]);
-const one = toggleCard(two, TROOP_SCOPE, 'notices', false).cards;
-t('再關通告 → 剩一張', one, 'calendar');
+t('  其餘兩張照開', [cardOpen({ PUBLIC_CARDS: two }, 'calendar'), cardOpen({ PUBLIC_CARDS: two }, 'activities')], [true, true]);
+const one = toggleCard(two, TROOP_SCOPE, 'activities', false).cards;
+t('再關活動 → 剩一張', one, 'calendar');
 
 /* ── 4. 關卡保留 scope（重開唔使重設）── */
-const closed = toggleCard('calendar,notices', 'troop,b2,b3', 'calendar', false);
-t('關卡後 cards', closed.cards, 'notices');
+const closed = toggleCard('activities,calendar', 'troop,b2,b3', 'calendar', false);
+t('關卡後 cards', closed.cards, 'activities');
 t('關卡後 scopes 保留', closed.scopes, 'troop,b2,b3');
 const reopened = toggleCard(closed.cards, closed.scopes, 'calendar', true);
-t('重開卡 → cards', reopened.cards, 'calendar,notices');
+t('重開卡 → cards', reopened.cards, 'activities,calendar');
 t('重開卡 → scopes 冇被改走', reopened.scopes, 'troop,b2,b3');
 
 /* ── 5. 所有支部＋旅都關 ⇒ 卡片等於重新關閉 ── */
@@ -72,7 +73,7 @@ t('關唔存在嘅 scope 唔會出錯', toggleScope('troop', 'b5', false), 'troo
 const cfg = (card, scope) => ({ PUBLIC_VIEW: 'TRUE', PUBLIC_CARDS: card, [`PUBLIC_SCOPE_${card.toUpperCase()}`]: scope });
 t('卡開＋scope 命中 → 公開', isItemPublic(cfg('calendar', 'troop,b3'), 'calendar', 'b3'), true);
 t('卡開＋scope 未命中 → 唔公開', isItemPublic(cfg('calendar', 'troop,b3'), 'calendar', 'b2'), false);
-t('卡關閉 → 就算 scope 命中都唔公開', isItemPublic(cfg('notices', 'troop,b2'), 'calendar', 'b2'), false);
+t('卡關閉 → 就算 scope 命中都唔公開', isItemPublic(cfg('activities', 'troop,b2'), 'calendar', 'b2'), false);
 t('全旅項目（branchId 空）用 troop scope', isItemPublic(cfg('calendar', 'troop'), 'calendar', ''), true);
 t('全旅項目受 troop scope 控制', isItemPublic(cfg('calendar', 'b3'), 'calendar', ''), false);
 t('總掣關 → 一律唔公開', isItemPublic({ PUBLIC_VIEW: 'FALSE', PUBLIC_CARDS: 'calendar', PUBLIC_SCOPE_CALENDAR: 'troop' }, 'calendar', 'troop'), false);
@@ -94,6 +95,42 @@ t('教練員可以改自己支部', canToggleScope('coach', 'b3', 'b3'), true);
 t('支部領袖唔可以改其他支部', canToggleScope('branch_leader', 'b3', 'b2'), false);
 t('家長唔可以改任何範圍', canToggleScope('parent', 'b3', 'b3'), false);
 t('成員唔可以改任何範圍', canToggleScope('member', 'b3', 'b3'), false);
+
+/* ── 9. ★ 舊卡 id 歸一（2026-09-03：第三張卡由 notices 改成 activities）──
+ *
+ * 呢一節係今次改動嘅**真正風險點**。82 旅 live Sheet 入面係：
+ *   PUBLIC_CARDS = 'calendar,notices'
+ *   PUBLIC_SCOPE_NOTICES = 'troop'
+ * 如果讀入時唔歸一：
+ *   ・openCards 認唔到 'notices' → 第三張卡無聲無息變「已關閉」
+ *   ・scopeKey('activities') 會去搵 PUBLIC_SCOPE_ACTIVITIES（唔存在）→ 各支部
+ *     已設定嘅公開範圍全部消失
+ * 兩者都係**靜默失敗**：管理員明明開咗卡，訪客卻乜都睇唔到，冇任何錯誤訊息。
+ */
+const LEGACY = { PUBLIC_VIEW: 'TRUE', PUBLIC_CARDS: 'calendar,notices', PUBLIC_SCOPE_NOTICES: 'troop,b2' };
+
+t('normalizeCardId：notices → activities', normalizeCardId('notices'), 'activities');
+t('normalizeCardId：新 id 原樣返回', normalizeCardId('activities'), 'activities');
+t('normalizeCardId：其他卡唔受影響', [normalizeCardId('calendar'), normalizeCardId('albums')], ['calendar', 'albums']);
+t('normalizeCardId：未知字串原樣返回（交由 PUBLIC_CARD_IDS 過濾）', normalizeCardId('nonsense'), 'nonsense');
+
+t('舊 PUBLIC_CARDS 讀出嚟係新 id', openCards(LEGACY), ['calendar', 'activities']);
+t('  → 第三張卡仍然係「開」（唔會無聲無息變關）', cardOpen(LEGACY, 'activities'), true);
+t('  → cardEffective 仍然有效', cardEffective(LEGACY, 'activities'), true);
+t('舊 PUBLIC_SCOPE_NOTICES 由 fallback 讀到', openScopes(LEGACY, 'activities'), ['troop', 'b2']);
+t('  → 全旅內容公開', isItemPublic(LEGACY, 'activities', ''), true);
+t('  → b2 內容公開（支部領袖之前同意過）', isItemPublic(LEGACY, 'activities', 'b2'), true);
+t('  → b3 內容唔公開（之前冇同意）', isItemPublic(LEGACY, 'activities', 'b3'), false);
+
+/* 新 key 存在時要優先用新 key（唔好被舊值蓋過） */
+const MIGRATED = { PUBLIC_VIEW: 'TRUE', PUBLIC_CARDS: 'calendar,activities',
+  PUBLIC_SCOPE_ACTIVITIES: 'troop,b3', PUBLIC_SCOPE_NOTICES: 'troop,b2' };
+t('新 key 存在 → 優先用新 key', openScopes(MIGRATED, 'activities'), ['troop', 'b3']);
+t('  → b3 公開、b2 唔公開（跟新 key）',
+  [isItemPublic(MIGRATED, 'activities', 'b3'), isItemPublic(MIGRATED, 'activities', 'b2')], [true, false]);
+
+/* 其他卡唔應該被 legacy fallback 污染 */
+t('albums 唔會誤讀 PUBLIC_SCOPE_NOTICES', openScopes(LEGACY, 'albums'), []);
 
 if (errors.length) {
   console.error(`❌ 公開資料卡片模型有問題（${errors.length}/${checked}）：\n` + errors.map(x => '  - ' + x).join('\n'));

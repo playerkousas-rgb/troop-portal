@@ -22,7 +22,7 @@ import type { Role } from './model';
 import { branches as modelBranches, MANAGER_ROLES, LEADER_ROLES, normalizeRole } from './model';
 // PublicCardId 係純 type，要用 `import type`：Node 嘅 --experimental-strip-types
 // （npm run check:* 用）唔會自動 elide 混喺 value import 入面嘅 type。
-import { PUBLIC_CARD_IDS, scopeKey, toggleCard, toggleScope, canToggleCard, canToggleScope } from './publicScope';
+import { PUBLIC_CARD_IDS, scopeKey, toggleCard, toggleScope, canToggleCard, canToggleScope, normalizeCardId } from './publicScope';
 import type { PublicCardId } from './publicScope';
 import { DEMO_TROOP_KEY, MOCK_TROOP } from './mockConstants';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
@@ -77,6 +77,16 @@ const seed: AppState = {
     // ★ 公開資料三層模型（lib/publicScope.ts）
     //   第 1 層：管理員開咗邊幾張卡（demo：行事曆＋通告開，相簿未開）
     //   第 2 層：每張卡嘅內容 scope（troop＝全旅由管理員決定；b*＝各支部由團長決定）
+    /**
+     * ★ 刻意保留**舊** card id 同舊 scope key（2026-09-03 第三張卡由 notices 改成 activities）。
+     *
+     * demo 旅團故意用舊格式 seed，令佢真正行經 normalizeCardId()／openScopes() 嘅
+     * legacy fallback 路徑 —— 呢個正正係 82 旅 live Sheet 嘅實際狀態。
+     * 如果 demo 用新格式，歸一邏輯就永遠唔會被執行到，壞咗都唔會發現。
+     *
+     * 預期行為：前端讀到嘅第三張卡係 `activities`（唔係 `notices`），
+     * 而佢嘅 scope 係 `troop,b2`（由 PUBLIC_SCOPE_NOTICES fallback 讀到）。
+     */
     PUBLIC_CARDS: 'calendar,notices',
     PUBLIC_SCOPE_CALENDAR: 'troop,b2,b3',
     PUBLIC_SCOPE_ALBUMS: 'troop',
@@ -1002,14 +1012,24 @@ function handleMutate(action: string, p: Record<string, any>) {
     }
     /* ═══ 公開資料：第 1 層（管理員開／關卡片）═══ */
     case 'setPublicCard': {
-      const card = String(p.card || '');
-      if (!PUBLIC_CARD_IDS.includes(card as PublicCardId)) return { success: false, error: '未知的卡片' };
+      // ★ 先歸一再驗證（鏡像 GS）：舊 client 可能仍送 `notices`（第三張卡嘅舊 id）。
+      const card = normalizeCardId(String(p.card || '')) as PublicCardId;
+      if (!PUBLIC_CARD_IDS.includes(card)) return { success: false, error: '未知的卡片' };
       const opUser = store.users.find(u => u.id === String(p.operatedBy || ''));
       if (!opUser) return { success: false, error: '未能確認操作者身份，請重新登入。' };
       if (!canToggleCard(String(opUser.role || ''))) return { success: false, error: '只有管理層可以開放公開資料卡片。' };
       const on = ['true', 'TRUE', '1', 'yes'].includes(String(p.enabled));
-      const key = scopeKey(card as PublicCardId) as keyof typeof store.config;
-      const r = toggleCard(store.config.PUBLIC_CARDS, String(store.config[key] || ''), card as PublicCardId, on);
+      const key = scopeKey(card) as keyof typeof store.config;
+      // ★ 舊 card id 歸一：store 入面可能仍寫住 'calendar,notices'（demo seed 刻意保留舊格式，
+      //   82 旅 live Sheet 亦係咁）。唔歸一嘅話「關閉活動卡」會刪唔到 → 張卡關唔到。
+      const cardsNorm = store.config.PUBLIC_CARDS.split(',')
+        .map((c: string) => normalizeCardId(c.trim())).filter(Boolean)
+        .filter((c: string, i: number, a: string[]) => a.indexOf(c) === i).join(',');
+      let scopeCur = String(store.config[key] || '');
+      if (!scopeCur && card === 'activities' && (store.config as any).PUBLIC_SCOPE_NOTICES) {
+        scopeCur = String((store.config as any).PUBLIC_SCOPE_NOTICES);
+      }
+      const r = toggleCard(cardsNorm, scopeCur, card, on);
       store.config.PUBLIC_CARDS = r.cards;
       (store.config as any)[key] = r.scopes;
       logAudit(ob, 'setPublicCard', 'SystemConfig', card, on ? '開放卡片' : '關閉卡片');
@@ -1017,18 +1037,25 @@ function handleMutate(action: string, p: Record<string, any>) {
     }
     /* ═══ 公開資料：第 2 層（內容 scope：troop 由管理員，支部由該支部團長）═══ */
     case 'setPublicScope': {
-      const card = String(p.card || '');
       const scope = String(p.scope || '');
-      if (!PUBLIC_CARD_IDS.includes(card as PublicCardId)) return { success: false, error: '未知的卡片' };
+      // ★ 先歸一再驗證（鏡像 GS）：舊 client 可能仍送 `notices`（第三張卡嘅舊 id）。
+      const card = normalizeCardId(String(p.card || '')) as PublicCardId;
+      if (!PUBLIC_CARD_IDS.includes(card)) return { success: false, error: '未知的卡片' };
       if (!scope) return { success: false, error: '缺少範圍' };
       const opUser = store.users.find(u => u.id === String(p.operatedBy || ''));
       if (!opUser) return { success: false, error: '未能確認操作者身份，請重新登入。' };
       if (!canToggleScope(String(opUser.role || ''), opUser.branchId, scope)) {
         return { success: false, error: scope === 'troop' ? '全旅內容只可以由管理層決定公唔公開。' : '只可以開放自己支部嘅內容。' };
       }
-      const key = scopeKey(card as PublicCardId);
+      const key = scopeKey(card);
       const on = ['true', 'TRUE', '1', 'yes'].includes(String(p.enabled));
-      (store.config as any)[key] = toggleScope(String((store.config as any)[key] || ''), scope, on);
+      let cur = String((store.config as any)[key] || '');
+      // ★ 舊 key fallback（鏡像 GS）：live Sheet／demo seed 入面係 PUBLIC_SCOPE_NOTICES。
+      //   新 key 未寫過就要讀舊 key，否則各支部已設定嘅公開範圍會喺第一次寫入時全部消失。
+      if (!cur && card === 'activities' && (store.config as any).PUBLIC_SCOPE_NOTICES) {
+        cur = String((store.config as any).PUBLIC_SCOPE_NOTICES);
+      }
+      (store.config as any)[key] = toggleScope(cur, scope, on);
       logAudit(ob, 'setPublicScope', 'SystemConfig', card + '/' + scope, on ? '公開' : '取消公開');
       return S(ob);
     }
