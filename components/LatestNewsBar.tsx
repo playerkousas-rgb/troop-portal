@@ -6,7 +6,7 @@ import { apiAddLatestNews, apiDeleteLatestNews } from '@/lib/api';
 import { getSession } from '@/lib/session';
 import { useConfirm, kv } from '@/components/ConfirmProvider';
 
-const LEADER_ROLES = ['super_admin', 'troop_super', 'troop_leader', 'admin', 'group_leader', 'branch_leader', 'coach'];
+const LEADER_ROLES = ['super_admin', 'troop_leader', 'admin', 'group_leader', 'branch_leader', 'coach'];
 // 這些頁面不顯示最新消息（未登入／平台資訊頁／MOCK 展示樹）
 const HIDDEN_PATHS = ['/', '/login', '/setup', '/onboard', '/apply', '/downloads', '/troops', '/updates', '/marketplace', '/connectors'];
 

@@ -41,7 +41,7 @@ export default function Page(){
   }
   if(!s)return <div className="card">{err||'載入中...'}</div>;
   const ps=s.patrols.filter(p=>p.branchId===selected);
-  return <Auth roles={['super_admin', 'troop_super', 'troop_leader', 'admin', 'group_leader', 'branch_leader']}><div className="stack"><section className="hero"><span className="badge gold">支部管理</span><h1>支部與小隊設定</h1><p>新增、啟用／停用及刪除各支部小隊。</p>
+  return <Auth roles={['super_admin', 'troop_leader', 'admin', 'group_leader', 'branch_leader']}><div className="stack"><section className="hero"><span className="badge gold">支部管理</span><h1>支部與小隊設定</h1><p>新增、啟用／停用及刪除各支部小隊。</p>
     {branchScoped&&<p className="badge blue" style={{marginTop:6}}>🏢 你是{ROLE_LABEL[myRole as Role]}：只會顯示及管理「{branches.find(b=>b.id===myBranchId)?.name||myBranchId}」支部的小隊。</p>}
     </section>
     {err&&<p className="badge red">{err}</p>}

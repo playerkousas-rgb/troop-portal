@@ -115,7 +115,7 @@ export default function PluginManagementPage() {
   if (!s) return <div className="card">載入中...</div>;
 
   return (
-    <Auth roles={['super_admin', 'troop_super', 'troop_leader', 'admin']}>
+    <Auth roles={['super_admin', 'troop_leader', 'admin']}>
       <div className="stack">
         <section className="hero">
           <span className="badge gold">單位元件設定</span>

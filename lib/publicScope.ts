@@ -141,7 +141,7 @@ export function toggleScope(current: string | undefined, scope: string, on: bool
    權限
    ══════════════════════════════════════════════════════════ */
 
-const ADMIN_TIER = ['super_admin', 'troop_super', 'troop_leader', 'admin'];
+const ADMIN_TIER = ['super_admin', 'troop_leader', 'admin'];
 const BRANCH_SCOPED = ['group_leader', 'branch_leader', 'coach'];
 
 /** 邊個可以開／關卡片 → 只有管理層 */

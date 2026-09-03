@@ -429,7 +429,7 @@ PRIVATE 活動、報名名單、聯絡電話一概唔入 feed。
 - `isItemPublic(config, card, branchId)` 一次過檢查三層；branchId 空值／`troop` ⇒ `troop` scope。
 
 **寫入權限**（新 action `setPublicCard` / `setPublicScope`，handler 自己檢查）：
-- 管理層（super_admin／troop_super／troop_leader／admin）→ 可改任何卡、任何 scope
+- 管理層（super_admin／troop_leader／admin）→ 可改任何卡、任何 scope
 - `troop`（全旅內容）→ **只准管理層**
 - 支部 scope → **只准該支部**嘅 group_leader／branch_leader／coach
 
@@ -747,3 +747,87 @@ troop-portal/
 - 旅團登記：`lib/troops.ts` 的 `APPROVED_TROOPS`（key 格式 `troop_XXXX`，需與首頁選擇值一致）
 - GS 部署：Deploy → Web App → Execute as Me, **Anyone**
 - 已驗證：`npm run build` 通過；GS slice 邏輯有 26 項單元測試全綠（member/leader/parent/admin/guest 各角色過濾 + API key 認證 + Drive 跳過）
+
+---
+
+## 2026-09-03 重構：廢除 `troop_super`，旅長成為最高人類權限
+
+### 用戶決定（三條）
+
+1. **`troop_super` 整個廢除，旅長（`troop_leader`）成為最高權限** —— 但**身份卡要顯示「旅長」而唔係「管理員」**。
+2. **旅長交接係「交換職位」，唔係單向指派**：現任旅長撳掣同另一人對調，對方變旅長、
+   自己接手對方原本嘅角色＋支部。**對象可以是支部領袖，唔一定係管理員。**
+3. **管理員只能加不能減**：管理員唔可以刪其他管理員嘅帳號、唔可以改其他管理員嘅角色
+   （其他欄位照改得）；要改角色必須經後台。用戶明確否決「可降級」變體（「會造成 BUG」）。
+
+### 新角色階梯
+
+```
+super_admin      技術測試（寫死，全旅只有一個，唔經 API 指派）
+troop_leader     旅長 ← 最高人類權限，**全旅只有一個**，唔可以經 API 指派
+admin            管理員（可以無數個）
+group_leader / branch_leader / coach / parent / member
+```
+
+`troop_super` 已喺 `lib/model.ts` 嘅 `Role` union 移除。
+**但 `normalizeRole()` 會把舊 Sheet 列嘅 `role='troop_super'` 讀成 `troop_leader`** ——
+唔係刪除，因為刪除會剝走佢哋所有權限（live-Sheet 相容）。
+
+### 改咗啲乜
+
+| 位置 | 改動 |
+|---|---|
+| `lib/model.ts` | `Role` 去 `troop_super`；新增 `normalizeRole()`；`ROLE_LABEL`／`ROLE_ORDER`／`MANAGER_ROLES`／`isAdmin()`／`canSeeRole()` 全部更新 |
+| `lib/permissions.ts` | `checkEditPermission` 分開 `troop_leader`／`admin` 兩條分支；`assignableRoles()` 重寫 —— **`troop_leader` 唔喺任何列表**，`admin` 而家可以指派 `admin` |
+| `lib/session.ts` | 移除 `case 'troop_super'` 同 `demoSession` 嘅 map entry |
+| `app/admin/users/page.tsx` | 篩選項 超管→旅長；`locked` 旗標改指 `troop_leader`；**身份卡金色徽章「超管」→「旅長」**；新增「👑 交接旅長」掣 |
+| `lib/api.ts` | 新增 `apiTransferTroopLeader()` |
+| `gs/SCOUTSYSTEM_2_SETUP.gs` | 見下 |
+
+### GS 改動
+
+- **Bootstrap（L263 + L341）** 建 `role='troop_leader'`、名「旅長」（原本 `troop_super`）。
+- **`NON_ASSIGNABLE_ROLES_ = ['troop_leader']` + `isNonAssignableRole_`** 取代 `ABOVE_ADMIN_ROLES_`／`isAboveAdminRole_`；
+  中央守衛（~L1834）豁免 `applyJoin`（靜默降級）同 `transferTroopLeader`。
+- **★ 副作用修咗一個真 bug**：12 條 admin-tier 守衛原本漏咗 `troop_leader`
+  （實測 9 條入面 0 條有佢 —— 旅長調 `updateUserPermissions` 回「你沒有權限修改功能授權。」而 `admin` 通過）。
+  把呢啲行嘅 `troop_super` 換成 `troop_leader` 之後，**「旅長權限 < 管理員」嘅前後端矛盾由構造上消失**。
+- **新增 `handleTransferTroopLeader_(p)`**（~L3416，dispatcher L1978）——
+  **對調角色 ＋ branchId**（只換角色會令前旅長變成分支領袖但冇支部）。
+  拒絕自己／唔存在嘅用戶／`super_admin` 目標；只准現任 `troop_leader`
+  （或 `TECH_TEST_ACCOUNTS_`／`system`／`staff_token`）；被拒會寫 `DENIED:transferTroopLeader`。
+- **新增 `checkAdminPeerGuard_(p, kind)`**（~L1782）—— 把決定 3 落到服務端。
+  接咗入 `handleUpdateUserRole_`（kind `'role'`，由 `String(p.field||'').toLowerCase() !== 'role'` 守著）
+  同 `handleDeleteUser_`（kind `'delete'`）。
+
+### ★ check:security §11 測出嚟嘅真漏洞
+
+原本嘅 peer guard 只保護「目標係 `admin`」，**漏咗旅長** ——
+`admin` 可以把旅長降級做 `member` 甚至刪除佢，咁樣全旅就會**冇旅長**，
+而且**唔可以經 API 修復**（`transferTroopLeader` 要現任旅長發起）。
+
+修正：受保護對象 = `admin` **同** `troop_leader`。GS 同 MOCK 兩邊都改。
+拒絕訊息分開兩款（旅長版指引用「交接旅長」）。
+
+### 檢查腳本更新
+
+- `scripts/check-reserved-roles.mjs` —— §9／§10 為新模型重寫，新增 **§11**
+  （「只能加不能減」＋交接旅長，GS ＋ MOCK 兩邊）。**66 → 91 項斷言**。
+- `scripts/check-public-cards.mjs` —— L82／L87 角色列表去 `troop_super`。
+
+### ⚠️ 兩個踩過嘅陷阱（寫測試時必讀）
+
+1. **唔好用 `u_admin` 還原 `u_m1`。** §11 嘅 peer guard 會擋住 admin 改 admin，
+   令還原**靜默失敗**，`u_m1` 永久留喺 `admin` 狀態喺 `.mockdata` ——
+   對照組喺**第二次跑**先假失敗。實測重現過：清 `.mockdata` 後第 1 次過、第 2 次 2 項失敗。
+   **重置一律用 `u_tl`（旅長，唔受 peer guard 限制），而且喺開頭先重置。**
+2. **負對照嘅方向要啱。** `if (false && …)` 令守衛**永遠擋住所有人**
+   （掛嘅反而係正向對照組）；正確做法係 `if (true) return null;` —— **永遠放行**，
+   咁先可以證明「唔可以」嗰啲斷言真係靠守衛先過。
+   本次負對照：11 項失敗（包括 6 條「唔可以」斷言），還原後 91 項全綠。
+
+### 仍需人手做（呢個環境做唔到）
+
+- **82 旅重新部署 GS** —— 上面所有 GS 修正**喺重新部署之前全部係 inert**。
+- 「第一個管理員 = 旅長」由 `createdAt` 推導 —— **未實作**。
+  （`Users` 表頭已含 `createdAt`；bootstrap 已經 seed 旅長。）

@@ -380,6 +380,16 @@ export function apiBatchCreateMembers(rows: Array<{ name: string; ymNumber: stri
 export function apiUpdateUserRole(userId: string, role: string) {
   return apiMutate('updateUserRole', { userId, role });
 }
+/**
+ * 交接旅長 —— **交換職位**（唔係單向指派）。
+ *
+ * 旅長全旅只有一個 ＝ 最早建立嘅管理員。現任旅長撳呢個按鈕同另一人對調：
+ * 對方變旅長，自己接手對方原本嘅角色＋支部（對象可以是支部領袖）。
+ * 只有現任旅長先調得動，後端 `handleTransferTroopLeader_` 會再驗一次。
+ */
+export function apiTransferTroopLeader(targetUserId: string) {
+  return apiMutate('transferTroopLeader', { targetUserId });
+}
 export function apiDeleteUser(userId: string) {
   return apiMutate('deleteUser', { userId });
 }

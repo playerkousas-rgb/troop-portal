@@ -23,25 +23,36 @@ export function checkEditPermission(
     return { canEdit: true, canChangeRole: true };
   }
 
-  // 超管（troop_super）→ 可改 admin 及以下
-  if (operatorRole === 'troop_super') {
+  // 旅長（troop_leader）→ 全旅最高，可改除技術測試帳號外所有人
+  // ★ 旅長全旅只有一個 ＝ 最早建立嘅管理員（用戶決定 2026-09-03）。
+  //   交接唔係經呢度，而係「交換職位」按鈕（自己變成對方原本嘅角色）。
+  if (operatorRole === 'troop_leader') {
     if (targetRole === 'super_admin') {
       return { canEdit: false, canChangeRole: false, reason: '技術測試帳號只能在 GS 代碼修改' };
     }
     return { canEdit: true, canChangeRole: true };
   }
 
-  // 旅長／管理員 → 可改除超管/技術測試外所有用戶（旅長權限＝管理員）
-  if (operatorRole === 'admin' || operatorRole === 'troop_leader') {
-    if (targetRole === 'super_admin' || targetRole === 'troop_super') {
-      return { canEdit: false, canChangeRole: false, reason: '超管/技術測試帳號只能在 Sheet 修改' };
+  // 管理員（admin）→ 可改除技術測試帳號／旅長外所有用戶
+  // ★ 用戶決定：**其他管理員只能加不能減** —— 可以開新管理員帳號，
+  //   但唔可以把另一個管理員降級或者改佢角色（要改必須用後台／旅長）。
+  if (operatorRole === 'admin') {
+    if (targetRole === 'super_admin') {
+      return { canEdit: false, canChangeRole: false, reason: '技術測試帳號只能在 GS 代碼修改' };
+    }
+    if (targetRole === 'troop_leader') {
+      return { canEdit: false, canChangeRole: false, reason: '旅長帳號只有旅長本人可以處理（用「交接旅長」交換職位）' };
+    }
+    if (targetRole === 'admin') {
+      // 其他資料可以改（電話／email／支部…），但角色唔可以動
+      return { canEdit: true, canChangeRole: false, reason: '管理員之間只能加不能減：不可以更改其他管理員的角色' };
     }
     return { canEdit: true, canChangeRole: true };
   }
 
   // 團長（group_leader）→ 可改所屬支部的支部領袖、教練員、家長、成員
   if (operatorRole === 'group_leader') {
-    if (['super_admin', 'troop_super', 'troop_leader', 'admin', 'group_leader'].includes(targetRole)) {
+    if (['super_admin', 'troop_leader', 'admin', 'group_leader'].includes(targetRole)) {
       return { canEdit: false, canChangeRole: false, reason: '權限不足' };
     }
     // 支部領袖和教練員要檢查支部
@@ -55,7 +66,7 @@ export function checkEditPermission(
 
   // 支部領袖（branch_leader）→ 可改所屬支部的教練員、家長、成員（含角色）
   if (operatorRole === 'branch_leader') {
-    if (['super_admin', 'troop_super', 'troop_leader', 'admin', 'group_leader', 'branch_leader'].includes(targetRole)) {
+    if (['super_admin', 'troop_leader', 'admin', 'group_leader', 'branch_leader'].includes(targetRole)) {
       return { canEdit: false, canChangeRole: false, reason: '權限不足' };
     }
     // 教練員要檢查支部
@@ -90,9 +101,16 @@ export function checkEditPermission(
  * 例如：團長可提升教練員為支部領袖
  */
 export function assignableRoles(operatorRole: string): string[] {
-  if (operatorRole === 'super_admin') return ['troop_super', 'troop_leader', 'admin', 'group_leader', 'branch_leader', 'coach', 'parent', 'member'];
-  if (operatorRole === 'troop_super') return ['troop_leader', 'admin', 'group_leader', 'branch_leader', 'coach', 'parent', 'member'];
-  if (operatorRole === 'admin' || operatorRole === 'troop_leader') return ['group_leader', 'branch_leader', 'coach', 'parent', 'member'];
+  // ★ troop_leader 刻意**唔喺任何清單入面**：旅長全旅只有一個，
+  //   只能由 bootstrap（第一個管理員自動成為旅長）或者「交接旅長」交換按鈕產生，
+  //   唔可以經角色下拉直接指派 —— 否則又開返一條提權路。
+  // ★ admin 而家**可以**指派 admin（用戶決定：管理員「只能加不能減」——
+  //   可以開新管理員帳號，但唔可以改／刪其他管理員）。
+  //   呢個同時解決咗之前嘅前後端矛盾：assignableRoles 唔包 admin，
+  //   但 GS batchCreateUsers 嘅 allowedRoles 包 admin。
+  if (operatorRole === 'super_admin') return ['admin', 'group_leader', 'branch_leader', 'coach', 'parent', 'member'];
+  if (operatorRole === 'troop_leader') return ['admin', 'group_leader', 'branch_leader', 'coach', 'parent', 'member'];
+  if (operatorRole === 'admin') return ['admin', 'group_leader', 'branch_leader', 'coach', 'parent', 'member'];
   if (operatorRole === 'group_leader') return ['branch_leader', 'coach', 'parent', 'member'];
   if (operatorRole === 'branch_leader') return ['parent', 'member']; // 教練員任命／授權屬團長權責
   return [];
@@ -108,7 +126,7 @@ export function assignableRoles(operatorRole: string): string[] {
  */
 export function hasFeature(userFeatures: string[] | undefined, feature: string, role?: string): boolean {
   // 技術測試／超管／管理員一律全開（同 GS FEATURE_DEFAULTS 一致）
-  if (role && ['super_admin', 'troop_super', 'troop_leader', 'admin'].includes(role)) return true;
+  if (role && ['super_admin', 'troop_leader', 'admin'].includes(role)) return true;
   if (!userFeatures) return false;
   return userFeatures.includes(feature);
 }
@@ -126,7 +144,7 @@ export function hasFeature(userFeatures: string[] | undefined, feature: string, 
 export type ScopedGrant = { feature: string; branchId: string };
 
 /** 全旅級角色：唔受支部限制，亦唔需要逐個支部授權 */
-const TROOP_WIDE_ROLES = ['super_admin', 'troop_super', 'troop_leader', 'admin'];
+const TROOP_WIDE_ROLES = ['super_admin', 'troop_leader', 'admin'];
 
 /**
  * 檢查某人喺某支部有冇某項功能權限。

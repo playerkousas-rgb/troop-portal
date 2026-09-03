@@ -21,7 +21,7 @@ const ITEMS: { icon: string; title: string; text: string; href: string; external
 
 export default function SystemManagement() {
   return (
-    <Auth roles={['super_admin', 'troop_super', 'troop_leader', 'admin']}>
+    <Auth roles={['super_admin', 'troop_leader', 'admin']}>
       <div className="max-w-3xl mx-auto space-y-4">
         <section className="bg-gradient-to-br from-slate-800 to-slate-600 text-white rounded-2xl px-5 py-5 shadow-lg">
           <h1 className="font-black text-2xl leading-tight m-0">🛠️ 系統管理</h1>

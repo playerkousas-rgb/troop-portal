@@ -14,7 +14,7 @@
  */
 
 /** 全旅級角色（唔受支部限制） */
-export const CALENDAR_ADMIN_TIER = ['super_admin', 'troop_super', 'troop_leader', 'admin'];
+export const CALENDAR_ADMIN_TIER = ['super_admin', 'troop_leader', 'admin'];
 
 export type CalendarScope = {
   /** 係咪管理員級（睇到全部支部） */

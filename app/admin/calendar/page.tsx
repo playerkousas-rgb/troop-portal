@@ -176,12 +176,12 @@ export default function Page(){
      全旅內容由管理層決定，各支部內容由該支部團長／支部領袖決定。
      實際掣喺共用組件 components/ui/PublicScopePanel.tsx（行事曆／相簿／通告 三張卡共用）。 */
   const session = getSession();
-  const adminTier = ['super_admin', 'troop_super', 'troop_leader', 'admin'].includes(session?.role || '');
+  const adminTier = ['super_admin', 'troop_leader', 'admin'].includes(session?.role || '');
   const ownBranch = session?.branchId || '';
 
   if(!s)return <div className="card">{err||'載入中...'}</div>;
 
-  return <Auth roles={['super_admin', 'troop_super', 'troop_leader', 'admin', 'group_leader', 'branch_leader', 'coach']}><div className="stack">
+  return <Auth roles={['super_admin', 'troop_leader', 'admin', 'group_leader', 'branch_leader', 'coach']}><div className="stack">
     <section className="hero">
       <span className="badge gold">行事曆設定</span>
       <h1>行事曆管理</h1>

@@ -46,7 +46,7 @@ export default function Page(){
   const pending=s.applications.filter(a=>a.status==='pending');
   const decided=s.applications.filter(a=>a.status!=='pending');
 
-  return <Auth roles={['super_admin', 'troop_super', 'troop_leader', 'admin', 'group_leader', 'branch_leader']}><div className="stack">
+  return <Auth roles={['super_admin', 'troop_leader', 'admin', 'group_leader', 'branch_leader']}><div className="stack">
     <section className="hero">
       <span className="badge gold">申請管理</span>
       <h1>審核 / 申請管理</h1>

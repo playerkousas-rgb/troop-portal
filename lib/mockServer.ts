@@ -289,7 +289,6 @@ function mockLinkChildren(parent: any, children: any): { linked: string[]; creat
 
 const FEATURES: Record<string, string[]> = {
   super_admin: ['branches', 'members', 'applications', 'events', 'registrations', 'attendance', 'meetings', 'library_import', 'notices', 'users', 'permissions', 'settings', 'plugins', 'audit', 'calendar', 'equipment'],
-  troop_super: ['branches', 'members', 'applications', 'events', 'registrations', 'attendance', 'meetings', 'library_import', 'notices', 'users', 'permissions', 'settings', 'plugins', 'audit', 'calendar', 'equipment'],
   admin: ['branches', 'members', 'applications', 'events', 'registrations', 'attendance', 'meetings', 'library_import', 'notices', 'users', 'permissions', 'settings', 'plugins', 'audit', 'calendar', 'equipment'],
   // 旅長：實際職級最高，權限同管理員（管理員 = 代旅長操作嘅「旅內電腦人」）
   troop_leader: ['branches', 'members', 'applications', 'events', 'registrations', 'attendance', 'meetings', 'library_import', 'notices', 'users', 'permissions', 'settings', 'plugins', 'audit', 'calendar', 'equipment'],
@@ -333,7 +332,7 @@ function grantsFor(userId: string) {
   return USER_SCOPED_GRANTS[userId] || [];
 }
 
-const TROOP_WIDE = ['super_admin', 'troop_super', 'troop_leader', 'admin'];
+const TROOP_WIDE = ['super_admin', 'troop_leader', 'admin'];
 
 /**
  * 「旅團自選功能」：預設關閉，由團長自己決定開唔開，唔屬階級權限。
@@ -359,7 +358,7 @@ export function buildMockState(userId: string): AppState {
   const user = findUser(userId);
   const role: Role = (user?.role as Role) || 'guest';
   const branchId = user?.branchId || '';
-  const admin = ['super_admin', 'troop_super', 'troop_leader', 'admin'].includes(role);
+  const admin = ['super_admin', 'troop_leader', 'admin'].includes(role);
   // ★ 可見範圍必須同寫入權限一致：
   //   團長／支部領袖只管自己支部 → 亦只應該睇到自己支部嘅資料
   //   （之前團長 leaderAll=true，寫唔到別團但睇得曬別團成員同家長電話）。
@@ -484,7 +483,7 @@ export function buildMockState(userId: string): AppState {
   }
 
   // 審計
-  if (['super_admin', 'troop_super', 'troop_leader', 'admin'].includes(role)) out.audits = [...store.audits];
+  if (['super_admin', 'troop_leader', 'admin'].includes(role)) out.audits = [...store.audits];
 
   // 最新消息：登入後所有人都見到（最多 3 條）
   if (!guest) out.latestNews = [...store.latestNews];
@@ -609,7 +608,7 @@ function handleSaveAttendance(p: Record<string, any>) {
   //   家長／成員讀得自己嗰支部嘅紀錄，但絕對唔可以寫。
   const writer = findUser(String(p.operatedBy || p.userId || ''));
   const wRole = String((writer as any)?.role || '');
-  if (!['super_admin', 'troop_super', 'troop_leader', 'admin', 'group_leader', 'branch_leader', 'coach'].includes(wRole)) {
+  if (!['super_admin', 'troop_leader', 'admin', 'group_leader', 'branch_leader', 'coach'].includes(wRole)) {
     return { success: false, error: '只有領袖可以點名。' };
   }
   const scope = attendanceBranchScope(p, String(p.branchId || ''));
@@ -770,6 +769,52 @@ function handleRegistrationSummary(p: Record<string, any>) {
 // ==================== 寫入（改 mock store，回整包 state） ====================
 
 const S = (operatedBy: string) => ({ success: true, state: buildMockState(String(operatedBy || '')) });
+
+/**
+ * 「只能加不能減」守衛（同 GS `checkAdminPeerGuard_` 一致）—— 用戶決定 2026-09-03。
+ *
+ * 管理員可以有無數個，但**其他管理員只可以加，唔可以減**：
+ *   ・唔可以更改其他管理員嘅角色
+ *   ・唔可以刪除其他管理員嘅帳號
+ * 要改必須由旅長（全旅唯一）處理。
+ *
+ * @return null = 放行；物件 = 拒絕
+ */
+function checkAdminPeerGuard(
+  operatedBy: string,
+  targetId: string,
+  kind: 'role' | 'delete'
+): { success: false; error: string } | null {
+  if (!operatedBy) return null;
+  const op = store.users.find(u => u.id === operatedBy);
+  if (!op) return null;
+  // 只有 admin 受限；旅長唔受呢條限制
+  if (String(op.role || '').toLowerCase() !== 'admin') return null;
+  if (!targetId || targetId === operatedBy) return null;
+  const target = store.users.find(u => u.id === targetId);
+  if (!target) return null;
+  const tRole = String(target.role || '').toLowerCase();
+  // ★ 受保護對象 = 管理員 **同旅長**（同 GS checkAdminPeerGuard_ 一致）
+  //   原本只擋「目標係 admin」，但漏咗旅長 —— admin 可以把旅長降級／刪除，
+  //   咁樣全旅就會冇旅長，而且唔可以經 API 修復（交接要現任旅長發起）。
+  //   呢個漏洞係 check:security §11 測出嚟嘅。
+  if (tRole !== 'admin' && tRole !== 'troop_leader') return null;
+
+  const isTL = (tRole === 'troop_leader');
+  const act = kind === 'delete' ? 'deleteUser' : 'updateUserRole';
+  logAudit(operatedBy, 'DENIED:' + act, 'Security', '',
+    `admin 試圖${kind === 'delete' ? '刪除' : '更改'}${isTL ? '旅長' : '另一個管理員'}嘅${kind === 'delete' ? '帳號' : '角色'}（只能加不能減）`);
+  if (isTL) {
+    return {
+      success: false,
+      error: `旅長係全旅最高權限，管理員唔可以${kind === 'delete' ? '刪除旅長嘅帳號' : '更改旅長嘅角色'}。要換旅長請由現任旅長用「交接旅長」。`,
+    };
+  }
+  return {
+    success: false,
+    error: `管理員之間只能加不能減：不可以${kind === 'delete' ? '刪除其他管理員嘅帳號' : '更改其他管理員嘅角色'}，請由旅長處理。`,
+  };
+}
 
 /** 寫入操作紀錄（審核紀錄與操作紀錄合併在同一份，前端再分類） */
 function logAudit(userId: string, action: string, entity: string, entityId: string, detail: string) {
@@ -985,9 +1030,50 @@ function handleMutate(action: string, p: Record<string, any>) {
       });
       return S(ob);
     }
-    case 'deleteUser': store.users = store.users.filter(u => u.id !== p.userId); return S(ob);
+    case 'deleteUser': {
+      // ★ 「只能加不能減」（同 GS checkAdminPeerGuard_ 一致）
+      const peer = checkAdminPeerGuard(ob, String(p.userId || ''), 'delete');
+      if (peer) return peer;
+      store.users = store.users.filter(u => u.id !== p.userId);
+      return S(ob);
+    }
     case 'toggleUser': { const i = findIdx(store.users, 'id', String(p.userId || '')); if (i >= 0) store.users[i].approved = !store.users[i].approved; return S(ob); }
-    case 'updateUserRole': { const i = findIdx(store.users, 'id', String(p.userId || '')); if (i >= 0) store.users[i].role = p.role as Role; return S(ob); }
+    case 'updateUserRole': {
+      // ★ 「只能加不能減」（同 GS checkAdminPeerGuard_ 一致）
+      const peer = checkAdminPeerGuard(ob, String(p.userId || ''), 'role');
+      if (peer) return peer;
+      const i = findIdx(store.users, 'id', String(p.userId || ''));
+      if (i >= 0) store.users[i].role = p.role as Role;
+      return S(ob);
+    }
+    // ★ 交接旅長 —— **交換職位**（同 GS handleTransferTroopLeader_ 一致）
+    //   旅長全旅只有一個；交接係「我同另一人對調」，對象可以是支部領袖，
+    //   所以角色＋支部一齊換（否則旅長會變成冇支部嘅支部領袖）。
+    case 'transferTroopLeader': {
+      const opId = String(p.operatedBy || '');
+      const targetId = String(p.targetUserId || '');
+      if (!opId) return { success: false, error: '未能識別操作者身份，請重新登入' };
+      if (!targetId) return { success: false, error: '請選擇要交接給誰' };
+      if (opId === targetId) return { success: false, error: '不可以交接給自己' };
+      const op = store.users.find(u => u.id === opId);
+      const target = store.users.find(u => u.id === targetId);
+      if (!op) return { success: false, error: '找不到操作者帳號，請重新登入' };
+      if (!target) return { success: false, error: '找不到該用戶' };
+      if (target.role === 'super_admin') return { success: false, error: '技術測試帳號不可以成為旅長。' };
+      if (op.role !== 'troop_leader') {
+        logAudit(opId, 'DENIED:transferTroopLeader', 'Security', '', `role=${op.role} 試圖交接旅長（唔係現任旅長）`);
+        return { success: false, error: '只有現任旅長可以交接旅長職位。' };
+      }
+      const oldRole = target.role;
+      const oldBranch = target.branchId || '';
+      target.role = 'troop_leader';
+      target.branchId = '';
+      op.role = oldRole;
+      op.branchId = oldBranch;
+      logAudit(opId, 'transferTroopLeader', 'Users', targetId,
+        `旅長交接（交換職位）：${opId} ⇄ ${targetId}；對方原角色=${oldRole}${oldBranch ? '@' + oldBranch : ''}`);
+      return { success: true, message: `已交接旅長職位。你而家嘅角色係「${oldRole}」${oldBranch ? `（${oldBranch} 支部）` : ''}。` };
+    }
     case 'updateUserField': {
       const i = findIdx(store.users, 'id', String(p.userId || ''));
       if (i >= 0 && p.field) (store.users[i] as any)[p.field] = String(p.value ?? '');
@@ -1413,13 +1499,15 @@ function isReservedRole(role: unknown): boolean {
   return RESERVED_ROLES.includes(String(role ?? '').trim().toLowerCase());
 }
 
-// ★ 高過管理員嘅角色（同 GS ABOVE_ADMIN_ROLES_ 一致）：admin 或以下唔可以指派。
-//   實測確認過漏洞：有「使用者管理」權限嘅 admin 可以自己砌 request，把別人升做
-//   troop_super / troop_leader —— 即係造出比自己更高權限嘅帳號。
-const ABOVE_ADMIN_ROLES = ['troop_super', 'troop_leader'];
+// ★ 唔可以經 API 指派嘅角色（同 GS NON_ASSIGNABLE_ROLES_ 一致）。
+//   旅長全旅只有一個 ＝ 最早建立嘅管理員，只能由 bootstrap 或者「交接旅長」
+//   交換按鈕產生 —— 唔可以經角色下拉指派，否則又開返一條提權路。
+//   實測確認過漏洞：有「使用者管理」權限嘅 admin 可以自己砌 request，
+//   把別人升做 troop_leader —— 即係造出比自己更高權限嘅帳號。
+const NON_ASSIGNABLE_ROLES = ['troop_leader'];
 
-function isAboveAdminRole(role: unknown): boolean {
-  return ABOVE_ADMIN_ROLES.includes(String(role ?? '').trim().toLowerCase());
+function isNonAssignableRole(role: unknown): boolean {
+  return NON_ASSIGNABLE_ROLES.includes(String(role ?? '').trim().toLowerCase());
 }
 
 /** 由 request 抽出「準備指派嘅角色」—— 唔同 action 放喺唔同參數 */
@@ -1443,19 +1531,17 @@ export function handleMockRequest(action: string, params: Record<string, any> = 
     return { success: false, error: '「超級管理員」係系統內建帳號，不能經介面指派或建立。' };
   }
 
-  // ★ 角色階梯守衛（同 GS checkActionPermission_ 一致）：admin 或以下唔可以指派
-  //   高過自己嘅角色（troop_super / troop_leader），否則可以造出比自己更高權限嘅帳號。
+  // ★ 不可指派角色守衛（同 GS checkActionPermission_ 一致）：旅長唔可以經 API 指派。
   //   applyJoin 除外：公開表單由自己嘅 sanitizer 靜默降級。
-  //   注意：admin → admin 刻意唔擋，管理員本来就可以開其他管理員帳號。
+  //   transferTroopLeader 除外：佢係「交接旅長」交換按鈕專用 action，
+  //   由自己嘅守衛驗「操作者係咪現任旅長」。
+  //   注意：admin → admin 刻意唔擋，管理員「只能加不能減」—— 可以開新管理員帳號。
   {
     const wanted = requestedRole(p);
-    if (action !== 'applyJoin' && wanted && isAboveAdminRole(wanted)) {
+    if (action !== 'applyJoin' && action !== 'transferTroopLeader' && wanted && isNonAssignableRole(wanted)) {
       const opId = String(p.operatedBy || p.userId || '');
-      const opRole = String(store.users.find(u => u.id === opId)?.role || '').toLowerCase();
-      if (opRole !== 'troop_super') {
-        logAudit(opId || 'anonymous', 'DENIED:' + action, 'Security', '', `role=${opRole} 試圖指派高過自己嘅角色 ${wanted}`);
-        return { success: false, error: '權限不足：只有超管可以指派「超管」或「旅長」。' };
-      }
+      logAudit(opId || 'anonymous', 'DENIED:' + action, 'Security', '', `試圖經 API 指派旅長（${wanted}）`);
+      return { success: false, error: '「旅長」全旅只有一個，只可以用「交接旅長」同另一人交換職位。' };
     }
   }
 

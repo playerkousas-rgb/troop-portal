@@ -51,7 +51,7 @@ export default function Admin() {
   const canApplications = hasFeature(s?.userFeatures, 'applications', role);
   const canEvents = hasFeature(s?.userFeatures, 'events', role);
 
-  return <Auth roles={['super_admin', 'troop_super', 'troop_leader', 'admin', 'group_leader', 'branch_leader', 'coach']}><div className="max-w-5xl mx-auto space-y-4">
+  return <Auth roles={['super_admin', 'troop_leader', 'admin', 'group_leader', 'branch_leader', 'coach']}><div className="max-w-5xl mx-auto space-y-4">
     <ConsoleHeader
       icon={admin ? '🛡️' : '🧭'}
       name={session?.name || '管理員'}

@@ -79,12 +79,12 @@ t('總掣關 → 一律唔公開', isItemPublic({ PUBLIC_VIEW: 'FALSE', PUBLIC_C
 t('scopeOpen 同 isItemPublic 一致', scopeOpen(cfg('calendar', 'troop,b3'), 'calendar', 'b3'), true);
 
 /* ── 8. 權限：卡片只准管理層；內容層 troop 只准管理層、支部只准自己 ── */
-for (const role of ['super_admin', 'troop_super', 'troop_leader', 'admin'])
+for (const role of ['super_admin', 'troop_leader', 'admin'])
   t(`${role} 可以開關卡片`, canToggleCard(role), true);
 for (const role of ['group_leader', 'branch_leader', 'coach', 'member', 'parent', ''])
   t(`${role || '訪客'} 唔可以開關卡片`, canToggleCard(role), false);
 
-for (const role of ['super_admin', 'troop_super', 'troop_leader', 'admin'])
+for (const role of ['super_admin', 'troop_leader', 'admin'])
   t(`${role} 可以改全旅內容`, canToggleScope(role, '', TROOP_SCOPE), true);
 t('支部領袖唔可以改全旅內容', canToggleScope('branch_leader', 'b3', TROOP_SCOPE), false);
 t('團長唔可以改全旅內容', canToggleScope('group_leader', 'b3', TROOP_SCOPE), false);

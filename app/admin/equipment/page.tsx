@@ -190,7 +190,7 @@ export default function AdminEquipment() {
   if (!s) return <div className="card">{err ? <span className="badge red">{err}</span> : '載入中...'}</div>;
 
   return (
-    <Auth roles={['super_admin', 'troop_super', 'troop_leader', 'admin', 'group_leader', 'branch_leader']}>
+    <Auth roles={['super_admin', 'troop_leader', 'admin', 'group_leader', 'branch_leader']}>
       <div className="stack">
         <section className="hero">
           <span className="badge gold">物資管理</span>

@@ -152,8 +152,8 @@ console.log('\n【GS：對照組 —— 正常操作必須照常】');
   ok('updateUserField(field=name) 放行', r.success === true, JSON.stringify(r).slice(0, 120));
 
   env.reset();
-  r = env.call('updateUserRole', { userId: 'u_target', role: 'troop_super', operatedBy: 'sheep' });
-  ok('troop_super 唔係保留角色，仍可指派', r.success === true, JSON.stringify(r).slice(0, 120));
+  r = env.call('updateUserRole', { userId: 'u_target', role: 'admin', operatedBy: 'sheep' });
+  ok('admin 唔係保留角色，仍可指派（平級／向下）', r.success === true, JSON.stringify(r).slice(0, 120));
 }
 
 // ==================== 4. GS：公開申請路（靜默降級，唔好洩露角色名） ====================
@@ -332,22 +332,23 @@ console.log('\n【GS：授權路唔可以越權自我授權】');
   ok('updateUserPermissions：團長都被拒（限管理層）', r.success === false, JSON.stringify(r));
 }
 
-// ==================== 9. 角色階梯：唔可以向上提權 ====================
+// ==================== 9. 旅長唯一：唔可以經 API 指派 ====================
 //
-// 同一類 bug 嘅第二個實測漏洞：`RESERVED_ROLES_` 只封咗 super_admin，
-// 所以任何有「使用者管理」權限嘅 admin 都可以自己砌 request，把別人升做
-// troop_super / troop_leader —— 即係造出比自己更高權限嘅帳號。
-// 前端 assignableRoles() 唔會提供呢啲選項，但 operatedBy 係前端傳上嚟嘅。
+// 用戶決定（2026-09-03）：**旅長全旅只有一個 ＝ 最早建立嘅管理員**。
+// `troop_super`（超管）已廢除 —— 佢同旅長職能重疊，而且 GS 9 處 admin 級守衛
+// 有 0 處包含 troop_leader，令旅長實際低過管理員（實測確認）。
 //
-// 已修：ABOVE_ADMIN_ROLES_ + isAboveAdminRole_ + checkActionPermission_ 階梯守衛。
-// 注意 admin → admin 係**刻意容許**（管理員本来就可以開其他管理員帳號，
-// batchCreateUsers 嘅 allowedRoles 亦容許），呢度只封「向上提權」。
-console.log('\n【GS：角色階梯 —— admin 唔可以指派高過自己嘅角色】');
+// 新模型下 `troop_leader` 係唯一嘅 NON_ASSIGNABLE_ROLE：只可以經 bootstrap
+// 或者「交接旅長」交換按鈕（transferTroopLeader）產生，唔可以經角色下拉指派。
+// 否則任何有「使用者管理」權限嘅 admin 都可以砌 request 造出第二個旅長。
+//
+// 注意 admin → admin 係**刻意容許**（管理員「只能加不能減」：可以開新管理員帳號）。
+console.log('\n【GS：旅長唔可以經 API 指派（唯一，只經 bootstrap／交接）】');
 {
   const ctx = loadGs();
   const users = [
+    { userId: 'u_tl', name: '周旅長', role: 'troop_leader', branchId: '', approved: 'TRUE' },
     { userId: 'u_admin', name: '陳堅強', role: 'admin', branchId: '', approved: 'TRUE' },
-    { userId: 'u_ts', name: '超管', role: 'troop_super', branchId: '', approved: 'TRUE' },
     { userId: 'u_target', name: '目標', role: 'member', branchId: 'b3', approved: 'TRUE' },
   ];
   const writes = [];
@@ -370,29 +371,31 @@ console.log('\n【GS：角色階梯 —— admin 唔可以指派高過自己嘅�
     JSON.parse(ctx.doGet({ parameter: Object.assign({ apiKey: API_KEY, action }, params) }).__text);
 
   writes.length = 0;
-  let r = call('updateUserRole', { userId: 'u_target', role: 'troop_super', operatedBy: 'u_admin' });
-  ok('admin 唔可以把人升做 troop_super（向上提權）', r.success === false, JSON.stringify(r));
+  let r = call('updateUserRole', { userId: 'u_target', role: 'troop_leader', operatedBy: 'u_admin' });
+  ok('admin 唔可以把人升做旅長', r.success === false, JSON.stringify(r));
+  ok('  且冇寫入', writes.length === 0, `writes=${JSON.stringify(writes)}`);
+  ok('  錯誤訊息講明要用交接', /交接旅長/.test(r.error || ''), r.error);
+
+  writes.length = 0;
+  r = call('updateUserField', { userId: 'u_target', field: 'role', value: 'troop_leader', operatedBy: 'u_admin' });
+  ok('updateUserField(field=role) 一樣擋到', r.success === false, JSON.stringify(r));
   ok('  且冇寫入', writes.length === 0, `writes=${JSON.stringify(writes)}`);
 
   writes.length = 0;
-  r = call('updateUserRole', { userId: 'u_target', role: 'troop_leader', operatedBy: 'u_admin' });
-  ok('admin 唔可以把人升做 troop_leader（向上提權）', r.success === false, JSON.stringify(r));
-  ok('  且冇寫入', writes.length === 0, `writes=${JSON.stringify(writes)}`);
+  r = call('createUser', { name: '新旅長', email: 's9@y.z', role: 'troop_leader', password: 'p', operatedBy: 'u_admin' });
+  ok('createUser 一樣擋到', r.success === false, JSON.stringify(r));
+  ok('  且冇建帳號', users.filter((u) => u.email === 's9@y.z').length === 0, '竟然建咗帳號');
 
+  // ★ 連現任旅長自己都唔可以經角色下拉指派旅長（只可以經交接按鈕）
   writes.length = 0;
-  r = call('updateUserField', { userId: 'u_target', field: 'role', value: 'troop_super', operatedBy: 'u_admin' });
-  ok('updateUserField(field=role) 一樣擋到向上提權', r.success === false, JSON.stringify(r));
+  r = call('updateUserRole', { userId: 'u_target', role: 'troop_leader', operatedBy: 'u_tl' });
+  ok('連現任旅長都不可以經 updateUserRole 指派旅長（只可以經交接）', r.success === false, JSON.stringify(r));
   ok('  且冇寫入', writes.length === 0, `writes=${JSON.stringify(writes)}`);
-
-  writes.length = 0;
-  r = call('createUser', { name: '新超管', email: 's9@y.z', role: 'troop_super', password: 'p', operatedBy: 'u_admin' });
-  ok('createUser 一樣擋到向上提權', r.success === false, JSON.stringify(r));
-  ok('  且冇寫入', users.filter((u) => u.email === 's9@y.z').length === 0, '竟然建咗帳號');
 
   // ── 對照組：正常操作唔可以壞 ──
   writes.length = 0;
   r = call('updateUserRole', { userId: 'u_target', role: 'admin', operatedBy: 'u_admin' });
-  ok('對照：admin 可以開其他管理員帳號（平級，刻意容許）', r.success === true, JSON.stringify(r));
+  ok('對照：admin 可以開其他管理員帳號（「只能加」）', r.success === true, JSON.stringify(r));
   ok('  且寫入咗 admin', writes.some((w) => w.col === 'role' && w.val === 'admin'), JSON.stringify(writes));
 
   users.find((u) => u.userId === 'u_target').role = 'member';
@@ -401,52 +404,185 @@ console.log('\n【GS：角色階梯 —— admin 唔可以指派高過自己嘅�
   ok('對照：admin 可以正常向下指派 branch_leader', r.success === true, JSON.stringify(r));
 
   writes.length = 0;
-  r = call('updateUserRole', { userId: 'u_target', role: 'troop_leader', operatedBy: 'u_ts' });
-  ok('對照：troop_super 可以指派 troop_leader（同 assignableRoles 一致）', r.success === true, JSON.stringify(r));
-  ok('  且寫入咗 troop_leader',
-    writes.some((w) => w.col === 'role' && w.val === 'troop_leader'), JSON.stringify(writes));
+  r = call('updateUserRole', { userId: 'u_target', role: 'admin', operatedBy: 'u_tl' });
+  ok('對照：旅長可以指派 admin 及以下', r.success === true, JSON.stringify(r));
 }
 
-// ==================== 10. MOCK：鏡像角色階梯守衛 ====================
+// ==================== 10. MOCK：鏡像旅長唯一守衛 ====================
 //
 // §9 只驗咗 GS。MOCK 亦加咗同一套守衛（lib/mockServer.ts），呢度驗佢真係生效 ——
 // 未經驗證嘅守衛唔算修好。
-// ⚠️ MOCK store 係持久嘅（.mockdata），所以用基線快照，只斷言「今次自己冇新增」。
-console.log('\n【MOCK：必須鏡像角色階梯守衛】');
+// ⚠️ 兩個踩過嘅陷阱：
+//  ・MOCK store 係持久嘅（.mockdata），所以用基線快照，只斷言「今次自己冇新增」。
+//  ・**唔好用 u_admin 還原 u_m1** —— §11 嘅 peer guard 會擋住 admin 改 admin，
+//    令還原靜默失敗，u_m1 永久留喺 admin 狀態，令呢一節嘅對照組喺**第二次跑**先假失敗
+//    （已實測重現：清 .mockdata 後第 1 次過、第 2 次 2 項失敗）。
+//    所以重置一律用 u_tl（旅長，唔受 peer guard 限制），而且喺**開頭**先重置，
+//    唔好依賴上一輪嘅還原成功。
+console.log('\n【MOCK：必須鏡像旅長唯一守衛】');
 {
   const { handleMockRequest } = await import('../lib/mockServer.ts');
   const j = (o) => JSON.stringify(o);
-  const ABOVE = ['troop_super', 'troop_leader'];
+  /** 用旅長重置 u_m1 —— 旅長唔受 peer guard 限制，所以呢個還原先至可靠 */
+  const reset = () => handleMockRequest('updateUserRole', { userId: 'u_m1', role: 'member', operatedBy: 'u_tl' });
+  reset();
 
   const snap = () =>
     ((handleMockRequest('getState', { userId: 'u_admin', keys: 'users' }).state || {}).users || [])
-      .filter((u) => ABOVE.includes(u.role)).map((u) => `${u.id}:${u.role}`);
+      .filter((u) => u.role === 'troop_leader').map((u) => `${u.id}:${u.role}`);
   const base = snap();
 
-  let r = handleMockRequest('updateUserRole', { userId: 'u_m1', role: 'troop_super', operatedBy: 'u_admin' });
-  ok('MOCK：admin 唔可以把人升做 troop_super', r.success === false, j(r));
-  ok('  錯誤訊息同 GS 一致', /只有超管可以指派/.test(r.error || ''), r.error);
+  let r = handleMockRequest('updateUserRole', { userId: 'u_m1', role: 'troop_leader', operatedBy: 'u_admin' });
+  ok('MOCK：admin 唔可以把人升做旅長', r.success === false, j(r));
+  ok('  錯誤訊息同 GS 一致', /交接旅長/.test(r.error || ''), r.error);
 
-  r = handleMockRequest('updateUserRole', { userId: 'u_m1', role: 'troop_leader', operatedBy: 'u_admin' });
-  ok('MOCK：admin 唔可以把人升做 troop_leader', r.success === false, j(r));
-
-  r = handleMockRequest('updateUserField', { userId: 'u_m1', field: 'role', value: 'troop_super', operatedBy: 'u_admin' });
+  r = handleMockRequest('updateUserField', { userId: 'u_m1', field: 'role', value: 'troop_leader', operatedBy: 'u_admin' });
   ok('MOCK：updateUserField(field=role) 一樣擋到', r.success === false, j(r));
 
-  r = handleMockRequest('createUser', { name: '新超管', email: 'ladder-mock@demo.scout', role: 'troop_super', password: 'p', operatedBy: 'u_admin' });
-  ok('MOCK：createUser 一樣擋到向上提權', r.success === false, j(r));
+  r = handleMockRequest('createUser', { name: '新旅長', email: 'tl-mock@demo.scout', role: 'troop_leader', password: 'p', operatedBy: 'u_admin' });
+  ok('MOCK：createUser 一樣擋到', r.success === false, j(r));
 
   const after = snap();
-  ok('  且冇新增任何 troop_super／troop_leader 帳號',
-    after.length === base.length, `base=${j(base)} after=${j(after)}`);
+  ok('  且冇新增任何旅長帳號', after.length === base.length, `base=${j(base)} after=${j(after)}`);
 
-  // 對照：平級／向下指派唔可以壞
+  // 對照：平級／向下指派唔可以壞（每次都用 reset() 確保 u_m1 係 member 先至測得準）
+  reset();
   r = handleMockRequest('updateUserRole', { userId: 'u_m1', role: 'branch_leader', operatedBy: 'u_admin' });
   ok('MOCK 對照：admin 可以正常向下指派 branch_leader', r.success === true, j(r));
+  reset();
   r = handleMockRequest('updateUserRole', { userId: 'u_m1', role: 'admin', operatedBy: 'u_admin' });
-  ok('MOCK 對照：admin 可以開其他管理員帳號（平級）', r.success === true, j(r));
-  // 還原 u_m1 原本角色，避免污染後續 check
-  handleMockRequest('updateUserRole', { userId: 'u_m1', role: 'member', operatedBy: 'u_admin' });
+  ok('MOCK 對照：admin 可以開其他管理員帳號（「只能加」）', r.success === true, j(r));
+  // 還原：用旅長（唔受 peer guard 限制），避免污染後續 check 同下一次跑
+  reset();
+}
+
+
+// ==================== 11. 「只能加不能減」＋交接旅長 ====================
+//
+// 用戶決定（2026-09-03）：
+//  ・管理員可以有無數個，但**其他管理員只可以加，唔可以減** —— 唔可以改其他管理員
+//    嘅角色、唔可以刪其他管理員嘅帳號。要改必須由旅長處理。
+//  ・旅長交接係**交換職位**：對方變旅長，現任旅長接手對方原本嘅角色＋支部
+//    （對象可以是支部領袖，唔一定係管理員）。
+//
+// 前後端都要擋：前端 lib/permissions.ts 已經擋，但 operatedBy 係前端傳上嚟嘅，
+// request 可以自己砌 —— 前端守衛唔等於後端守衛（同 updateUserRole 提權洞同一個根因）。
+console.log('\n【GS：「只能加不能減」＋交接旅長】');
+{
+  const ctx = loadGs();
+  const users = [
+    { userId: 'u_tl', name: '周旅長', role: 'troop_leader', branchId: '', approved: 'TRUE' },
+    { userId: 'u_a1', name: '管理員甲', role: 'admin', branchId: '', approved: 'TRUE' },
+    { userId: 'u_a2', name: '管理員乙', role: 'admin', branchId: '', approved: 'TRUE' },
+    { userId: 'u_bl', name: '黃志遠', role: 'branch_leader', branchId: 'b3', approved: 'TRUE' },
+    { userId: 'u_m', name: '成員', role: 'member', branchId: 'b3', approved: 'TRUE' },
+  ];
+  const writes = [];
+  ctx.getSheet_ = () => null;
+  ctx.readTable_ = (n) => (n === 'Users' ? users : []);
+  ctx.mapUsers_ = () => users.map((u) => ({
+    id: u.userId, name: u.name, role: u.role, branchId: u.branchId, email: '', approved: true,
+  }));
+  ctx.updateCellByName_ = (sheet, idCol, id, col, val) => {
+    writes.push({ id, col, val });
+    const row = users.find((x) => x[idCol] === id);
+    if (row) row[col] = val;
+  };
+  ctx.findRowIndexById_ = (s, c, id) => users.findIndex((x) => x[c] === id);
+  ctx.appendRowByHeaders_ = () => {};
+  ctx.writeAudit_ = () => {};
+  ctx.getUserFeatures_ = () => [];
+  ctx.uid_ = (p) => `${p}_s11`;
+  ctx.now_ = () => '2026-09-03';
+  ctx.sendEmail_ = () => {};
+  ctx.getConfigValue_ = (k) => (k === 'API_KEY_HASH' ? sha256(API_KEY) : '');
+  const call = (action, params = {}) =>
+    JSON.parse(ctx.doGet({ parameter: Object.assign({ apiKey: API_KEY, action }, params) }).__text);
+  const byId = (id) => users.find((u) => u.userId === id);
+
+  // ── 「只能加不能減」 ──
+  writes.length = 0;
+  let r = call('updateUserRole', { userId: 'u_a2', role: 'member', operatedBy: 'u_a1' });
+  ok('管理員甲 唔可以改 管理員乙 嘅角色', r.success === false, JSON.stringify(r));
+  ok('  且冇寫入', writes.length === 0, `writes=${JSON.stringify(writes)}`);
+  ok('  錯誤訊息講明「只能加不能減」', /只能加不能減/.test(r.error || ''), r.error);
+
+  writes.length = 0;
+  r = call('deleteUser', { userId: 'u_a2', operatedBy: 'u_a1' });
+  ok('管理員甲 唔可以刪 管理員乙 嘅帳號', r.success === false, JSON.stringify(r));
+
+  writes.length = 0;
+  r = call('updateUserRole', { userId: 'u_m', role: 'parent', operatedBy: 'u_a1' });
+  ok('對照：管理員甲 可以改 成員 嘅角色（向下）', r.success === true, JSON.stringify(r));
+
+  byId('u_m').role = 'member';
+  writes.length = 0;
+  r = call('updateUserRole', { userId: 'u_a2', role: 'group_leader', operatedBy: 'u_tl' });
+  ok('對照：旅長 可以改 管理員乙 嘅角色（旅長唔受限）', r.success === true, JSON.stringify(r));
+  byId('u_a2').role = 'admin';
+
+  // ── 交接旅長（交換職位）──
+  writes.length = 0;
+  r = call('transferTroopLeader', { targetUserId: 'u_a1', operatedBy: 'u_a1' });
+  ok('交接：唔可以交接給自己', r.success === false, JSON.stringify(r));
+
+  writes.length = 0;
+  r = call('transferTroopLeader', { targetUserId: 'u_a1', operatedBy: 'u_bl' });
+  ok('交接：非現任旅長被拒', r.success === false, JSON.stringify(r));
+  ok('  錯誤訊息講明只有現任旅長', /只有現任旅長/.test(r.error || ''), r.error);
+
+  writes.length = 0;
+  r = call('transferTroopLeader', { targetUserId: 'u_bl', operatedBy: 'u_tl' });
+  ok('交接：現任旅長可以交接俾支部領袖', r.success === true, JSON.stringify(r));
+  ok('  對方變成旅長', byId('u_bl').role === 'troop_leader', `role=${byId('u_bl').role}`);
+  ok('  對方支部被清空（旅長係全旅級）', byId('u_bl').branchId === '', `branch=${byId('u_bl').branchId}`);
+  ok('  舊旅長接手對方原本嘅角色 branch_leader', byId('u_tl').role === 'branch_leader', `role=${byId('u_tl').role}`);
+  ok('  舊旅長接手對方原本嘅支部 b3', byId('u_tl').branchId === 'b3', `branch=${byId('u_tl').branchId}`);
+  ok('  交接後全旅仍然只有一個旅長',
+    users.filter((u) => u.role === 'troop_leader').length === 1,
+    JSON.stringify(users.filter((u) => u.role === 'troop_leader').map((u) => u.userId)));
+}
+
+console.log('\n【MOCK：必須鏡像「只能加不能減」＋交接旅長】');
+{
+  const { handleMockRequest } = await import('../lib/mockServer.ts');
+  const j = (o) => JSON.stringify(o);
+  const users = () =>
+    ((handleMockRequest('getState', { userId: 'u_admin', keys: 'users' }).state || {}).users || []);
+  const roleOf = (id) => String(users().find((u) => u.id === id)?.role || '');
+  // ⚠️ 同 §10 一樣：重置一律用旅長（u_tl），唔好用 u_admin —— peer guard 會擋住
+  const reset = () => handleMockRequest('updateUserRole', { userId: 'u_m1', role: 'member', operatedBy: 'u_tl' });
+  reset();
+
+  let r = handleMockRequest('updateUserRole', { userId: 'u_tl', role: 'member', operatedBy: 'u_admin' });
+  ok('MOCK：管理員唔可以改旅長嘅角色', r.success === false, j(r));
+
+  r = handleMockRequest('deleteUser', { userId: 'u_tl', operatedBy: 'u_admin' });
+  ok('MOCK：管理員唔可以刪旅長嘅帳號', r.success === false, j(r));
+  ok('  旅長帳號仍然存在', roleOf('u_tl') === 'troop_leader', `role=${roleOf('u_tl')}`);
+
+  r = handleMockRequest('updateUserRole', { userId: 'u_m1', role: 'parent', operatedBy: 'u_admin' });
+  ok('MOCK 對照：管理員可以改成員嘅角色（向下）', r.success === true, j(r));
+
+  r = handleMockRequest('transferTroopLeader', { targetUserId: 'u_m1', operatedBy: 'u_admin' });
+  ok('MOCK：非現任旅長交接被拒', r.success === false, j(r));
+
+  // 交接：現任旅長 ⇄ 成員，真正對調
+  reset();
+  r = handleMockRequest('transferTroopLeader', { targetUserId: 'u_m1', operatedBy: 'u_tl' });
+  ok('MOCK：現任旅長可以交接', r.success === true, j(r));
+  ok('  對方變成旅長', roleOf('u_m1') === 'troop_leader', `role=${roleOf('u_m1')}`);
+  ok('  舊旅長接手對方原本嘅角色 member', roleOf('u_tl') === 'member', `role=${roleOf('u_tl')}`);
+  ok('  交接後全旅仍然只有一個旅長',
+    users().filter((u) => u.role === 'troop_leader').length === 1,
+    j(users().filter((u) => u.role === 'troop_leader').map((u) => u.id)));
+
+  // 還原：把旅長交返俾 u_tl（而家 u_m1 係旅長，所以由 u_m1 發起）
+  handleMockRequest('transferTroopLeader', { targetUserId: 'u_tl', operatedBy: 'u_m1' });
+  reset();
+  ok('  已還原 seed 狀態（u_tl 係旅長、u_m1 係成員）',
+    roleOf('u_tl') === 'troop_leader' && roleOf('u_m1') === 'member',
+    `u_tl=${roleOf('u_tl')} u_m1=${roleOf('u_m1')}`);
 }
 
 // ==================== 結果 ====================

@@ -43,7 +43,7 @@ export default function Notices() {
   const { confirm } = useConfirm();
 
   const session = getSession();
-  const isLeader = session && ['super_admin', 'troop_super', 'troop_leader', 'admin', 'group_leader', 'branch_leader', 'coach'].includes(session.role);
+  const isLeader = session && ['super_admin', 'troop_leader', 'admin', 'group_leader', 'branch_leader', 'coach'].includes(session.role);
 
   useEffect(() => {
     loadStateSlice(['bookmarks', 'announcementPdfs', 'config']).then(st => { setS(st); setFolderId(st.config.ANNOUNCEMENT_FOLDER_ID || ''); }).catch(e => setErr(e.message));
@@ -143,7 +143,7 @@ export default function Notices() {
   };
   const isGuest = !session || session.role === 'guest';
   /* 邊個可以設定「公開通告範圍」：管理層可改全部＋全旅；支部領袖只可以改自己支部 */
-  const adminTier = ['super_admin', 'troop_super', 'troop_leader', 'admin'].includes(session?.role || '');
+  const adminTier = ['super_admin', 'troop_leader', 'admin'].includes(session?.role || '');
   const canSetScope = adminTier || ['group_leader', 'branch_leader', 'coach'].includes(session?.role || '');
   const allPdfs = s.announcementPdfs || [];
   const pdfs = isGuest

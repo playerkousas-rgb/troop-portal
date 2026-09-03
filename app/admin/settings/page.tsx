@@ -199,7 +199,7 @@ export default function Page() {
     openScopes(s.config, card).map(id => id === TROOP_SCOPE ? '全旅' : (ALL_BRANCHES.find(b => b.id === id)?.name || id)).join('、');
   const plugins = s.plugins || [];
 
-  return <Auth roles={['super_admin', 'troop_super', 'troop_leader', 'admin']}><div className="max-w-3xl mx-auto space-y-4">
+  return <Auth roles={['super_admin', 'troop_leader', 'admin']}><div className="max-w-3xl mx-auto space-y-4">
     <section className="bg-gradient-to-br from-slate-800 to-slate-600 text-white rounded-2xl px-5 py-5 shadow-lg">
       <h1 className="font-black text-2xl leading-tight m-0">⚙️ 系統設定</h1>
       <p className="text-base text-white/85 mt-1.5 mb-0 leading-relaxed">

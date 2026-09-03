@@ -12,7 +12,6 @@ export function dashboardFor(role: Role): string {
     //   版面一樣，只係顯示嘅管理項目按權限多寡不同，而「系統管理」只有管理員先有。
     case 'admin':
     case 'troop_leader':
-    case 'troop_super':
     case 'super_admin':
     case 'group_leader':
     case 'branch_leader':
@@ -46,7 +45,6 @@ export function demoSession(role: Role): Session {
   const base = { troopCode: selected?.id || '0082', troopName: selected?.name || '第82旅' };
   const map: Record<Role, Session> = {
     super_admin: { userId:'admin', name:'管理員', role, ...base },
-    troop_super: { userId:'troop_super', name:'超管', role, ...base },
     troop_leader: { userId:'u_tl', name:'周旅長', role, ...base },
     admin: { userId:'u1', name:'陳管理員', role, ...base },
     group_leader: { userId:'u2', name:'李團長', role, branchId:'b3', ...base },

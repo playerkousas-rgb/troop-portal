@@ -469,7 +469,7 @@ export default function AttendancePage() {
   const todayLabel = todayISO();
 
   return (
-    <Auth roles={['super_admin', 'troop_super', 'troop_leader', 'admin', 'group_leader', 'branch_leader', 'coach', 'member', 'parent']}>
+    <Auth roles={['super_admin', 'troop_leader', 'admin', 'group_leader', 'branch_leader', 'coach', 'member', 'parent']}>
       <div className="w-full px-3 sm:px-6 py-5 pb-32 space-y-5 attendance-page">
 
         {/* ═══ Hero ═══ */}
