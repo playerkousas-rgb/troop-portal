@@ -1099,6 +1099,18 @@ function handleMutate(action: string, p: Record<string, any>) {
       if (!op) return { success: false, error: '找不到操作者帳號，請重新登入' };
       if (!target) return { success: false, error: '找不到該用戶' };
       if (target.role === 'super_admin') return { success: false, error: '技術測試帳號不可以成為旅長。' };
+      // ★ 交接對象限「領袖層」（同 GS handleTransferTroopLeader_ 一致，用戶決定 2026-09-03）
+      //   前端條掣只出現喺帳戶表（排除 member／parent），所以後端要對齊 ——
+      //   否則經 API 直接砌 request 就可以把旅長交俾一個未成年成員。
+      const tRole = String(target.role || '').toLowerCase();
+      if (tRole === 'member' || tRole === 'parent') {
+        logAudit(opId, 'DENIED:transferTroopLeader', 'Security', '',
+          `試圖交接旅長俾 ${tRole}（${targetId}）—— 只准領袖層`);
+        return {
+          success: false,
+          error: `只可以交接俾管理員／團長／支部領袖／教練員。${tRole === 'parent' ? '家長' : '成員'}帳號唔可以成為旅長。`,
+        };
+      }
       if (op.role !== 'troop_leader') {
         logAudit(opId, 'DENIED:transferTroopLeader', 'Security', '', `role=${op.role} 試圖交接旅長（唔係現任旅長）`);
         return { success: false, error: '只有現任旅長可以交接旅長職位。' };

@@ -531,6 +531,16 @@ console.log('\n【GS：「只能加不能減」＋交接旅長】');
   ok('交接：非現任旅長被拒', r.success === false, JSON.stringify(r));
   ok('  錯誤訊息講明只有現任旅長', /只有現任旅長/.test(r.error || ''), r.error);
 
+  // ── 交接對象限「領袖層」（用戶決定 2026-09-03：收緊後端對齊 UI）──
+  //   前端條「👑 交接旅長」掣只出現喺帳戶表（排除 member／parent），所以後端都要擋。
+  //   呢個落差係全 repo 審計實測出嚟嘅：改之前 targetUserId=u_m4（成年成員）回 success=true。
+  writes.length = 0;
+  r = call('transferTroopLeader', { targetUserId: 'u_m', operatedBy: 'u_tl' });
+  ok('交接：旅長唔可以交接俾成員', r.success === false, JSON.stringify(r));
+  ok('  錯誤訊息講明只准領袖層', /只可以交接俾管理員/.test(r.error || ''), r.error);
+  ok('  且冇寫入', writes.length === 0, `writes=${JSON.stringify(writes)}`);
+  ok('  且 u_m 仍然係 member', byId('u_m').role === 'member', `role=${byId('u_m').role}`);
+
   writes.length = 0;
   r = call('transferTroopLeader', { targetUserId: 'u_bl', operatedBy: 'u_tl' });
   ok('交接：現任旅長可以交接俾支部領袖', r.success === true, JSON.stringify(r));
@@ -564,25 +574,37 @@ console.log('\n【MOCK：必須鏡像「只能加不能減」＋交接旅長】'
   r = handleMockRequest('updateUserRole', { userId: 'u_m1', role: 'parent', operatedBy: 'u_admin' });
   ok('MOCK 對照：管理員可以改成員嘅角色（向下）', r.success === true, j(r));
 
-  r = handleMockRequest('transferTroopLeader', { targetUserId: 'u_m1', operatedBy: 'u_admin' });
+  r = handleMockRequest('transferTroopLeader', { targetUserId: 'u_bl', operatedBy: 'u_admin' });
   ok('MOCK：非現任旅長交接被拒', r.success === false, j(r));
 
-  // 交接：現任旅長 ⇄ 成員，真正對調
+  // ── 交接對象限「領袖層」（用戶決定 2026-09-03：收緊後端對齊 UI）──
+  //   前端條「👑 交接旅長」掣只出現喺帳戶表（排除 member／parent），
+  //   所以後端都要擋 —— 否則經 API 直接砌 request 就可以把旅長交俾未成年成員。
   reset();
   r = handleMockRequest('transferTroopLeader', { targetUserId: 'u_m1', operatedBy: 'u_tl' });
-  ok('MOCK：現任旅長可以交接', r.success === true, j(r));
-  ok('  對方變成旅長', roleOf('u_m1') === 'troop_leader', `role=${roleOf('u_m1')}`);
-  ok('  舊旅長接手對方原本嘅角色 member', roleOf('u_tl') === 'member', `role=${roleOf('u_tl')}`);
+  ok('MOCK：旅長唔可以交接俾成員', r.success === false, j(r));
+  ok('  錯誤訊息講明只准領袖層', /只可以交接俾管理員/.test(r.error || ''), r.error);
+  ok('  且 u_m1 冇變旅長', roleOf('u_m1') === 'member', `role=${roleOf('u_m1')}`);
+
+  r = handleMockRequest('transferTroopLeader', { targetUserId: 'u5', operatedBy: 'u_tl' });
+  ok('MOCK：旅長唔可以交接俾家長', r.success === false, j(r));
+  ok('  且 u5 冇變旅長', roleOf('u5') === 'parent', `role=${roleOf('u5')}`);
+
+  // 交接：現任旅長 ⇄ 支部領袖（領袖層，應該成功）
+  r = handleMockRequest('transferTroopLeader', { targetUserId: 'u_bl', operatedBy: 'u_tl' });
+  ok('MOCK：現任旅長可以交接俾支部領袖', r.success === true, j(r));
+  ok('  對方變成旅長', roleOf('u_bl') === 'troop_leader', `role=${roleOf('u_bl')}`);
+  ok('  舊旅長接手對方原本嘅角色 branch_leader', roleOf('u_tl') === 'branch_leader', `role=${roleOf('u_tl')}`);
   ok('  交接後全旅仍然只有一個旅長',
     users().filter((u) => u.role === 'troop_leader').length === 1,
     j(users().filter((u) => u.role === 'troop_leader').map((u) => u.id)));
 
-  // 還原：把旅長交返俾 u_tl（而家 u_m1 係旅長，所以由 u_m1 發起）
-  handleMockRequest('transferTroopLeader', { targetUserId: 'u_tl', operatedBy: 'u_m1' });
+  // 還原：把旅長交返俾 u_tl（而家 u_bl 係旅長，所以由 u_bl 發起）
+  handleMockRequest('transferTroopLeader', { targetUserId: 'u_tl', operatedBy: 'u_bl' });
   reset();
-  ok('  已還原 seed 狀態（u_tl 係旅長、u_m1 係成員）',
-    roleOf('u_tl') === 'troop_leader' && roleOf('u_m1') === 'member',
-    `u_tl=${roleOf('u_tl')} u_m1=${roleOf('u_m1')}`);
+  ok('  已還原 seed 狀態（u_tl 係旅長、u_bl 係支部領袖、u_m1 係成員）',
+    roleOf('u_tl') === 'troop_leader' && roleOf('u_bl') === 'branch_leader' && roleOf('u_m1') === 'member',
+    `u_tl=${roleOf('u_tl')} u_bl=${roleOf('u_bl')} u_m1=${roleOf('u_m1')}`);
 }
 
 // ==================== 12. 角色歸一 ＋「全旅只有一個旅長」不變量 ====================

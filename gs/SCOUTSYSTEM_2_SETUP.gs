@@ -3558,9 +3558,29 @@ function handleTransferTroopLeader_(p) {
   var users = mapUsers_();
   var op = users.filter(function (u) { return u.id === operatedBy; })[0];
   var target = users.filter(function (u) { return u.id === targetId; })[0];
-  if (!op) return { success: false, error: '找不到操作者帳號，請重新登入' };
+  if (!op) return { success: false, error: '找不到操作者帳號，請重新登入' } ;
   if (!target) return { success: false, error: '找不到該用戶' };
   if (target.role === 'super_admin') return { success: false, error: '技術測試帳號不可以成為旅長。' };
+
+  // ★ 交接對象限「領袖層」：管理員／團長／支部領袖／教練員（用戶決定 2026-09-03）。
+  //
+  //   之前後端只擋 super_admin，即係**成员／家長都可以做旅長** —— 而前端條
+  //   「👑 交接旅長」掣只出現喺帳戶表（`app/admin/users/page.tsx` L676 刻意排除
+  //   member／parent），所以經 UI 永遠交接唔到成員。實測證實呢個落差：
+  //   `transferTroopLeader targetUserId=u_m4`（成年成員）回 success=true。
+  //
+  //   旅長係全旅最高權限，交俾一個未成年成員顯然唔合理，所以**收緊後端對齊 UI**
+  //   （而唔係放寬 UI）—— 前端守衛唔等於後端守衛，operatedBy 係前端傳上嚟嘅。
+  var tRole = String(target.role || '').toLowerCase();
+  if (tRole === 'member' || tRole === 'parent') {
+    writeAudit_(operatedBy, 'DENIED:transferTroopLeader', 'Security', '',
+      '試圖交接旅長俾 ' + tRole + '（' + targetId + '）—— 只准領袖層');
+    return {
+      success: false,
+      error: '只可以交接俾管理員／團長／支部領袖／教練員。' +
+        (tRole === 'parent' ? '家長' : '成員') + '帳號唔可以成為旅長。',
+    };
+  }
 
   // 系統內建帳號（技術測試）可以代做交接；否則操作者必須係現任旅長
   var isSystem = TECH_TEST_ACCOUNTS_.indexOf(operatedBy) >= 0 ||
