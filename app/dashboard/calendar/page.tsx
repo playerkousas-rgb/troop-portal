@@ -1,5 +1,5 @@
 'use client';
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useConfirm, kv } from '@/components/ConfirmProvider';
 
 /* ═══════════════════════════════════════════════════
@@ -67,7 +67,11 @@ export default function CalendarPage() {
   };
   const isAdminRole = role === 'admin';
   const myBranch = DEMO_MY_BRANCH[role] || '';
-  const inScope = (branch: string) => isAdminRole || branch === '全旅' || branch === myBranch;
+  // useCallback：inScope 每次 render 都係新函數，直接放落 useMemo 嘅 deps 會令 memo 失效
+  const inScope = useCallback(
+    (branch: string) => isAdminRole || branch === '全旅' || branch === myBranch,
+    [isAdminRole, myBranch]
+  );
   const visibleBranches = isAdminRole ? BRANCHES : BRANCHES.filter(b => b === '全旅' || b === myBranch);
   const isFamily = role === 'parent' || role === 'member';
   const visibleTags = isFamily ? tags.filter(t => t !== '會議') : tags;
@@ -145,7 +149,7 @@ export default function CalendarPage() {
         .forEach(m => { if (!m.cancelled || isLeader) rows.push({ date, title: m.title, time: m.time, branch: m.branch, type: 'meeting', source: 'regular', id: m.ruleId, cancelled: m.cancelled, tag: '恆常集會' }); });
     }
     return rows;
-  }, [events, meetingItems, branchFilter, tagFilter, year, mo, isLeader, role]);
+  }, [events, meetingItems, branchFilter, tagFilter, year, mo, isLeader, inScope, isFamily]);
 
   /* ══════════ 管理動作（有權限者先見到按鈕）══════════ */
 

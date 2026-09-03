@@ -630,19 +630,30 @@ live preview 嘅 sandbox 網址對外攞唔到，所以一鍵加入喺 preview �
    而檢查受阻時解除阻塞屬於任務一部分）。**如果唔想要，revert 呢三個檔就可以**：
    `.eslintrc.json`、`package.json`、`package-lock.json`。
 
-   **結果（實測）**：10 個 warning、**0 個 error**、exit code 0。
-   全部 warning 都係 `react-hooks/exhaustive-deps`，分佈喺 6 個既有檔案：
+   **結果（實測）**：**9 個 warning、0 個 error**、exit code 0。
+   全部 warning 都係 `react-hooks/exhaustive-deps`，分佈喺 5 個檔案：
    `app/admin/equipment/page.tsx`(3)、`app/equipment/page.tsx`(3)、
    `app/admin/registrations/page.tsx`(1)、`app/admin/users/page.tsx`(1)、
-   `app/attendance/page.tsx`(1)、`app/dashboard/calendar/page.tsx`(1)。
-   **呢 10 個刻意冇修** —— 佢哋係既有 code、唔關今輪改動，而「補齊 hook 依賴」會改變
-   render／effect 觸發時機，屬於有行為風險嘅改動，唔應該溝入安全修正一齊做。
-   要處理請獨立開一個 task。
-   （原本 12 個；`components/ui/SubscribeCalendar.tsx` 嗰 2 個係本 session 新寫嘅 code，
-   已修：`branchIds.join(',')` 抽做 `branchParam` 變數，避免複雜表達式做 dependency。）
+   `app/attendance/page.tsx`(1)。
+   **呢 9 個刻意冇修** —— 用 `git blame` 逐行確認過，全部由 base commit `45f9fc8`
+   或更早引入，係既有 code；而「補齊 hook 依賴」會改變 render／effect 觸發時機，
+   屬於有行為風險嘅改動，唔應該溝入安全修正一齊做。要處理請獨立開一個 task。
+
+   **本 session 自己引入嘅 3 個 warning 已全部修好**（原本 12 個 → 9 個）：
+   ・`components/ui/SubscribeCalendar.tsx`(2)：`branchIds.join(',')` 直接做 dependency
+     係複雜表達式，ESLint 靜態分析唔到 → 抽做 `branchParam` 變數。
+   ・`app/dashboard/calendar/page.tsx`(1)：`useMemo` 缺 `inScope`／`isFamily` 依賴
+     → `inScope` 用 `useCallback` 包住（否則每次 render 都係新函數，直接放落 deps
+     會令 memo 失效），再補齊 deps；補完 ESLint 轉而報 `role` 係多餘依賴
+     （已確認 `role` 喺 memo 本体冇直接使用，只經 `isLeader`／`inScope`／`isFamily`
+     間接用到），所以一併移除。實測 `/dashboard/calendar` HTTP 200、16.6 KB、
+     內容正常、冇 error overlay。
+   ⚠️ 教訓：**唔好假設「lint warning 都係既有嘅」**。要先 `git blame` 逐行確認邊個
+     commit 引入，先至分得清「既有技術債」同「自己今次引入嘅 regression」。
+     我最初報告「10 個全部係既有 code」就係冇做呢步而講錯。
 
    ⚠️ **副作用**：Next 14 嘅 `next build` 預設會跑 ESLint，所以加咗 config 之後
-   build 輸出多咗「Linting and checking validity of types...」同嗰 10 個 warning。
+   build 輸出多咗「Linting and checking validity of types...」同嗰 9 個 warning。
    已實測確認 **build 仍然通過**（exit 0、63 條路由）—— warning 唔會令 build 失敗，
    只有 error 先會。
 
