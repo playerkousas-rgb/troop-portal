@@ -20,7 +20,10 @@
 import type { AppState, Equipment } from './store';
 import type { Role } from './model';
 import { branches as modelBranches, MANAGER_ROLES, LEADER_ROLES } from './model';
-import { PUBLIC_CARD_IDS, PublicCardId, scopeKey, toggleCard, toggleScope, canToggleCard, canToggleScope } from './publicScope';
+// PublicCardId 係純 type，要用 `import type`：Node 嘅 --experimental-strip-types
+// （npm run check:* 用）唔會自動 elide 混喺 value import 入面嘅 type。
+import { PUBLIC_CARD_IDS, scopeKey, toggleCard, toggleScope, canToggleCard, canToggleScope } from './publicScope';
+import type { PublicCardId } from './publicScope';
 import { DEMO_TROOP_KEY, MOCK_TROOP } from './mockConstants';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import path from 'path';

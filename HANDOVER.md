@@ -578,6 +578,23 @@ live preview 嘅 sandbox 網址對外攞唔到，所以一鍵加入喺 preview �
    另外 stub `getConfigValue_('API_KEY_HASH')` 時，`sha256_` 回傳嘅係**小寫** hex
    （GS 148 行 `toString(16)`），用 `.toUpperCase()` 會令所有請求死喺 API key 檢查，
    然後所有「應該被擋」嘅斷言假陽性通過 —— 呢種測試比冇測試更危險。
+
+   **回歸保護：`npm run check:security`（第 6 個 check，唔需要 dev server）。**
+   `scripts/check-reserved-roles.mjs`，38 項斷言，**執行真實代碼**而唔係 grep 原始碼：
+   GS 用 `node:vm` 載入 `.gs` 經**真實 `doGet` dispatch** 打；MOCK 直接 import
+   `lib/mockServer.ts` 嘅 `handleMockRequest`。覆蓋三條提權路＋對照組＋
+   `applyJoin` 靜默降級＋`decideApplication` 第二道守衛＋`batchCreateUsers` 白名單
+   ＋結構檢查（守衛必須喺 `isPrivilegedOperator_` 豁免之前）。
+   ・**負向對照已做**：暫時停用 GS 中央守衛 → 7 項失敗；停用 MOCK 守衛 → 5 項失敗。
+     證明呢個 check 真係捉到回歸，唔係裝飾。
+   ・**hermetic**：MOCK 嘅 store 會由 `.mockdata` 載入持久狀態，所以用「基線快照」
+     比對，只斷言今次攻擊嘗試冇**新增** super_admin，唔好斷言成個 store 乾淨
+     （否則環境殘留會令佢假失敗）。連跑 3 次結果一致。
+   ・順帶修咗 `lib/mockServer.ts` 嘅 import：`PublicCardId` 係純 type，
+     要拆做 `import type` —— Node 嘅 `--experimental-strip-types` 唔會自動 elide
+     混喺 value import 入面嘅 type（Next/webpack 會，所以之前冇爆）。
+   ・負向對照會污染 `.mockdata`（停用守衛時 `createUser` 真的成功寫入 super_admin），
+     做完記得 `rm -rf .mockdata`。
 2. **/onboard 第 6 步實測** — 走一次表單提交，確認管理員 Sheet「申請記錄」有新記錄 + 收到通知 email
 3. **旅團部署** — 新旅團接入流程（收到自動寄信 → `DEPLOY_ADMIN_GUIDE.md` 五步）
 4. **`/dashboard/*` demo 樹** — 仍是內嵌 mock 的展示頁（帶 Demo 角色切換），非真實登入頁。**用戶已決定保留**（2026-09-03），繼續作展示用途；已一併清走佢嘅 `super_admin` 角色，最高只到管理員。
