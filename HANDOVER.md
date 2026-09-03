@@ -473,7 +473,7 @@ live preview 嘅 sandbox 網址對外攞唔到，所以一鍵加入喺 preview �
    （過渡期：前端已改以 `sheep` 作 userId，未重新部署也能拿到全部資料；但仍建議盡快部署，才有 `publicConfig_` 敏感值剝除等修正）
 6. ~~**安全待辦**~~ — ✅ **已修**（三處：問題 A／問題 B／提權洞）。
    ⚠️ 三處**全部都係 GS 端改動，未部署到 82 旅之前一律無效** —— 見上面第 1 項。
-   回歸保護：`npm run check:security`（46 項斷言，執行真實代碼；負向對照已驗證有效）。
+   回歸保護：`npm run check:security`（67 項斷言，執行真實代碼；負向對照已驗證有效）。
 
    **問題 A：技術測試帳號分支冇驗證密碼。**
    `handleLogin_` 嘅「技術測試帳號」分支只比對帳號名
@@ -588,7 +588,7 @@ live preview 嘅 sandbox 網址對外攞唔到，所以一鍵加入喺 preview �
    然後所有「應該被擋」嘅斷言假陽性通過 —— 呢種測試比冇測試更危險。
 
    **回歸保護：`npm run check:security`（第 6 個 check，唔需要 dev server）。**
-   `scripts/check-reserved-roles.mjs`，46 項斷言，**執行真實代碼**而唔係 grep 原始碼：
+   `scripts/check-reserved-roles.mjs`，67 項斷言，**執行真實代碼**而唔係 grep 原始碼：
    GS 用 `node:vm` 載入 `.gs` 經**真實 `doGet` dispatch** 打；MOCK 直接 import
    `lib/mockServer.ts` 嘅 `handleMockRequest`。覆蓋三條提權路＋對照組＋
    `applyJoin` 靜默降級＋`decideApplication` 第二道守衛＋`batchCreateUsers` 白名單
@@ -616,6 +616,47 @@ live preview 嘅 sandbox 網址對外攞唔到，所以一鍵加入喺 preview �
      混喺 value import 入面嘅 type（Next/webpack 會，所以之前冇爆）。
    ・負向對照會污染 `.mockdata`（停用守衛時 `createUser` 真的成功寫入 super_admin），
      做完記得 `rm -rf .mockdata`。
+
+   **✅ 已修（2026-09-03）：角色階梯提權洞 —— `RESERVED_ROLES_` 只封咗最高嗰個。**
+   上面嘅修法只擋 `super_admin`。但同一個結構性弱點仲有大半個身位：
+   `admin` 一样可以砌 request 把別人升做 `troop_super`／`troop_leader` ——
+   即係**造出比自己更高權限嘅帳號**。`lib/permissions.ts:95`
+   `assignableRoles('admin')` 明確唔包含呢兩個角色，但後端完全冇 enforce。
+
+   實測證明（經真實 `doGet` dispatch，修復前）：
+   ・`admin` → `troop_super` ⚠️ **寫入咗**
+   ・`admin` → `troop_leader` ⚠️ **寫入咗**
+   ・`admin` → `admin` ✅ 寫入（**刻意容許**，見下）
+   ・對照 `super_admin` ✅ 被既有守衛擋
+
+   修法：
+   ・GS 新增 `ABOVE_ADMIN_ROLES_ = ['troop_super','troop_leader']` ＋ `isAboveAdminRole_`
+   ・階梯守衛放喺 `checkActionPermission_` **查到操作者角色之後**（因為要知道操作者
+     自己係咩角色）：`wantedRole && isAboveAdminRole_(wantedRole) && role !== 'troop_super'`
+     → 拒絕，錯誤「權限不足：只有超管可以指派「超管」或「旅長」。」，寫 `DENIED:<action>`
+   ・`troop_super` 可以指派 `troop_leader`（同 `assignableRoles` 一致）；系統內建帳號
+     已經喺上面 `isPrivilegedOperator_` 放行咗
+   ・`lib/mockServer.ts` 鏡像同一套（`ABOVE_ADMIN_ROLES`／`isAboveAdminRole`＋守衛）
+   ・**`admin → admin` 刻意唔擋**：管理員本来就可以開其他管理員帳號
+     （`batchCreateUsers` 嘅 `allowedRoles` 亦容許）。呢度只封「**向上**提權」，
+     平級／向下指派一律放行，所以正常流程零影響。
+
+   回歸保護：`check:security` §9（GS，11 項）＋ §10（MOCK 鏡射，8 項），總數 46 → **67**。
+   **負向對照已做（第五次／第六次）**：停用 GS 階梯守衛 → **8 項失敗**；
+   停用 MOCK 階梯守衛 → **6 項失敗**。兩次都已還原，`grep -c "if (false &&"` → 0，
+   GS 同 `public/downloads/` byte-identical，`.mockdata` 已清。
+
+   ⚠️ **仍然 inert**：呢個同之前三個 GS 安全修正一樣，要 82 旅重新部署 GS 先生效。
+
+   **★ 相關嘅未解設計矛盾（用戶已提出新模型，待實作）**：
+   `troop_leader` 喺前後端待遇矛盾 —— `lib/model.ts:5-6` 話「旅長權限＝管理員」、
+   `lib/model.ts:30` `ROLE_ORDER` 話 `troop_leader` 高過 `admin`、
+   `lib/permissions.ts:35` 話兩者一樣，但 **GS 後端 9 處 admin 級守衛有 0 處包含
+   `troop_leader`**（實測：`admin` 過到 L3915，`troop_leader` 被拒「你沒有權限修改
+   功能授權。」）。用戶提議：**旅長唯一＝第一個管理員**（`Users` 表有 `createdAt`
+   欄位，可客觀認定），管理員無限，第一個管理員權限最高可刪其他管理員，
+   其他管理員只可以加唔可以減。呢個模型會令 `troop_leader` 變成唔可指派嘅身份，
+   上面條提權路自然消失。
 2. **/onboard 第 6 步實測** — 走一次表單提交，確認管理員 Sheet「申請記錄」有新記錄 + 收到通知 email
 3. **旅團部署** — 新旅團接入流程（收到自動寄信 → `DEPLOY_ADMIN_GUIDE.md` 五步）
 4. **`/dashboard/*` demo 樹** — 仍是內嵌 mock 的展示頁（帶 Demo 角色切換），非真實登入頁。**用戶已決定保留**（2026-09-03），繼續作展示用途；已一併清走佢嘅 `super_admin` 角色，最高只到管理員。

@@ -332,6 +332,123 @@ console.log('\n【GS：授權路唔可以越權自我授權】');
   ok('updateUserPermissions：團長都被拒（限管理層）', r.success === false, JSON.stringify(r));
 }
 
+// ==================== 9. 角色階梯：唔可以向上提權 ====================
+//
+// 同一類 bug 嘅第二個實測漏洞：`RESERVED_ROLES_` 只封咗 super_admin，
+// 所以任何有「使用者管理」權限嘅 admin 都可以自己砌 request，把別人升做
+// troop_super / troop_leader —— 即係造出比自己更高權限嘅帳號。
+// 前端 assignableRoles() 唔會提供呢啲選項，但 operatedBy 係前端傳上嚟嘅。
+//
+// 已修：ABOVE_ADMIN_ROLES_ + isAboveAdminRole_ + checkActionPermission_ 階梯守衛。
+// 注意 admin → admin 係**刻意容許**（管理員本来就可以開其他管理員帳號，
+// batchCreateUsers 嘅 allowedRoles 亦容許），呢度只封「向上提權」。
+console.log('\n【GS：角色階梯 —— admin 唔可以指派高過自己嘅角色】');
+{
+  const ctx = loadGs();
+  const users = [
+    { userId: 'u_admin', name: '陳堅強', role: 'admin', branchId: '', approved: 'TRUE' },
+    { userId: 'u_ts', name: '超管', role: 'troop_super', branchId: '', approved: 'TRUE' },
+    { userId: 'u_target', name: '目標', role: 'member', branchId: 'b3', approved: 'TRUE' },
+  ];
+  const writes = [];
+  ctx.getSheet_ = () => null;
+  ctx.readTable_ = (n) => (n === 'Users' ? users : []);
+  ctx.updateCellByName_ = (sheet, idCol, id, col, val) => {
+    writes.push({ id, col, val });
+    const row = users.find((x) => x[idCol] === id);
+    if (row) row[col] = val;
+  };
+  ctx.findRowIndexById_ = (s, c, id) => users.findIndex((x) => x[c] === id);
+  ctx.appendRowByHeaders_ = (sheet, row) => users.push(row);
+  ctx.writeAudit_ = () => {};
+  ctx.getUserFeatures_ = () => [];
+  ctx.uid_ = (p) => `${p}_s9`;
+  ctx.now_ = () => '2026-09-03';
+  ctx.sendEmail_ = () => {};
+  ctx.getConfigValue_ = (k) => (k === 'API_KEY_HASH' ? sha256(API_KEY) : '');
+  const call = (action, params = {}) =>
+    JSON.parse(ctx.doGet({ parameter: Object.assign({ apiKey: API_KEY, action }, params) }).__text);
+
+  writes.length = 0;
+  let r = call('updateUserRole', { userId: 'u_target', role: 'troop_super', operatedBy: 'u_admin' });
+  ok('admin 唔可以把人升做 troop_super（向上提權）', r.success === false, JSON.stringify(r));
+  ok('  且冇寫入', writes.length === 0, `writes=${JSON.stringify(writes)}`);
+
+  writes.length = 0;
+  r = call('updateUserRole', { userId: 'u_target', role: 'troop_leader', operatedBy: 'u_admin' });
+  ok('admin 唔可以把人升做 troop_leader（向上提權）', r.success === false, JSON.stringify(r));
+  ok('  且冇寫入', writes.length === 0, `writes=${JSON.stringify(writes)}`);
+
+  writes.length = 0;
+  r = call('updateUserField', { userId: 'u_target', field: 'role', value: 'troop_super', operatedBy: 'u_admin' });
+  ok('updateUserField(field=role) 一樣擋到向上提權', r.success === false, JSON.stringify(r));
+  ok('  且冇寫入', writes.length === 0, `writes=${JSON.stringify(writes)}`);
+
+  writes.length = 0;
+  r = call('createUser', { name: '新超管', email: 's9@y.z', role: 'troop_super', password: 'p', operatedBy: 'u_admin' });
+  ok('createUser 一樣擋到向上提權', r.success === false, JSON.stringify(r));
+  ok('  且冇寫入', users.filter((u) => u.email === 's9@y.z').length === 0, '竟然建咗帳號');
+
+  // ── 對照組：正常操作唔可以壞 ──
+  writes.length = 0;
+  r = call('updateUserRole', { userId: 'u_target', role: 'admin', operatedBy: 'u_admin' });
+  ok('對照：admin 可以開其他管理員帳號（平級，刻意容許）', r.success === true, JSON.stringify(r));
+  ok('  且寫入咗 admin', writes.some((w) => w.col === 'role' && w.val === 'admin'), JSON.stringify(writes));
+
+  users.find((u) => u.userId === 'u_target').role = 'member';
+  writes.length = 0;
+  r = call('updateUserRole', { userId: 'u_target', role: 'branch_leader', operatedBy: 'u_admin' });
+  ok('對照：admin 可以正常向下指派 branch_leader', r.success === true, JSON.stringify(r));
+
+  writes.length = 0;
+  r = call('updateUserRole', { userId: 'u_target', role: 'troop_leader', operatedBy: 'u_ts' });
+  ok('對照：troop_super 可以指派 troop_leader（同 assignableRoles 一致）', r.success === true, JSON.stringify(r));
+  ok('  且寫入咗 troop_leader',
+    writes.some((w) => w.col === 'role' && w.val === 'troop_leader'), JSON.stringify(writes));
+}
+
+// ==================== 10. MOCK：鏡像角色階梯守衛 ====================
+//
+// §9 只驗咗 GS。MOCK 亦加咗同一套守衛（lib/mockServer.ts），呢度驗佢真係生效 ——
+// 未經驗證嘅守衛唔算修好。
+// ⚠️ MOCK store 係持久嘅（.mockdata），所以用基線快照，只斷言「今次自己冇新增」。
+console.log('\n【MOCK：必須鏡像角色階梯守衛】');
+{
+  const { handleMockRequest } = await import('../lib/mockServer.ts');
+  const j = (o) => JSON.stringify(o);
+  const ABOVE = ['troop_super', 'troop_leader'];
+
+  const snap = () =>
+    ((handleMockRequest('getState', { userId: 'u_admin', keys: 'users' }).state || {}).users || [])
+      .filter((u) => ABOVE.includes(u.role)).map((u) => `${u.id}:${u.role}`);
+  const base = snap();
+
+  let r = handleMockRequest('updateUserRole', { userId: 'u_m1', role: 'troop_super', operatedBy: 'u_admin' });
+  ok('MOCK：admin 唔可以把人升做 troop_super', r.success === false, j(r));
+  ok('  錯誤訊息同 GS 一致', /只有超管可以指派/.test(r.error || ''), r.error);
+
+  r = handleMockRequest('updateUserRole', { userId: 'u_m1', role: 'troop_leader', operatedBy: 'u_admin' });
+  ok('MOCK：admin 唔可以把人升做 troop_leader', r.success === false, j(r));
+
+  r = handleMockRequest('updateUserField', { userId: 'u_m1', field: 'role', value: 'troop_super', operatedBy: 'u_admin' });
+  ok('MOCK：updateUserField(field=role) 一樣擋到', r.success === false, j(r));
+
+  r = handleMockRequest('createUser', { name: '新超管', email: 'ladder-mock@demo.scout', role: 'troop_super', password: 'p', operatedBy: 'u_admin' });
+  ok('MOCK：createUser 一樣擋到向上提權', r.success === false, j(r));
+
+  const after = snap();
+  ok('  且冇新增任何 troop_super／troop_leader 帳號',
+    after.length === base.length, `base=${j(base)} after=${j(after)}`);
+
+  // 對照：平級／向下指派唔可以壞
+  r = handleMockRequest('updateUserRole', { userId: 'u_m1', role: 'branch_leader', operatedBy: 'u_admin' });
+  ok('MOCK 對照：admin 可以正常向下指派 branch_leader', r.success === true, j(r));
+  r = handleMockRequest('updateUserRole', { userId: 'u_m1', role: 'admin', operatedBy: 'u_admin' });
+  ok('MOCK 對照：admin 可以開其他管理員帳號（平級）', r.success === true, j(r));
+  // 還原 u_m1 原本角色，避免污染後續 check
+  handleMockRequest('updateUserRole', { userId: 'u_m1', role: 'member', operatedBy: 'u_admin' });
+}
+
 // ==================== 結果 ====================
 
 console.log('');

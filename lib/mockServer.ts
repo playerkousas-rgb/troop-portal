@@ -1413,6 +1413,15 @@ function isReservedRole(role: unknown): boolean {
   return RESERVED_ROLES.includes(String(role ?? '').trim().toLowerCase());
 }
 
+// ★ 高過管理員嘅角色（同 GS ABOVE_ADMIN_ROLES_ 一致）：admin 或以下唔可以指派。
+//   實測確認過漏洞：有「使用者管理」權限嘅 admin 可以自己砌 request，把別人升做
+//   troop_super / troop_leader —— 即係造出比自己更高權限嘅帳號。
+const ABOVE_ADMIN_ROLES = ['troop_super', 'troop_leader'];
+
+function isAboveAdminRole(role: unknown): boolean {
+  return ABOVE_ADMIN_ROLES.includes(String(role ?? '').trim().toLowerCase());
+}
+
 /** 由 request 抽出「準備指派嘅角色」—— 唔同 action 放喺唔同參數 */
 function requestedRole(p: Record<string, any>): string {
   const r = p.role;
@@ -1432,6 +1441,22 @@ export function handleMockRequest(action: string, params: Record<string, any> = 
   if (action !== 'applyJoin' && isReservedRole(requestedRole(p))) {
     logAudit(String(p.operatedBy || p.userId || 'anonymous'), 'DENIED:' + action, 'Security', '', '試圖指派保留角色 super_admin');
     return { success: false, error: '「超級管理員」係系統內建帳號，不能經介面指派或建立。' };
+  }
+
+  // ★ 角色階梯守衛（同 GS checkActionPermission_ 一致）：admin 或以下唔可以指派
+  //   高過自己嘅角色（troop_super / troop_leader），否則可以造出比自己更高權限嘅帳號。
+  //   applyJoin 除外：公開表單由自己嘅 sanitizer 靜默降級。
+  //   注意：admin → admin 刻意唔擋，管理員本来就可以開其他管理員帳號。
+  {
+    const wanted = requestedRole(p);
+    if (action !== 'applyJoin' && wanted && isAboveAdminRole(wanted)) {
+      const opId = String(p.operatedBy || p.userId || '');
+      const opRole = String(store.users.find(u => u.id === opId)?.role || '').toLowerCase();
+      if (opRole !== 'troop_super') {
+        logAudit(opId || 'anonymous', 'DENIED:' + action, 'Security', '', `role=${opRole} 試圖指派高過自己嘅角色 ${wanted}`);
+        return { success: false, error: '權限不足：只有超管可以指派「超管」或「旅長」。' };
+      }
+    }
   }
 
   if (action === 'health') return { success: true, version: MOCK_BACKEND_VERSION, action: 'health', ready: true };

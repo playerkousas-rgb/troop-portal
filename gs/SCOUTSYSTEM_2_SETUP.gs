@@ -1769,6 +1769,19 @@ function isReservedRole_(role) {
   return RESERVED_ROLES_.indexOf(String(role === undefined || role === null ? '' : role).trim().toLowerCase()) >= 0;
 }
 
+// ★ 高過管理員嘅角色：只有系統內建帳號（技術測試）可以指派。
+//   實測確認過漏洞：任何有「使用者管理」權限嘅 admin 都可以自己砌 request，
+//   把別人升做 troop_super / troop_leader —— 即係造出比自己更高權限嘅帳號。
+//   前端 assignableRoles() 唔會提供呢啲選項，但 operatedBy 係前端傳上嚟嘅，
+//   request 可以自己砌，所以後端必須自己再擋一次。
+//   （troop_super 可以指派 troop_leader，同 lib/permissions.ts assignableRoles 一致。）
+var ABOVE_ADMIN_ROLES_ = ['troop_super', 'troop_leader'];
+
+/** 呢個角色係咪高過管理員（唔可以由 admin 或以下指派） */
+function isAboveAdminRole_(role) {
+  return ABOVE_ADMIN_ROLES_.indexOf(String(role === undefined || role === null ? '' : role).trim().toLowerCase()) >= 0;
+}
+
 /** 由 request 抽出「準備指派嘅角色」—— 唔同 action 放喺唔同參數 */
 function requestedRole_(p) {
   if (!p) return '';
@@ -1809,6 +1822,22 @@ function checkActionPermission_(action, p) {
     return { success: false, error: '帳號已停用，無法執行此操作' };
   }
   var role = String(getField_(actor, 'role') || '').toLowerCase();
+
+  // ★ 角色階梯守衛：admin 或以下唔可以指派高過自己嘅角色。
+  //   實測確認過漏洞：任何有「使用者管理」權限嘅 admin 都可以自己砌 request，
+  //   把別人升做 troop_super / troop_leader —— 即係造出比自己更高權限嘅帳號。
+  //   前端 assignableRoles() 唔會提供呢啲選項，但 operatedBy 係前端傳上嚟嘅，
+  //   request 可以自己砌，所以後端必須自己擋。
+  //   troop_super 可以指派 troop_leader（同 lib/permissions.ts assignableRoles 一致）；
+  //   系統內建帳號（技術測試）已經喺上面 isPrivilegedOperator_ 放行咗。
+  //   注意：admin → admin 刻意**唔擋**，因為管理員本来就可以開其他管理員帳號
+  //   （batchCreateUsers 嘅 allowedRoles 亦容許），呢度只封「向上提權」。
+  var wantedRole = requestedRole_(p);
+  if (wantedRole && isAboveAdminRole_(wantedRole) && role !== 'troop_super') {
+    writeAudit_(operatedBy, 'DENIED:' + action, 'Security', '',
+      'role=' + role + ' 試圖指派高過自己嘅角色 ' + wantedRole);
+    return { success: false, error: '權限不足：只有超管可以指派「超管」或「旅長」。' };
+  }
 
   // ★ 支部範圍檢查：唔單止「有冇呢個功能」，仲要「喺邊個支部有」。
   //   深資團團長被童軍團團長邀請去幫手點名，就淨係喺童軍團點到名，
