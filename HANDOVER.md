@@ -508,6 +508,19 @@ live preview 嘅 sandbox 網址對外攞唔到，所以一鍵加入喺 preview �
 
    ⚠️ 呢個測試行嘅係 repo 入面嘅 `.gs` 原始碼，**未部署到 82 旅**；
    部署後請親自複測：`sheep`+`0728` 應該照入到，`sheep`+亂噏密碼應該被拒。
+
+   **⚠️ 陷阱：MOCK 後台嘅免密碼登入係設計如此，千祈唔好「順手修」。**
+   `lib/mockServer.ts` 嘅 `handleMockLogin`（513–535 行）完全冇讀 `p.password`，
+   實測 `u_super` 用空密碼／錯密碼／`0728` 都回 `super_admin`（3/3）。呢個**唔係**同一個洞：
+   ・範圍只限演示旅團 —— `app/api/proxy/route.ts` 第 44 行：只有 `troopKey === DEMO_TROOP_KEY`
+     （`troop_demo`）先行 MOCK；真實旅團一律 `fetch` 去 Apps Script（161／192 行）。
+   ・demo 帳號**根本冇 password 欄位**（seed 只有 id／name／email／role／approved），冇嘢可驗證。
+   ・`app/login/page.tsx` 第 55 行嘅 demo 快捷按鈕本身就傳 `password: ''` —— 加密碼檢查會直接搞壞佢。
+   ・`lib/mock.ts` 第 22–28 行 `isMockMode()` 要 localStorage 開關 **且** 目前選中嘅係 `troop_demo`
+     先成立，註解寫明係為咗避免把真旅團誤當 MOCK。
+   殘留考量（**產品決定，未處理**）：`troop_demo` 冇 env 開關，任何人對住佢都攞到
+   `super_admin` session —— 但攞到嘅係 seed 假資料，碰唔到真實旅團數據。
+   如果唔想公開 demo，需要加 env flag 控制 `troop_demo` 係咪可選。
 2. **/onboard 第 6 步實測** — 走一次表單提交，確認管理員 Sheet「申請記錄」有新記錄 + 收到通知 email
 3. **旅團部署** — 新旅團接入流程（收到自動寄信 → `DEPLOY_ADMIN_GUIDE.md` 五步）
 4. **`/dashboard/*` demo 樹** — 仍是內嵌 mock 的展示頁（帶 Demo 角色切換），非真實登入頁；確認不再需要可刪
