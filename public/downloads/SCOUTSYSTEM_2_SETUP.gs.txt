@@ -199,7 +199,7 @@ function getInitialSheets_() {
       ['ANNOUNCEMENT_FOLDER_ID', '', '公告 PDF 的 Google Drive 資料夾 ID。取得方式：打開 Drive 資料夾，看網址 https://drive.google.com/drive/folders/XXXX，XXXX 就是 ID。資料夾需設為「知道連結的人都可檢視」。'],
       ['MEETINGS_FOLDER_ID', '', '會議文件 PDF 的 Google Drive 資料夾 ID。可在「單位元件設定」或「會議管理」頁設定。'],
       ['REGISTRY_URL', 'https://troop-router.vercel.app/api/registry.json', '轉駁器 registry。'],
-      ['PUBLIC_CARDS', '', '管理員開放的公開資料卡片，逗號分隔：calendar（行事曆）／albums（相簿）／notices（通告）。可全開、開兩個、開一個。'],
+      ['PUBLIC_CARDS', 'calendar,notices', '管理員開放的公開資料卡片，逗號分隔：calendar（行事曆）／albums（相簿）／notices（通告）。可全開、開兩個、開一個。預設開行事曆＋通告（同舊版公開瀏覽行為一致），相簿要管理員另外開。'],
       ['PUBLIC_SCOPE_CALENDAR', 'troop', '行事曆卡片的公開範圍：troop（全旅，由管理員決定）＋各支部 id（由該支部團長決定）。'],
       ['PUBLIC_SCOPE_ALBUMS', 'troop', '相簿卡片的公開範圍，格式同上。'],
       ['PUBLIC_SCOPE_NOTICES', 'troop', '通告卡片的公開範圍，格式同上。'],
