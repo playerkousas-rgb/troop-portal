@@ -8,6 +8,7 @@ import { isLeaderOrAbove, publicViewEnabled } from '@/lib/model';
 import { hasFeature } from '@/lib/permissions';
 import { isItemPublic, cardEffective } from '@/lib/publicScope';
 import PublicLocked from '@/components/ui/PublicLocked';
+import PublicScopePanel from '@/components/ui/PublicScopePanel';
 import EmptyState from '@/components/ui/EmptyState';
 import { useConfirm, kv } from '@/components/ConfirmProvider';
 
@@ -55,6 +56,9 @@ export default function AlbumsPage() {
   const ownBranchId = me?.branchId || session?.branchId || '';
 
   const canManage = isLeaderOrAbove(session?.role) && hasFeature(state?.userFeatures, 'photos', session?.role);
+  /* 邊個可以設定「公開相簿範圍」：管理層可改全部＋全旅；支部領袖只可以改自己支部 */
+  const adminTier = ['super_admin', 'troop_super', 'troop_leader', 'admin'].includes(session?.role || '');
+  const canSetScope = adminTier || ['group_leader', 'branch_leader', 'coach'].includes(session?.role || '');
 
   /* ★ 三層公開模型（lib/publicScope.ts）：
      ・已登入 → 照舊用 canViewAlbum（photos 功能＋支部範圍）
@@ -128,6 +132,17 @@ export default function AlbumsPage() {
     </header>
 
     {err && <p className="text-sm font-bold text-rose-700 bg-rose-50 border border-rose-200 rounded-xl px-3 py-2 m-0">{err}</p>}
+
+    {/* 公開相簿範圍 —— 全旅內容由管理層決定，各支部內容由該支部團長決定 */}
+    {canSetScope && state?.config && (
+      <PublicScopePanel
+        card="albums"
+        s={state}
+        adminTier={adminTier}
+        ownBranchId={ownBranchId}
+        onSaved={setState}
+      />
+    )}
 
     {/* 領袖：補相簿連結（原嚟喺「活動管理」，而家搬過嚟 —— 活動完結後先会有相） */}
     {canManage && (

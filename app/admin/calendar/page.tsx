@@ -1,9 +1,9 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { AppState, loadState, loadStateSlice } from '@/lib/store';
-import { apiToggleRegularMeeting, apiCreateRegularMeeting, apiCreateEvent, apiDeleteRegularMeeting, apiUpdateRegularMeeting, apiSetPublicScope } from '@/lib/api';
-import { branches, publicViewEnabled } from '@/lib/model';
-import { scopeOpen, openScopes, cardEffective, TROOP_SCOPE } from '@/lib/publicScope';
+import { apiToggleRegularMeeting, apiCreateRegularMeeting, apiCreateEvent, apiDeleteRegularMeeting, apiUpdateRegularMeeting } from '@/lib/api';
+import { branches } from '@/lib/model';
+import PublicScopePanel from '@/components/ui/PublicScopePanel';
 import { getSession } from '@/lib/session';
 import { useConfirm, kv } from '@/components/ConfirmProvider';
 import Auth from '@/components/Auth';
@@ -171,39 +171,13 @@ export default function Page(){
     }catch(e:any){setErr(e.message)}
   }
 
-  /* ═══ 公開行事曆同意（兩層同意嘅第二層）═══
-     管理員嘅總掣 PUBLIC_VIEW 只係「開放呢個功能」；每個支部仲要自己嘅領袖同意。
-     管理層可以代任何支部設定；支部領袖／團長只可以設定自己支部。 */
+  /* ═══ 公開行事曆範圍（三張公開資料卡之一）═══
+     管理員嘅總掣 PUBLIC_VIEW 只係「開放呢個功能」；每張卡入面嘅內容仲要各自開放：
+     全旅內容由管理層決定，各支部內容由該支部團長／支部領袖決定。
+     實際掣喺共用組件 components/ui/PublicScopePanel.tsx（行事曆／相簿／通告 三張卡共用）。 */
   const session = getSession();
   const adminTier = ['super_admin', 'troop_super', 'troop_leader', 'admin'].includes(session?.role || '');
   const ownBranch = session?.branchId || '';
-  // 管理層 → 列出所有支部；支部領袖 → 只列自己支部
-  const consentBranches = adminTier ? branches : branches.filter(b => b.id === ownBranch);
-  const masterOn = s ? publicViewEnabled(s.config) : false;
-  const calendarCardOn = s ? cardEffective(s.config, 'calendar') : false;
-  const [busyBranch, setBusyBranch] = useState('');
-
-  async function toggleConsent(branchId: string, branchName: string, next: boolean) {
-    const ok = await confirm({
-      title: next ? '確認公開呢個支部嘅行事曆' : '確認取消公開',
-      message: kv([
-        ['支部', branchName],
-        ['變更後', next ? '🟢 公開：未登入訪客可睇到本支部已公佈活動＋恆常集會' : '🔴 唔公開：本支部項目唔會顯示畀未登入訪客'],
-        ['範圍', '只限已公佈活動＋已啟用恆常集會（標題／日期／時間／地點／通告連結）'],
-        ['唔包括', '未公佈（PRIVATE）活動、報名名單、出席紀錄、成員及家長聯絡電話'],
-        ['通告', '通告係另一套機制（逐份發佈），唔受呢個掣影響'],
-        ...(next ? [] : [['提示', '已訂閱本支部嘅用戶，日曆會停止收到本支部項目。'] as [string, string]]),
-      ]),
-      confirmLabel: '確認',
-    });
-    if (!ok) return;
-    setBusyBranch(branchId); setErr(''); setOkMsg('');
-    try {
-      const f = await apiSetPublicScope({ card: 'calendar', scope: branchId, enabled: next });
-      setS(f);
-      setOkMsg(next ? `✅ 已公開${branchName}行事曆` : `🔒 已取消公開${branchName}行事曆`);
-    } catch (e: any) { setErr(e.message); } finally { setBusyBranch(''); }
-  }
 
   if(!s)return <div className="card">{err||'載入中...'}</div>;
 
@@ -216,76 +190,14 @@ export default function Page(){
     {err&&<p className="badge red">{err}</p>}
     {okMsg&&<p className="badge green">{okMsg}</p>}
 
-    {/* ═══ 公開行事曆同意（兩層同意）═══ */}
-    {consentBranches.length > 0 && (
-      <section className="card stack">
-        <h3>🌐 公開行事曆範圍</h3>
-        <p className="muted m-0">
-          管理員喺系統設定開咗<strong>「行事曆」卡</strong>只係開放呢個功能；
-          入面每一項內容仲要各自開放 ——
-          <strong>全旅內容由管理層決定</strong>，<strong>各支部內容由該支部團長／支部領袖決定</strong>。
-          全部範圍都關晒 → 呢張卡等於重新關閉，要再由管理員開返。
-        </p>
-        {!masterOn && (
-          <p className="m-0 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[13px] text-amber-800">
-            ⚠️ 管理員而家<strong>未開放「公開瀏覽」</strong>（系統設定 → 🌐 公開瀏覽），
-            所以就算下面開咗，訪客仍然乜都睇唔到。要先請管理員開總掣。
-          </p>
-        )}
-        <div className="stack">
-          {/* 全旅內容 —— 只有管理層可以改 */}
-          {adminTier && (() => {
-            const on = scopeOpen(s.config, 'calendar', TROOP_SCOPE);
-            const busy = busyBranch === TROOP_SCOPE;
-            return (
-              <div className="rounded-xl border border-brand-200 bg-brand-50 px-3.5 py-3 flex items-center justify-between gap-3 flex-wrap">
-                <div className="min-w-0">
-                  <p className="m-0 font-bold text-slate-800">🏕️ 全旅內容</p>
-                  <p className="m-0 mt-0.5 text-[13px] text-slate-600">
-                    {on
-                      ? '🟢 已公開 —— 訪客睇到跨支部／全旅活動（卡片一開就預設公開）'
-                      : '🔒 未公開 —— 全旅活動唔會顯示畀未登入訪客'}
-                  </p>
-                </div>
-                <button className={`btn ${on ? '' : 'primary'}`} disabled={busy}
-                  onClick={() => toggleConsent(TROOP_SCOPE, '全旅內容', !on)}>
-                  {busy ? '處理中...' : on ? '取消公開' : '公開全旅內容'}
-                </button>
-              </div>
-            );
-          })()}
-          {consentBranches.map(b => {
-            const on = scopeOpen(s.config, 'calendar', b.id);
-            const busy = busyBranch === b.id;
-            return (
-              <div key={b.id} className="rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-3 flex items-center justify-between gap-3 flex-wrap">
-                <div className="min-w-0">
-                  <p className="m-0 font-bold text-slate-800">{b.name}</p>
-                  <p className="m-0 mt-0.5 text-[13px] text-slate-500">
-                    {on
-                      ? '🟢 已公開 —— 訪客睇到本支部已公佈活動＋恆常集會'
-                      : '🔒 未公開 —— 本支部項目唔會顯示畀未登入訪客'}
-                  </p>
-                </div>
-                <button
-                  className={`btn ${on ? '' : 'primary'}`}
-                  disabled={busy}
-                  onClick={() => toggleConsent(b.id, b.name, !on)}
-                >
-                  {busy ? '處理中...' : on ? '取消公開' : '公開本支部'}
-                </button>
-              </div>
-            );
-          })}
-        </div>
-        <p className="muted m-0 text-[12px]">
-          {adminTier
-            ? <>行事曆卡而家公開嘅範圍：<strong>{openScopes(s.config, 'calendar').map(id => id === TROOP_SCOPE ? '全旅' : (branches.find(b => b.id === id)?.name || id)).join('、') || '（全部關閉＝卡片等於未開）'}</strong></>
-            : '你只可以設定自己支部嘅範圍；全旅內容由管理層決定。'}
-          {!calendarCardOn && masterOn && ' ⚠️ 行事曆卡所有範圍都關咗，卡片等於未開。'}
-        </p>
-      </section>
-    )}
+    {/* ═══ 公開行事曆範圍（三張公開資料卡之一，共用 PublicScopePanel）═══ */}
+    <PublicScopePanel
+      card="calendar"
+      s={s}
+      adminTier={adminTier}
+      ownBranchId={ownBranch}
+      onSaved={f => { setS(f); setOkMsg('✅ 已更新公開範圍'); }}
+    />
 
     {/* Regular meetings */}
     <section className="card">

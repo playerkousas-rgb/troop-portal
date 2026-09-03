@@ -6,6 +6,7 @@ import { apiSaveConfig, apiUpdateBookmark, apiDeleteBookmark, apiUpdatePdfTags }
 import { getSession } from '@/lib/session';
 import { branches, publicViewEnabled } from '@/lib/model';
 import { isItemPublic, TROOP_SCOPE } from '@/lib/publicScope';
+import PublicScopePanel from '@/components/ui/PublicScopePanel';
 import PublicLocked from '@/components/ui/PublicLocked';
 import { useConfirm, kv } from '@/components/ConfirmProvider';
 
@@ -141,6 +142,9 @@ export default function Notices() {
     return hit ? hit.id : v;
   };
   const isGuest = !session || session.role === 'guest';
+  /* 邊個可以設定「公開通告範圍」：管理層可改全部＋全旅；支部領袖只可以改自己支部 */
+  const adminTier = ['super_admin', 'troop_super', 'troop_leader', 'admin'].includes(session?.role || '');
+  const canSetScope = adminTier || ['group_leader', 'branch_leader', 'coach'].includes(session?.role || '');
   const allPdfs = s.announcementPdfs || [];
   const pdfs = isGuest
     ? allPdfs.filter(p => p.visible !== false
@@ -149,6 +153,12 @@ export default function Notices() {
 
   return (
     <main className="max-w-3xl mx-auto px-4 py-4 pb-24 space-y-4">
+
+      {/* 公開通告範圍 —— 全旅內容由管理層決定，各支部內容由該支部團長決定 */}
+      {canSetScope && (
+        <PublicScopePanel card="notices" s={s} adminTier={adminTier}
+          ownBranchId={session?.branchId || ''} onSaved={setS} />
+      )}
 
       {/* Header + 直接發佈入口 */}
       <div className="flex items-center justify-between gap-2 flex-wrap">
