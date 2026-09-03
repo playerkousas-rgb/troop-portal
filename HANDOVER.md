@@ -1485,3 +1485,102 @@ GS 250,009 bytes，同 `public/downloads/` 副本 `cmp` 一致。
 理論上可能已經被人用過。重新部署後建議：
 1. 開 Sheet 嘅 `Users` 表，確認 `role='troop_leader'` **恰好一行**
 2. 睇 `AuditLog` 有冇 `updateUserField role=…` 或 `updateUserRole` 嘅可疑紀錄
+
+---
+
+## 2026-09-03 ★★ 第三條繞過路：`toggleUser` 停用帳號
+
+### 點解會繼續搵
+
+修好頭兩條路之後，我意識到自己係**撞啱**先至發現佢哋。所以做咗一次系統性
+enumerate：grep 晒所有寫 `Users` 表嘅 GS 位置。
+
+```
+69 個 handler，但 checkAdminPeerGuard_ 只被調用 4 次
+```
+
+逐個核對，大部分係 `password`／`memberId`（唔影響權限），但有一個可疑：
+
+```
+L3377  updateCellByName_('Users', 'userId', p.userId, 'approved', String(!current));
+```
+
+### 漏洞
+
+`handleToggleUser_`（L3372-3380）同 mock `toggleUser`（L1106）
+**兩邊都冇 peer guard**。實測：
+```
+{action:'toggleUser', userId:'u_tl', operatedBy:'u_admin'}
+→ success=true，旅長 approved 變 false
+```
+
+停用唔係改 role，但效果一樣致命：`checkActionPermission_`（L1935-1937）
+會拒絕 `approved=false` 嘅帳號做任何需要 feature 嘅操作。所以：
+- 旅長做唔到 `transferTroopLeader`（要現任旅長發起）
+- 管理員自己又唔可以升做旅長（不可指派角色）
+→ **全旅領導層永久癱瘓**，同一類後果，只係今次唔係改 role 而係鎖帳號。
+
+### 修正
+
+| 位置 | 修正 |
+|---|---|
+| `gs/…gs:3399` `handleToggleUser_` | 加 `checkAdminPeerGuard_(p, 'toggle')` |
+| `gs/…gs:1877-1902` `checkAdminPeerGuard_` | 加 `'toggle'` kind（用字準確：「停用」唔好講成「刪除」） |
+| `lib/mockServer.ts:1106` `toggleUser` | 同上 |
+| `lib/mockServer.ts:832-836` `checkAdminPeerGuard` | signature 加 `'toggle'` |
+
+三種 kind 嘅拒絕訊息已逐一核實（唔靠記憶）：
+```
+kind=role    target=u_tl   → 旅長係全旅最高權限，管理員唔可以更改旅長嘅角色。…
+kind=delete  target=u_tl   → 旅長係全旅最高權限，管理員唔可以刪除旅長嘅帳號。…
+kind=toggle  target=u_tl   → 旅長係全旅最高權限，管理員唔可以停用旅長嘅帳號。…
+kind=role    target=u_adm2 → 管理員之間只能加不能減：不可以更改其他管理員嘅角色，…
+kind=delete  target=u_adm2 → 管理員之間只能加不能減：不可以刪除其他管理員嘅帳號，…
+kind=toggle  target=u_adm2 → 管理員之間只能加不能減：不可以停用其他管理員嘅帳號，…
+```
+
+四個守衛嘅位置（`grep -n "checkAdminPeerGuard_(p,"`）：
+```
+3399  handleToggleUser_     'toggle'
+3630  handleUpdateUserRole_ 'role'
+3745  handleUpdateUserField_ 'role'（只喺 field='role' 時）
+3755  handleDeleteUser_     'delete'
+```
+
+### ★ 過程中我自己個 harness 又錯咗一次
+
+第一版用 `!!u.approved` 判斷啟用狀態，但 `updateCellByName_` 寫入嘅係
+**字串** `'false'` —— 而 JS 入面 `!!'false'` 係 `true`。
+
+結果產生咗一個**假 ✅**（「旅長仍然係啟用狀態」明明已經被停用）
+同兩個**假 ❌**。修正為同 GS `parseBool_` 一致嘅語意先至睇到真相。
+
+**呢個 session 第五次「失敗／通過嘅斷言原來係測試錯」。**
+教訓：harness 入面嘅型別轉換要同被測系統一致，特別係 Sheet 一切都係字串。
+
+### 驗證
+
+`check:gsroles` 由 38 升到 **45 項斷言**（新增 C3 節）。
+`check:security` 由 120 升到 **125 項斷言**（§11 加 5 個 toggleUser 斷言）。
+
+**Negative control（第 16 個）：**攞走 `handleToggleUser_` 嘅守衛
+→ `check:gsroles` **恰好 4 項變紅**（旅長／管理員各 2 項）；
+還原後 `grep -c NEGCTRL` → 0，`cmp` 同副本一致，45/0 返綠。
+
+### ★ 教訓（累積）
+
+1. **「測試綠燈」只証明測咗嗰條路。** 同一個操作有几條 API 路就要測几条。
+2. **萬用寫入 endpoint 係守衛嘅天然缺口** —— 要諗「有冇第二條路做到同一件事」。
+3. **前後端落差反覆出現** —— mock 同 GS 要逐一對比，唔好假設一致。
+4. **撞啱搵到嘅 bug 代表仲有未搵到嘅。** 應該做系統性 enumerate
+   （呢次：grep 所有寫 Users 表嘅位置 → 69 個 handler vs 4 次守衛調用）。
+5. **harness 嘅型別轉換要同被測系統一致**（Sheet 一切都係字串）。
+
+### 驗證（全套）
+
+`tsc` 0 error · `next build` exit 0 / 64 routes · `npm run lint` 9 warnings / 0 errors
+（同基線一致）· **10 個 check 全綠**：`check:gs` · `check:gscards` 17 ·
+**`check:gsroles` 45** · `check:perms` 47/47/18 · `check:public` 60 ·
+**`check:security` 125** · `check:links` 210 · `check:modules` ·
+`check:calendar` · `check:render`。
+GS 251,416 bytes，同 `public/downloads/` 副本 `cmp` 一致。

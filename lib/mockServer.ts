@@ -832,7 +832,7 @@ const S = (operatedBy: string) => ({ success: true, state: buildMockState(String
 function checkAdminPeerGuard(
   operatedBy: string,
   targetId: string,
-  kind: 'role' | 'delete'
+  kind: 'role' | 'delete' | 'toggle'
 ): { success: false; error: string } | null {
   if (!operatedBy) return null;
   const op = store.users.find(u => u.id === operatedBy);
@@ -850,18 +850,26 @@ function checkAdminPeerGuard(
   if (tRole !== 'admin' && tRole !== 'troop_leader') return null;
 
   const isTL = (tRole === 'troop_leader');
-  const act = kind === 'delete' ? 'deleteUser' : 'updateUserRole';
+  /**
+   * ★ 三種受管制操作（2026-09-03 加 'toggle'，同 GS checkAdminPeerGuard_ 一致）。
+   *   'toggle' = 停用／啟用帳號。停用唔係改 role，但效果一樣致命
+   *   （停用咗嘅旅長做唔到 transferTroopLeader），所以一樣要擋。
+   */
+  const verb = kind === 'delete' ? '刪除' : (kind === 'toggle' ? '停用' : '更改');
+  const noun = kind === 'role' ? '角色' : '帳號';
+  const act = kind === 'delete' ? 'deleteUser'
+    : (kind === 'toggle' ? 'toggleUser' : 'updateUserRole');
   logAudit(operatedBy, 'DENIED:' + act, 'Security', '',
-    `admin 試圖${kind === 'delete' ? '刪除' : '更改'}${isTL ? '旅長' : '另一個管理員'}嘅${kind === 'delete' ? '帳號' : '角色'}（只能加不能減）`);
+    `admin 試圖${verb}${isTL ? '旅長' : '另一個管理員'}嘅${noun}（只能加不能減）`);
   if (isTL) {
     return {
       success: false,
-      error: `旅長係全旅最高權限，管理員唔可以${kind === 'delete' ? '刪除旅長嘅帳號' : '更改旅長嘅角色'}。要換旅長請由現任旅長用「交接旅長」。`,
+      error: `旅長係全旅最高權限，管理員唔可以${verb}旅長嘅${noun}。要換旅長請由現任旅長用「交接旅長」。`,
     };
   }
   return {
     success: false,
-    error: `管理員之間只能加不能減：不可以${kind === 'delete' ? '刪除其他管理員嘅帳號' : '更改其他管理員嘅角色'}，請由旅長處理。`,
+    error: `管理員之間只能加不能減：不可以${verb}其他管理員嘅${noun}，請由旅長處理。`,
   };
 }
 
@@ -1103,7 +1111,21 @@ function handleMutate(action: string, p: Record<string, any>) {
       store.users = store.users.filter(u => u.id !== p.userId);
       return S(ob);
     }
-    case 'toggleUser': { const i = findIdx(store.users, 'id', String(p.userId || '')); if (i >= 0) store.users[i].approved = !store.users[i].approved; return S(ob); }
+    case 'toggleUser': {
+      /**
+       * ★ 停用帳號要過 peer guard（2026-09-03 修正，同 GS handleToggleUser_ 一致）。
+       *
+       * 呢個係繞過「只能加不能減」嘅第三條路。停用唔係改 role，但效果一樣致命：
+       * 停用咗嘅帳號過唔到 checkActionPermission_ 嘅 approved 檢查，所以管理員
+       * 一旦停用咗旅長 → 旅長做唔到 transferTroopLeader、管理員又唔可以自己升做
+       * 旅長 → 全旅領導層永久癱瘓。
+       */
+      const peer = checkAdminPeerGuard(ob, String(p.userId || ''), 'toggle');
+      if (peer) return peer;
+      const i = findIdx(store.users, 'id', String(p.userId || ''));
+      if (i >= 0) store.users[i].approved = !store.users[i].approved;
+      return S(ob);
+    }
     case 'updateUserRole': {
       // ★ 「只能加不能減」（同 GS checkAdminPeerGuard_ 一致）
       const peer = checkAdminPeerGuard(ob, String(p.userId || ''), 'role');

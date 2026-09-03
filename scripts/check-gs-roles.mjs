@@ -269,6 +269,57 @@ rf = call({ action: 'updateUserField', operatedBy: 'u_admin', userId: 'u_adm2', 
 ok('改非 role 欄位唔被 peer guard 誤擋', rf.success === true, JSON.stringify(rf));
 
 // ══════════════════════════════════════════════════════════════
+console.log('\n【C3. 第三條路：toggleUser 停用帳號】\n');
+/**
+ * ★ handleToggleUser_（L3372-3380）把 approved 反转，但冇 peer guard。
+ *
+ *   checkActionPermission_（L1935-1937）會拒絕 approved=false 嘅帳號做
+ *   任何需要 feature 嘅操作。所以管理員一旦停用咗旅長：
+ *     ・旅長做唔到 transferTroopLeader（要現任旅長發起）
+ *     ・管理員自己又唔可以升做旅長（不可指派角色）
+ *   → 同一類永久癱瘓，只係今次唔係改 role 而係鎖帳號。
+ *
+ *   mock 側（lib/mockServer.ts:1106）同樣冇守衛。
+ */
+/**
+ * ★ updateCellByName_ 寫入嘅係**字串**（'false'），而 JS 入面 `!!'false'` 係 true。
+ *   第一版用 `!!u.approved` 令「已停用」睇落似「啟用」—— 產生咗一個假 ✅
+ *   同兩個假 ❌。必须用同 GS parseBool_ 一致嘅語意。
+ */
+const approvedOf = (id) => {
+  const u = U(id);
+  if (!u) return null;
+  const v = u.approved;
+  return v === true || v === 'TRUE' || v === 'true' || v === 1 || v === '1';
+};
+
+resetUsers(); T = TABLES(); AUDIT = [];
+let rt = call({ action: 'toggleUser', operatedBy: 'u_admin', userId: 'u_tl' });
+ok('★ 管理員唔可以停用旅長嘅帳號', rt.success === false, JSON.stringify(rt));
+ok('  → 旅長仍然係啟用狀態', approvedOf('u_tl') === true, `實際 = ${approvedOf('u_tl')}`);
+
+resetUsers(); T = TABLES();
+rt = call({ action: 'toggleUser', operatedBy: 'u_admin', userId: 'u_adm2' });
+ok('★ 管理員唔可以停用其他管理員嘅帳號', rt.success === false, JSON.stringify(rt));
+ok('  → 對方仍然係啟用狀態', approvedOf('u_adm2') === true, `實際 = ${approvedOf('u_adm2')}`);
+
+// 對照：停用團長／成員應該照舊可以
+resetUsers(); T = TABLES();
+rt = call({ action: 'toggleUser', operatedBy: 'u_admin', userId: 'u_gl' });
+ok('對照：管理員可以停用團長（peer guard 只擋管理層）',
+  rt.success === true && approvedOf('u_gl') === false,
+  `approved=${approvedOf('u_gl')}｜${JSON.stringify(rt)}`);
+call({ action: 'toggleUser', operatedBy: 'u_admin', userId: 'u_gl' });  // 還原
+ok('  已還原 u_gl', approvedOf('u_gl') === true, `approved=${approvedOf('u_gl')}`);
+
+// 旅長唔受限
+resetUsers(); T = TABLES();
+rt = call({ action: 'toggleUser', operatedBy: 'u_tl', userId: 'u_adm2' });
+ok('旅長可以停用管理員（唔受「只能加不能減」限制）',
+  rt.success === true && approvedOf('u_adm2') === false,
+  `approved=${approvedOf('u_adm2')}｜${JSON.stringify(rt)}`);
+
+// ══════════════════════════════════════════════════════════════
 console.log('\n【D. 「全旅只有一個旅長」不變量（enforceSingleTroopLeader_）】\n');
 /**
  * 多個 legacy troop_super 行會被 normalizeRole_ 全部歸一成 troop_leader

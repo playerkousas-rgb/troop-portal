@@ -1875,23 +1875,31 @@ function checkAdminPeerGuard_(p, kind) {
   if (tRole !== 'admin' && tRole !== 'troop_leader') return null;
 
   var isTL = (tRole === 'troop_leader');
-  var act = kind === 'delete' ? 'deleteUser' : 'updateUserRole';
+  /**
+   * ★ 三種受管制操作（2026-09-03 加 'toggle'）。
+   *   'toggle' = 停用／啟用帳號。停用唔係改 role，但效果一樣致命
+   *   （停用咗嘅旅長做唔到 transferTroopLeader），所以一樣要擋。
+   *   分开 kind 只係為咗拒絕訊息用字準確（「停用」唔好講成「刪除」）。
+   */
+  var verb = kind === 'delete' ? '刪除' : (kind === 'toggle' ? '停用' : '更改');
+  var noun = kind === 'role' ? '角色' : '帳號';
+  var act = kind === 'delete' ? 'deleteUser'
+    : (kind === 'toggle' ? 'toggleUser' : 'updateUserRole');
   writeAudit_(operatedBy, 'DENIED:' + act, 'Security', '',
-    'admin 試圖' + (kind === 'delete' ? '刪除' : '更改') +
-    (isTL ? '旅長' : '另一個管理員') + '嘅' +
-    (kind === 'delete' ? '帳號' : '角色') + '（只能加不能減）');
+    'admin 試圖' + verb +
+    (isTL ? '旅長' : '另一個管理員') + '嘅' + noun + '（只能加不能減）');
   if (isTL) {
     return {
       success: false,
       error: '旅長係全旅最高權限，管理員唔可以' +
-        (kind === 'delete' ? '刪除旅長嘅帳號' : '更改旅長嘅角色') +
+        verb + '旅長嘅' + noun +
         '。要換旅長請由現任旅長用「交接旅長」。',
     };
   }
   return {
     success: false,
     error: '管理員之間只能加不能減：不可以' +
-      (kind === 'delete' ? '刪除其他管理員嘅帳號' : '更改其他管理員嘅角色') +
+      verb + '其他管理員嘅' + noun +
       '，請由旅長處理。',
   };
 }
@@ -3370,6 +3378,26 @@ function handleConfirmPayment_(p) {
 // ==================== 寫入：使用者 ====================
 
 function handleToggleUser_(p) {
+  /**
+   * ★ 停用帳號要過 peer guard（2026-09-03 修正）。
+   *
+   * 呢個係繞過「只能加不能減」嘅**第三條路**。停用唔係改 role，
+   * 但效果一樣致命：checkActionPermission_（L1935-1937）會拒絕
+   * approved=false 嘅帳號做任何需要 feature 嘅操作，所以管理員一旦
+   * 停用咗旅長：
+   *   ・旅長做唔到 transferTroopLeader（要現任旅長發起）
+   *   ・管理員自己又唔可以升做旅長（不可指派角色）
+   * → 全旅領導層永久癱瘓，要人手改 Sheet 先至救得返。
+   *
+   * 實測証明（scripts/check-gs-roles.mjs C3 節，經 doGet 驅動）：
+   *   {action:'toggleUser', userId:'u_tl', operatedBy:'u_admin'}
+   *   → success=true，旅長 approved 變 false。
+   *
+   * 受保護對象同 role 一樣 = 管理員 ＋ 旅長（checkAdminPeerGuard_ 內部判斷）。
+   * 停用團長／支部領袖／成員照舊可以，唔會誤擋正常帳號管理。
+   */
+  var peer = checkAdminPeerGuard_(p, 'toggle');
+  if (peer) return peer;
   var users = readTable_('Users');
   var user = users.filter(function (u) { return getField_(u, 'userId') === p.userId; })[0];
   if (!user) return { success: false, error: '找不到使用者' };

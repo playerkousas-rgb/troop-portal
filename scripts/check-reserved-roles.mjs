@@ -605,6 +605,28 @@ console.log('\n【MOCK：必須鏡像「只能加不能減」＋交接旅長】'
   handleMockRequest('updateUserField', { userId: 'u_gl', field: 'role', value: 'group_leader', operatedBy: 'u_tl' });
   ok('  已還原 u_gl', roleOf('u_gl') === 'group_leader', `role=${roleOf('u_gl')}`);
 
+  // ── ★ 第三條繞過路徑：toggleUser 停用帳號 ──
+  //
+  // 停用唔係改 role，但效果一樣致命：停用咗嘅帳號過唔到
+  // checkActionPermission_ 嘅 approved 檢查，所以管理員一旦停用咗旅長 →
+  // 旅長做唔到 transferTroopLeader（要現任旅長發起）、管理員又唔可以自己
+  // 升做旅長（不可指派角色）→ 全旅領導層永久癱瘓。
+  // GS handleToggleUser_ 同 mock toggleUser 原本兩邊都冇 peer guard。
+  const approvedOf = (id) => {
+    const u = users().find((x) => x.id === id);
+    return u ? !!u.approved : null;
+  };
+  r = handleMockRequest('toggleUser', { userId: 'u_tl', operatedBy: 'u_admin' });
+  ok('MOCK：管理員唔可以停用旅長嘅帳號', r.success === false, j(r));
+  ok('  旅長仍然係啟用狀態', approvedOf('u_tl') === true, `approved=${approvedOf('u_tl')}`);
+  ok('  錯誤訊息用「停用」而唔係「刪除」', /停用旅長嘅帳號/.test(r.error || ''), r.error);
+
+  r = handleMockRequest('toggleUser', { userId: 'u_gl', operatedBy: 'u_admin' });
+  ok('MOCK 對照：管理員可以停用團長（peer guard 只擋管理層）',
+    r.success === true && approvedOf('u_gl') === false, j(r));
+  handleMockRequest('toggleUser', { userId: 'u_gl', operatedBy: 'u_admin' });  // 還原
+  ok('  已還原 u_gl 為啟用', approvedOf('u_gl') === true, `approved=${approvedOf('u_gl')}`);
+
   r = handleMockRequest('transferTroopLeader', { targetUserId: 'u_bl', operatedBy: 'u_admin' });
   ok('MOCK：非現任旅長交接被拒', r.success === false, j(r));
 
