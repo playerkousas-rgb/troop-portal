@@ -283,6 +283,55 @@ console.log('\n【結構檢查：守衛必須喺身份豁免之前，先至擋�
     /action !== 'applyJoin'/.test(gs) && /action !== 'applyJoin'/.test(mock));
 }
 
+// ==================== 8. 授權路：唔可以越權自我授權 ====================
+//
+// 同一類 bug 嘅審計：`checkActionPermission_` 只驗操作者「有冇某個 feature」，
+// 唔驗「佢批出嚟嘅嘢有冇超出自己權限」。updateUserRole 就係咁中伏（已修）。
+// 呢度鎖住另外兩條授權路嘅既有守衛，防止日後被改鬆：
+//   ・grantFeature             —— 支部領袖只可授自己支部 ＋ 只可授自己擁有嘅功能
+//   ・updateUserPermissions    —— 限 admin／super_admin／troop_super
+console.log('\n【GS：授權路唔可以越權自我授權】');
+{
+  const ctx = loadGs();
+  const users = [
+    { id: 'u_admin', name: '陳堅強', role: 'admin', branchId: '', approved: true },
+    { id: 'u_bl', name: '黃志遠', role: 'branch_leader', branchId: 'b3', approved: true },
+    { id: 'u_gl', name: '李偉國', role: 'group_leader', branchId: 'b4', approved: true },
+    { id: 'u_co', name: '何健', role: 'coach', branchId: '', approved: true },
+  ];
+  const grants = [];
+  ctx.getSheet_ = () => null;
+  ctx.mapUsers_ = () => users;
+  ctx.readTable_ = (n) => (n === 'Users' ? users : []);
+  ctx.appendRowByHeaders_ = (sheet, row) => { if (sheet === 'UserPermissions') grants.push(row); };
+  ctx.writeAudit_ = () => {};
+  ctx.now_ = () => '2026-09-03';
+  // 支部領袖 b3 只有 attendance；團長 b4 有 attendance + events
+  ctx.getUserFeatures_ = (uid) =>
+    (uid === 'u_bl' ? ['attendance'] : uid === 'u_gl' ? ['attendance', 'events'] : []);
+
+  grants.length = 0;
+  let r = ctx.handleGrantFeature_({ operatedBy: 'u_bl', targetUserId: 'u_bl', feature: 'attendance', branchId: 'b2' });
+  ok('grantFeature：支部領袖 b3 唔可以授權去其他支部（b2）', r.success === false, JSON.stringify(r));
+  ok('  且冇寫入', grants.length === 0, `grants=${grants.length}`);
+
+  grants.length = 0;
+  r = ctx.handleGrantFeature_({ operatedBy: 'u_bl', targetUserId: 'u_co', feature: 'users', branchId: 'b3' });
+  ok('grantFeature：唔可以授出自己都冇嘅功能（users）', r.success === false, JSON.stringify(r));
+  ok('  且冇寫入', grants.length === 0, `grants=${grants.length}`);
+
+  grants.length = 0;
+  r = ctx.handleGrantFeature_({ operatedBy: 'u_bl', targetUserId: 'u_co', feature: 'attendance', branchId: 'b3' });
+  ok('對照：支部領袖可以喺自己支部授出自己擁有嘅功能', r.success === true, JSON.stringify(r));
+  ok('  寫入嘅 branchId 係自己支部 b3',
+    grants.length === 1 && grants[0].branchId === 'b3', JSON.stringify(grants));
+
+  r = ctx.handleUpdateUserPermissions_({ operatedBy: 'u_bl', targetUserId: 'u_co', features: '["users","permissions"]' });
+  ok('updateUserPermissions：支部領袖被拒', r.success === false, JSON.stringify(r));
+  r = ctx.handleUpdateUserPermissions_({ operatedBy: 'u_gl', targetUserId: 'u_co', features: '["users"]' });
+  ok('updateUserPermissions：團長都被拒（限管理層）', r.success === false, JSON.stringify(r));
+}
+
 // ==================== 結果 ====================
 
 console.log('');

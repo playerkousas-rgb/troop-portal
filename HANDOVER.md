@@ -473,7 +473,7 @@ live preview 嘅 sandbox 網址對外攞唔到，所以一鍵加入喺 preview �
    （過渡期：前端已改以 `sheep` 作 userId，未重新部署也能拿到全部資料；但仍建議盡快部署，才有 `publicConfig_` 敏感值剝除等修正）
 6. ~~**安全待辦**~~ — ✅ **已修**（三處：問題 A／問題 B／提權洞）。
    ⚠️ 三處**全部都係 GS 端改動，未部署到 82 旅之前一律無效** —— 見上面第 1 項。
-   回歸保護：`npm run check:security`（38 項斷言，執行真實代碼；負向對照已驗證有效）。
+   回歸保護：`npm run check:security`（46 項斷言，執行真實代碼；負向對照已驗證有效）。
 
    **問題 A：技術測試帳號分支冇驗證密碼。**
    `handleLogin_` 嘅「技術測試帳號」分支只比對帳號名
@@ -588,13 +588,26 @@ live preview 嘅 sandbox 網址對外攞唔到，所以一鍵加入喺 preview �
    然後所有「應該被擋」嘅斷言假陽性通過 —— 呢種測試比冇測試更危險。
 
    **回歸保護：`npm run check:security`（第 6 個 check，唔需要 dev server）。**
-   `scripts/check-reserved-roles.mjs`，38 項斷言，**執行真實代碼**而唔係 grep 原始碼：
+   `scripts/check-reserved-roles.mjs`，46 項斷言，**執行真實代碼**而唔係 grep 原始碼：
    GS 用 `node:vm` 載入 `.gs` 經**真實 `doGet` dispatch** 打；MOCK 直接 import
    `lib/mockServer.ts` 嘅 `handleMockRequest`。覆蓋三條提權路＋對照組＋
    `applyJoin` 靜默降級＋`decideApplication` 第二道守衛＋`batchCreateUsers` 白名單
-   ＋結構檢查（守衛必須喺 `isPrivilegedOperator_` 豁免之前）。
-   ・**負向對照已做**：暫時停用 GS 中央守衛 → 7 項失敗；停用 MOCK 守衛 → 5 項失敗。
-     證明呢個 check 真係捉到回歸，唔係裝飾。
+   ＋結構檢查（守衛必須喺 `isPrivilegedOperator_` 豁免之前）＋授權路越權審計。
+
+   **同類 bug 審計：另外兩條授權路已確認冇同一個洞（並已鎖定做回歸測試）。**
+   `checkActionPermission_` 嘅結構性弱點係「只驗操作者有冇某個 feature，
+   唔驗佢批出嚟嘅嘢有冇超出自己權限」—— `updateUserRole` 就係咁中伏。
+   逐一審計同類嘅寫入路：
+   ・`grantFeature`（1586 行）✅ **已有雙重守衛**：1603 行唔准授權自己支部以外；
+     1609 行唔准授出自己都冇嘅功能（`OPT_IN_FEATURES_` 例外，且限團長／支部領袖）。
+     實測：b3 支部領袖授權去 b2 ✘、授出 `users` ✘、喺 b3 授出 `attendance` ✅
+   ・`updateUserPermissions`（3909 行）✅ **限管理層**：3915 行只准
+     `admin`／`super_admin`／`troop_super`，支部領袖同團長一律被拒（實測確認）
+   ・`batchCreateUsers`（3285 行）✅ `allowedRoles` 白名單唔包 `super_admin`，
+     3298 行會將白名單以外嘅角色降級為 `parent`
+   ・**負向對照已做（三次）**：暫時停用 GS 中央守衛 → 7 項失敗；停用 MOCK 守衛
+     → 5 項失敗；放鬆 `grantFeature` 支部守衛 → 2 項失敗。
+     證明呢個 check 真係捉到回歸，唔係裝飾。（做完記得還原並 `rm -rf .mockdata`。）
    ・**hermetic**：MOCK 嘅 store 會由 `.mockdata` 載入持久狀態，所以用「基線快照」
      比對，只斷言今次攻擊嘗試冇**新增** super_admin，唔好斷言成個 store 乾淨
      （否則環境殘留會令佢假失敗）。連跑 3 次結果一致。
