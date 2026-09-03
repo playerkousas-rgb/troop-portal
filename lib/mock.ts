@@ -36,11 +36,12 @@ export function setMockMode(on: boolean) {
 
 /** 演示帳號：一鍵登入用（登入頁）。密碼不需要 —— MOCK 後台按 userId 直接放行。 */
 export const DEMO_ACCOUNTS: { userId: string; label: string; desc: string; dashboard: string }[] = [
-  { userId: 'u_m1', label: '🧒 成員(小童)', desc: '陳大文 16 歲 · 體驗報名需家長代操作', dashboard: '/member' },
-  { userId: 'u_m4', label: '🧑 成員(成年)', desc: '張磊磊 18 歲 · 可自行報名', dashboard: '/member' },
-  { userId: 'u5', label: '👩 家長', desc: '王秀蘭 · 代子女報名 / 查看', dashboard: '/parent' },
-  { userId: 'u_bl', label: '🏹 支部領袖', desc: '黃志遠 · 本支部活動 / 成員 / 點名', dashboard: '/leader' },
-  { userId: 'u_coach', label: '🧑‍🏫 教練員(獲授全旅點名)', desc: '何健 · 即使教練員，有權限亦可點全旅', dashboard: '/leader' },
-  { userId: 'u_gl', label: '📋 團長', desc: '李偉國 · 全旅活動 / 集會 / 會議', dashboard: '/leader' },
+  { userId: 'u_m1', label: '🧒 成員(未成年)', desc: '陳大文 16 歲 · 可表達 ❤️ 有興趣，報名要家長代操作', dashboard: '/member' },
+  { userId: 'u_m14', label: '🧒 成員(幼童軍)', desc: '陳小美 9 歲 · 與陳大文同一位家長但不同支部', dashboard: '/member' },
+  { userId: 'u_m4', label: '🧑 成員(成年)', desc: '張磊磊 18 歲 · 可自行報名（冇 ❤️ 有興趣／想考的章）', dashboard: '/member' },
+  { userId: 'u5', label: '👩 家長(兩名子女不同支部)', desc: '王秀蘭 · 陳大文(童軍 b3) ＋ 陳小美(幼童軍 b2)，有一名子女表達咗 ❤️ 有興趣', dashboard: '/parent' },
+  { userId: 'u_bl', label: '🏹 支部領袖', desc: '黃志遠 · 本支部活動 / 成員 / 點名', dashboard: '/admin' },
+  { userId: 'u_coach', label: '🧑‍🏫 教練員(獲授全旅點名)', desc: '何健 · 即使教練員，有權限亦可點全旅', dashboard: '/admin' },
+  { userId: 'u_gl', label: '📋 團長', desc: '李偉國 · 全旅活動 / 集會 / 會議', dashboard: '/admin' },
   { userId: 'u_admin', label: '🛠️ 管理員', desc: '陳堅強 · 全部管理功能', dashboard: '/admin' },
 ];

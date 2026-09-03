@@ -205,6 +205,246 @@ client 第一次 render 已有 session → 渲染用戶名，觸發 **React erro
 改為 `useState + useEffect`（同 `components/Auth.tsx` 做法），載入切片改為 `[session]` 依賴。
 實測 `/profile`：admin 顯示「陳堅強／管理員」且姓名、Email 欄位照舊自動填入；member 顯示「張磊磊／成員」；console error 由 2 個變 0。
 
+## 2026-09-02 UI 巡檢修正（用戶看 MOCK 發現嘅 13 項）
+
+用戶對住 MOCK 逐頁睇，提出 13 項問題；因為 MOCK 同真實 UI 共用同一套設計，
+真實頁面（`/admin`、`/activities`、`/albums` …）全部一齊改。家長／成員端今次未動。
+
+### 1) 管理中心統一（#1 #4 #5 #6 #9 #11 #13）
+| 之前 | 現在 |
+|---|---|
+| 管理中心底部有一排 4 個小標籤：📊 活動統計・📜 操作紀錄・📝 簽到／點名・📄 通告文件（PDF） | **全部移除**。點名同底部 tab bar 嘅大按鈕重複；通告 PDF 同活動統計都喺「活動管理」入面處理 |
+| 操作紀錄只係一個小標籤 | 升級做第 8 個管理項目「🛠️ 系統管理」（`/admin/system`：系統設定・操作紀錄・擴充元件・元件市場・轉駁中心） |
+| 團長／支部領袖／教練員用另一個版面 `/leader`（管理工具 + 擴充元件面板） | `/leader` 改做 307 轉址去 `/admin`；所有領袖同管理員共用同一個管理中心版面，只係管理卡按權限多寡顯示 |
+
+管理員一共 **8 個管理項目**（`lib/adminModules.ts` 係唯一對照表）：
+支部管理・使用者管理・行事曆管理・出席管理・活動管理・物資管理・會議管理・**系統管理**。
+「系統管理」用 `isAdmin(role)` 閘住 —— 團長／支部領袖／教練員永遠見唔到。
+
+實測（`npm run check:modules`，向 MOCK 後台攞真實 userFeatures）：
+`u_admin` 8 張卡（含 system）・`u_gl` 7 張（冇 system）・`u_bl` 5 張・`u_coach` 1 張（attendance）。
+完全冇管理權限嘅帳號會見到一張「🔒 你目前未獲授權任何管理項目」說明卡，唔會留空白。
+
+### 2) 擴充元件只屬管理員（#8 #10 #12）
+`/leader` 嘅「🧩 擴充元件」面板已刪除（隨 `/leader` 併入管理中心一齊消失）。
+管理員由右上角「⋯」選單進入：🔌 擴充元件 → 🧩 元件市場 → 🔀 轉駁中心；
+右上 ⚙️ 由「系統設定」改指去「系統管理」（`/admin/system`）。
+`/admin/plugins` 嘅 `Auth roles` 補回 `troop_leader`（否則旅長撳入去會撞「未獲授權」）。
+
+### 3) 相簿搬離活動（#2）
+通告係活動**之前**出現、相片係活動**之後**先有，兩者唔會同時存在，所以：
+- `/admin/events`：移除「📷 活動相簿連結」欄位（新增／編輯表單）、活動卡嘅 `AlbumEmbed`、確認彈窗嘅相簿行
+- `/albums`：領袖（有 `photos` 權限）而家喺呢一頁揀活動 + 貼連結補相簿，亦可移除；成員／家長照舊只係睇
+- 後台唔使改：仍然係 `updateEvent` 嘅 `albumUrl`，GS／MOCK 兩邊都照舊用 `photos` 權限把關
+
+### 4) 全站返回按鈕（#3）
+新增 `components/layout/BackButton.tsx`，喺 root layout 嘅 `<main>` 頂部渲染，除首頁外每一頁都有。
+行為：本分頁曾經喺 APP 內跳過頁 → `router.back()`；直接開連結入嚟 → 返回自己角色嘅主頁。
+（用 sessionStorage 記 APP 內路由次數 —— `document.referrer` 喺 SPA 唔更新、`history.length` 會連外部網站一齊計，都唔可靠。）
+
+### 5) 最新消息一行一條（#7）
+`components/LatestNewsBar.tsx`：1 條＝單行（truncate）；2 條以上＝每條一行（bullet + 可換行），
+標題顯示「最新消息 · 3 條」。舊版全部塞喺一行做左右捲動，手機上睇唔到第 2、3 條。
+
+### 新增檢查
+`npm run check:modules` —— 需要 dev server 運行中；用前端真正嘅 `ADMIN_MODULES` + `hasFeature` +
+後台真實 `userFeatures` 驗證每個角色見到嘅管理卡（管理員必須 8 個、非管理員唔可以有系統管理）。
+
+## 2026-09-02 家長／成員端 UI 巡檢（用戶第二輪 9 項）
+
+真實頁同 MOCK（內置 MOCK 後台 ＋ `/dashboard/**` 展示樹）一齊改。
+
+### 1) MOCK 家長：兩名子女不同支部 ＋ 子女表達 ❤️（只改 MOCK 資料）
+`lib/mockServer.ts` seed：
+- 新增成員 `m14 陳小美`（b2 幼童軍・9 歲・parentUserId=u5）＋ 帳號 `u_m14`
+- `u5 王秀蘭` 嘅 `childMemberIds` 由 `['m01']` 改 `['m01','m14']` → 陳大文（b3 童軍・16 歲）＋ 陳小美（b2 幼童軍・9 歲）
+- 新增全旅活動 `e08 全旅親子遠足日`（有通告連結／集合地點／費用，兩名子女都係對象）
+- 新增回覆：`e08_m14 = interested`、`e03_m14 = interested`（子女表達 ❤️）、`e08_m01 = registered`
+- `lib/mock.ts` DEMO_ACCOUNTS：家長說明改為「兩名子女不同支部」，並加咗 `u_m14` 一鍵登入
+
+> ⚠️ MOCK 資料會 persist 去 `.mockdata/mock-state.json`。舊演示資料仲喺度嘅話，
+> 新 seed 唔會生效 —— 請 `POST /api/proxy?troopKey=troop_demo&action=resetMock` 或刪除該檔案。
+
+### 2) 右上角「我的控制台」對家長／成員移除（#2 #7 #8）
+`components/layout/TopNav.tsx`：家長／成員（底部 tab bar 已經有「🏠 主頁」）唔再顯示
+右上嘅 👤 身份chip（title＝我的控制台）同「⋯」選單入面嘅「🏠 我的控制台」。
+領袖／管理員照舊（佢哋底部係「🔧 管理中心」，用戶今次未提出要改）。
+
+### 3) 行事曆支部範圍（#3 #4）
+新增 `lib/calendarScope.ts`（規則唯一來源）＋ `npm run check:calendar` 檢查腳本。
+- 管理員級（管理員／旅長／超管）→ 全部支部
+- 家長 → 全旅 ＋ 子女支部；成員／支部領袖／團長／教練員 → 全旅 ＋ 自己支部
+- 家長／成員嘅分類 chips 冇「會議」（領袖會議）；支部 chips 只列自己相關嘅幾個
+- `/calendar` 月曆＋清單兩邊都用 `scope.inScope()` 過濾活動／恆常集會／會議
+- `/dashboard/calendar`（展示樹）同樣處理（Demo 角色各自嘅支部；家長／成員冇「會議」標籤）
+
+實測（`npm run check:calendar`，用真實 `calendarScope` ＋ MOCK 後台資料）：
+`u5` 家長 → b2,b3,troop（會議隱藏）・`u_m14` → b2,troop・`u_m4` → b3,troop・
+`u_bl` → b3,troop（會議顯示）・`u_gl` → b4,troop（3/5 活動）・`u_admin` → 全部 8 個活動。
+
+### 4) 成年成員（18+）簡化（#5 #6）
+- `app/member/page.tsx`：成年成員唔再有「❤️ 有興趣（非報名）」掣（已經可以自己報名，標有興趣冇意思）；
+  「我的工具」亦冇「🎖️ 想考的章」（人數少，直接同旅團領袖講）
+- `/dashboard/activities`：成員示範撳「18 歲或以上」後同樣冇 ❤️ 掣；區地域總會活動嘅掣
+  對成年成員改為「📩 我想參加（自己聯絡領袖報名）」
+- `/dashboard/profile`：加「18 歲或以上（成年成員）」切換，成年成員冇「想考的章」分頁；
+  家長子女卡嘅快捷回覆移除 ❤️（同真實家長頁一致 —— 有興趣係子女自己表達）
+
+### 5) 活動／集會回覆卡可以睇通告同詳情（#9）
+`components/ui/EventReplyRow.tsx`（成員／家長／領袖管理中心共用）加咗可展開嘅
+「📄 通告及詳情（集合時間／地點・通告連結）」：日期、集合地點、費用、行事曆標籤、值日小隊、
+支部、通告連結（新分頁開啟）、收款連結；冇掛通告會提示「請聯絡旅團領袖」。
+`ReplyEvent` type 擴闊咗 `noticeUrl / noticeFileName / calendarTag / dutyPatrol / scope / branchId`
+（呼叫端一直傳成個 event，唔使改 caller）。
+
+### 新增檢查
+`npm run check:calendar` —— 需要 dev server；用真實 `lib/calendarScope.ts` ＋ MOCK 後台資料
+驗證每個角色見到嘅活動／集會支部範圍，同埋家長／成員冇「會議」分類。
+
+## 2026-09-02 新功能：想考的章選單 ＋ 行事曆匯出（用戶第三輪 2 項）
+
+### 1) 🎖️「想考的章」真正可以揀（之前 `/profile?tab=badges` 係死連結）
+
+**目錄 `lib/badges.ts`（新檔）** —— 按總會訓練綱要整理，只開放兩個支部（用戶要求）：
+
+| 支部 | 綱要 | 分類 | 數量 |
+|---|---|---|---|
+| 幼童軍 b2 | 活動徽章 | 戶外與歷奇／水上活動／運動與體能／科學與科技／藝術與文化／生活技能／安全、服務與世界 | 40 |
+| 幼童軍 b2 | 其他徽章 | 童軍先修章 | 1 |
+| 童軍 b3 | 專科徽章 | 興趣組 33／技能組 35／服務組 17／教導組 26 | 111 |
+| 童軍 b3 | 其他獎章及徽章 | 世界童軍主題章／公民及社會意識章／服務及領導／宗教及銜接／海上活動徽章／航空活動徽章 | 23 |
+
+合共 **175 個章**（id 全部唯一，`cub_*` / `scout_int_*` / `scout_pur_*` / `scout_srv_*` / `scout_ins_*` / `scout_*`）。
+
+- **刻意排除進度性獎章**（幼童軍獎章／歷奇章／高級歷奇章／金紫荊獎章；童軍探索獎章／標準獎章／高級獎章／總領袖獎章）—— 呢啲係必經階梯，唔係「自己揀想考邊個」。
+- 已按 **青少年活動署第 13/2026 號通告** 處理：2026-01-01 新增嘅專章已收入；
+  **2026-08-15 起取消**嘅 8 個專章已剔除（愛護動物〔興趣組〕、獨木舟國際賽艇、風帆賽艇舵手、
+  國際友誼〔技能組〕、營地管理、獨木舟救生、護養〔服務組〕、護養〔教導組〕）。
+- 已用腳本逐組比對 `scoutsinfohub.org.hk/scout-training-scheme`（2026-08-23 版）：
+  興趣組／技能組／服務組 **完全一致**；教導組該頁仍列「護養」，但總會通告已取消 → 以通告為準（26 個）。
+- ⚠️ 總會不時修訂綱要；呢個清單係「方便成員揀」，實際考核要求以總會最新公佈為準。
+
+**新頁 `/badges`** —— 分類摺疊清單＋全選／清除＋搜尋＋底部已揀清單＋確認登記；
+家長可撳子女名切換（`?member=`）。非 b2／b3 支部會顯示「暫未設有選單，請直接同領袖講」。
+
+**儲存（新 action `setWantedBadges`，唔入 feature 表＝成員自助）**
+- `Members` 加兩欄：`wantedBadges`（`id|id|id`，上限 2000 字元）＋ `wantedBadgesAt`
+- GS：`handleSetWantedBadges_`；mock：同名 case；`handleUpdateMember_` 白名單同 member DTO 一齊加欄
+- 後端守則（實測過）：只容許 **本人／其家長／管理層＋領袖**；非 b2/b3 成員自助會被拒
+- 角色判斷改用共用常數 `MANAGER_ROLES ＋ LEADER_ROLES`（初版手寫清單寫漏 `group_leader`／`branch_leader`，令支部領袖登記唔到 —— 已修）
+
+**入口**：成員主頁工具、家長主頁「想考的章」卡（只列 b2/b3 子女）、`/admin/members` 新增「🎖️ 想考的章」欄。
+
+> ⚠️ 已修 bug：`/badges` 原本寫 `if (!s || !target) return 載入中...`，
+> 把「仲喺度載入」同「載入完但冇資料」混為一談。未登入時後台回 0 個 member
+> （`buildMockState('')` → role=guest → `out.members = []`），於是永遠轉圈。
+> 已拆開兩個分支：`!s` → 載入中；`!target` → 「未能確認你嘅身分」＋登入按鈕。
+> （`/member`、`/parent` 冇呢個問題 —— 佢哋只 gate `!s`，之後另有「找不到成員／家長資料」。）
+MOCK 展示樹 `app/dashboard/profile` 嘅假章名（世界環保章／社區服務章）已改用真實目錄。
+
+### 2) 📅 行事曆 → 用戶自己嘅行事曆（ICS）
+
+**答案：唔係。** `grep CalendarApp gs/SCOUTSYSTEM_2_SETUP.gs` → **冇任何匹配**。
+新增日曆項目只係寫入旅團 Google **Sheet**（`Events`／`RegularMeetings`），
+並唔會喺旅團 Google 帳戶嘅 Google Calendar 開活動 —— 所以本來冇「訂閱」可加。
+
+做法：`lib/ics.ts`（新檔）產生標準 RFC 5545 `.ics`。
+
+> **用戶反馈（已跟進）**：「下載 ICS 再匯入比開 APP 睇更麻煩；做不到同步或一鍵加入就沒必要做。」
+> 所以由「下載為主」改成 **訂閱為主**（自動同步）：
+> - `app/api/ics/route.ts`（新）＝公開訂閱 feed，`GET /api/ics?troopKey=…[&branch=b2,b3]`
+> - `components/ui/SubscribeCalendar.tsx`（新）＝「📲 加入我的行事曆（自動同步）」面板：
+>   - **➕ 加入 Google 日曆** → `calendar.google.com/calendar/render?cid=<feed>` 一鍵加入＋自動同步
+>   - **🍎 Apple 日曆** → `webcal://` 一鍵開 Calendar.app 訂閱
+>   - **📧 Outlook／其他** → 複製訂閱網址（貼去「新增日曆 → 從網址訂閱」）
+>   - 下載 .ics 降級做摺疊入面嘅後備連結
+> - 面板同時掛喺**已登入版**同**公開版** `/calendar`（未登入訪客正正係最想訂閱嘅人）
+
+feed 細節：
+- 一次性活動 → `VEVENT`；冇時間＝全日（`VALUE=DATE`，`DTEND` 用次日）
+- 恆常集會 → `RRULE`（weekly／biweekly／monthly 第 N 個星期幾），取消日子用 `EXDATE` 排除
+- **取消日子按支部分開傳**：初版把全旅取消日子套落每條集會，b3 取消一日會連 b2 集會一齊喺訂閱日曆消失 —— 已修並實測
+- 支部名用靜態 `branches` 常量譯（公開 feed 攞唔到 `patrols`，否則會顯示成 `[b2]` 代號）
+
+⚠️ **訂閱 feed 必然係公開嘅**（Google 嘅伺服器唔會帶用戶 cookie 嚟攞），所以內容限定為
+「未登入訪客都睇到嘅嘢」＝已公佈活動＋已啟用恆常集會，同 `/calendar` 公開版一致；
+PRIVATE 活動、報名名單、聯絡電話一概唔入 feed。
+
+### ★ 訂閱功能跟住「公開瀏覽」開放（用戶要求）
+
+用戶指出：既然訂閱版唔係個人化視圖，就係**旅團要先決定公開咩畀未登入嘅人**，
+所以呢個功能應該跟住公開行事曆設定開放。已做兩層：
+
+1. **後台硬閘**（`app/api/ics/route.ts`）：`!publicViewEnabled(config)` → **HTTP 403**
+   「此旅團未開放公開行事曆，無法訂閱。」已實測：
+   - `PUBLIC_VIEW` 未設定（預設開放）→ 200，13 個 VEVENT
+   - `saveConfig PUBLIC_VIEW=FALSE` → **403**
+   - 改返 `TRUE` → 200 恢復
+2. **畫面跟住鎖**（`app/calendar/page.tsx`）：`publicOn === false` 時唔顯示訂閱掣，
+   改成解釋框說明點解＋去邊度開；管理層多一行直達
+   `管理中心 → 系統設定 → 🌐 公開瀏覽` 嘅連結，非管理層則提示「可向旅團領袖反映」。
+   （公開版 `/calendar` 本身喺 `PUBLIC_VIEW=FALSE` 時早就 return `<PublicLocked>`，唔會見到面板。）
+3. **切換時提醒**（`app/admin/settings/page.tsx`）：
+   - 「🌐 公開瀏覽」section 加咗一個說明框，白紙黑字寫明呢個開關**同時控制**訂閱功能，
+     並列明會公開乜（已公佈活動＋恆常集會：標題／日期／時間／地點／通告連結）、
+     唔會公開乜（PRIVATE 活動、報名名單、出席紀錄、成員及家長電話）、
+     關閉後已訂閱連結會即刻 403。
+   - `togglePublicView()` 嘅確認對話框亦按方向列明後果：
+     開 → 「一併開放訂閱／會公開／唔會公開／任何人拿到網址都睇到」；
+     關 → 「已訂閱嘅用戶日曆會停止更新」。
+
+### ★★ 三張公開資料卡：卡片開 ≠ 內容開（用戶要求，取代舊「兩層同意」）
+
+用戶最新指示：管理員以**卡片**形式公開 —— 行事曆／相簿／通告 呢三張屬公開資料嘅卡
+可以**全開、開 2 個、開 1 個**（互相獨立）。但「卡片開了不等於內容開」：
+
+> 「旅是由管理員決定的，所以卡片開了默認旅活動 相簿 通告公開（但也可以關）
+> （但當所有支部+旅都關了=該卡片重新關閉要再由管理員關）」「內容要由支部團長開放」
+
+規則（`lib/publicScope.ts`＝單一真相來源）：
+
+| 層 | 設定 | 邊個控制 | 效果 |
+|---|---|---|---|
+| 0 | `PUBLIC_VIEW`（既有） | 管理員 | 關 → 乜都唔公開，feed 403，訂閱掣唔顯示 |
+| 1 | `PUBLIC_CARDS`（csv：`calendar,albums,notices`） | **管理員** | 三張卡獨立開關 |
+| 2 | `PUBLIC_SCOPE_<CARD>`（csv：`troop` + `b1..b5`） | `troop`＝管理員；支部＝**該支部團長** | 只有列出嘅範圍先公開 |
+
+- **開卡即預設公開全旅內容**：`toggleCard()` 喺 scope 清單為空時會自動加入 `troop`；
+  關卡**保留** scope（重開唔使重新設定）。
+- **`cardEffective()` = 卡開 ＋ 至少一個 scope**。全部範圍關晒 → 卡片等於重新關閉，
+  要再由管理員開返（用戶明確要求）。
+- `isItemPublic(config, card, branchId)` 一次過檢查三層；branchId 空值／`troop` ⇒ `troop` scope。
+
+**寫入權限**（新 action `setPublicCard` / `setPublicScope`，handler 自己檢查）：
+- 管理層（super_admin／troop_super／troop_leader／admin）→ 可改任何卡、任何 scope
+- `troop`（全旅內容）→ **只准管理層**
+- 支部 scope → **只准該支部**嘅 group_leader／branch_leader／coach
+
+**實測**（`.mockdata` 乾淨狀態，`/api/ics` 行事曆卡）：
+- seed `calendar` + `troop,b2,b3` → 200，**7** VEVENT（全旅 2／幼童軍 2／童軍 3）
+- 關 `troop` → 200，**5**（全旅 0）
+- 三個 scope 全關 → **403**（cardEffective=false）
+- 開返 `b2` → 200，**2**（幼童軍 2）
+- 關閉成張卡 → **403**；重開 → 200 且 scope 保留
+- 權限 12 個 case 全對：`u_gl3`/`u_bl` 改卡被拒；`u_bl`(b3) 改 `troop` 被拒、改 b3 通過、改 b2 被拒；
+  家長 `u5` 一律被拒
+- 相簿卡／通告卡同樣實測：`troop` → 0 個相簿（唯一相簿係 b3）；`b3` → 1 個；
+  通告 `troop` → 只睇到全旅通告，加 `b3` → 多咗「營地安全指引.pdf[童軍]」（證明「童軍」→b3 對映正確）；
+  全關 → 0 份
+
+**UI**：
+- `app/admin/settings` 新增「🗂️ 公開資料卡片」section：三張 `BigSwitch`（行事曆／相簿／通告）
+  ＋每張卡顯示「已公開範圍」；確認對話框列明預設範圍／各支部／後果。`PUBLIC_VIEW` 關咗時顯示黃色提示。
+- `app/admin/calendar`「🌐 公開行事曆範圍」：管理層見到「🏕️ 全旅內容」掣＋所有支部；
+  支部領袖只見到自己支部，並提示「全旅內容由管理層決定」。
+- 訪客 gating：`/calendar`＋`/api/ics` 用 `isItemPublic(…,'calendar',…)`；
+  `/albums` 用 `'albums'`（訪客喺卡未開時顯示 `<PublicLocked>`）；
+  `/notices` 用 `'notices'`（通告嘅 `branchTags` 存顯示名，經 `tagToScope()` 譯返 branchId）。
+- 訂閱掣跟 `publicViewEnabled() && cardEffective(config,'calendar')`。
+
+⚠️ **要正式部署先至用得**：訂閱要 Google／Apple 嘅伺服器搵到個 URL。
+live preview 嘅 sandbox 網址對外攞唔到，所以一鍵加入喺 preview 度实测唔到；部署上 Vercel 之後先得。
+
 ## 待完成（下一階段）
 1. **82 旅重新部署 GS** — 把本 repo 的 `gs/SCOUTSYSTEM_2_SETUP.gs`（或 `public/downloads/SCOUTSYSTEM_2_SETUP.gs.txt`）貼回 82 旅 Script Editor → Deploy → 管理部署 → 新增版本；部署後用 `?action=health&apiKey=...` 確認 version=3.0-live，並複測超管登入。
    （過渡期：前端已改以 `sheep` 作 userId，未重新部署也能拿到全部資料；但仍建議盡快部署，才有 `publicConfig_` 敏感值剝除等修正）

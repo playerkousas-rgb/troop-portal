@@ -6,10 +6,6 @@ import { parseNoticeText } from '@/lib/noticeParser';
 import { branches } from '@/lib/model';
 import Link from 'next/link';
 import { useConfirm, kv } from '@/components/ConfirmProvider';
-import { resolveAlbum } from '@/lib/album';
-import AlbumEmbed from '@/components/ui/AlbumEmbed';
-import { hasFeature } from '@/lib/permissions';
-import { getSession } from '@/lib/session';
 import Auth from '@/components/Auth';
 
 /**
@@ -21,6 +17,10 @@ import Auth from '@/components/Auth';
  *   區地域總會活動唔做統計，領袖只係精選啱嘅通告畀成員睇，想報就報。
  * ─ 過期通告：一鍵處理過期活動 —— 旅團活動封存到「過期通告」（可查回）；
  *   外部（區地域總會）通告直接刪除。
+ *
+ * ★ 呢一頁唔再有「活動相簿」（用戶要求 #2）：通告係活動**之前**先出現，
+ *   相片係活動**之後**先有，兩者唔會同時存在，擺喺同一張活動卡只會混亂。
+ *   相簿連結改由領袖喺底部「📷 相簿」頁補上（活動完結後），成員／家長都喺嗰度睇。
  */
 
 const LIBRARY_URL = 'https://scout-circulars.vercel.app/';
@@ -56,32 +56,12 @@ function isExpired(e: EventItem): boolean {
 }
 
 
-/**
- * 貼連結時即時提示：呢個平台內嵌唔內嵌得。
- * 目的係唔好等到家長撳開先發現一片空白。
- */
-function AlbumHint({ url }: { url: string }) {
-  const info = resolveAlbum(url);
-  if (!info) return null;
-  const ok = info.kind === 'embed' && !info.hint;
-  return (
-    <span
-      className="text-sm font-semibold leading-relaxed"
-      style={{ color: ok ? '#15803d' : '#b45309', display: 'block', marginTop: 4 }}
-    >
-      {ok ? `✅ ${info.platform}：可以喺 APP 內直接睇相` : `⚠️ ${info.platform}：${info.hint || '未必內嵌到'}`}
-    </span>
-  );
-}
-
 export default function Page() {
   const [s, setS] = useState<AppState | null>(null);
   const [err, setErr] = useState('');
   const [msg, setMsg] = useState('');
   const [editing, setEditing] = useState<string | null>(null);
   const [tab, setTab] = useState<'self' | 'district' | 'archived'>('self');
-  // 📷 活動相簿：預設關閉（涉及小朋友私隱），要團長／管理員喺使用者管理開通
-  const photosOn = hasFeature(s?.userFeatures, 'photos', getSession()?.role);
 
   // 新增表單（共用欄位）
   const [showAdd, setShowAdd] = useState(false);
@@ -92,7 +72,6 @@ export default function Page() {
   const [paymentUrl, setPaymentUrl] = useState(''); const [dutyPatrol, setDutyPatrol] = useState('');
   const [calendarTag, setCalendarTag] = useState('');
   const [noticeUrl, setNoticeUrl] = useState('');
-  const [albumUrl, setAlbumUrl] = useState('');
   const [noticeFileName, setNoticeFileName] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -103,7 +82,6 @@ export default function Page() {
   const [editCategory, setEditCategory] = useState<'self' | 'district'>('self');
   const [editCalendarTag, setEditCalendarTag] = useState('');
   const [editNoticeUrl, setEditNoticeUrl] = useState('');
-  const [editAlbumUrl, setEditAlbumUrl] = useState('');
 
   const { confirm } = useConfirm();
 
@@ -173,7 +151,6 @@ export default function Page() {
         ['加入方法', modeLabel || ''],
         ['日期', date],
         ['通告連結', noticeUrl],
-        ['活動相簿', albumUrl || '（無）'],
         ['地點', location],
         ['範圍', scope === 'troop' ? '全旅' : `支部 ${branchId || '（未選）'}`],
         ['費用', fee],
@@ -187,7 +164,6 @@ export default function Page() {
         fee: fee || undefined, paymentUrl: paymentUrl || undefined, dutyPatrol: dutyPatrol || undefined,
         category, calendarTag: calendarTag || undefined, status: 'draft',
         noticeUrl: noticeUrl || undefined, noticeFileName: noticeFileName || undefined,
-        albumUrl: albumUrl || undefined,
         inputMode: inputMode === 'library' ? 'link' : inputMode,
       });
       setS(fresh); resetForm(); setShowAdd(false); setMsg('✅ 已新增草稿，記得按「發布」。');
@@ -202,7 +178,6 @@ export default function Page() {
     setEditPaymentUrl(e.paymentUrl || ''); setEditDutyPatrol(e.dutyPatrol || '');
     setEditCategory(eventCategory(e)); setEditCalendarTag(e.calendarTag || '');
     setEditNoticeUrl(e.noticeUrl || '');
-    setEditAlbumUrl(e.albumUrl || '');
   }
 
   async function saveEdit() {
@@ -216,7 +191,6 @@ export default function Page() {
         ['分類', editCategory === 'district' ? '區地域總會活動' : '旅團活動'],
         ['日期', editDate],
         ['通告連結', editNoticeUrl],
-        ['活動相簿', editAlbumUrl || '（無）'],
         ['地點', editLocation],
         ['範圍', editScope === 'troop' ? '全旅' : `支部 ${editBranchId || '（未選）'}`],
         ['費用', editFee],
@@ -229,7 +203,7 @@ export default function Page() {
         eventId: editing, title: editTitle, date: editDate, location: editLocation, fee: editFee,
         scope: editScope, branchId: editScope === 'branch' ? editBranchId : '',
         paymentUrl: editPaymentUrl, dutyPatrol: editDutyPatrol, category: editCategory,
-        calendarTag: editCalendarTag, noticeUrl: editNoticeUrl, albumUrl: editAlbumUrl,
+        calendarTag: editCalendarTag, noticeUrl: editNoticeUrl,
       });
       setS(fresh); setEditing(null);
     } catch (e: any) { setErr(e.message) }
@@ -409,20 +383,6 @@ export default function Page() {
           <label>收款連結<input value={paymentUrl} onChange={e => setPaymentUrl(e.target.value)} placeholder="可留空" /></label>
           <label>值日小隊<input value={dutyPatrol} onChange={e => setDutyPatrol(e.target.value)} placeholder="例如：TIGER" /></label>
           <label>行事曆標籤 🏷️<input value={calendarTag} onChange={e => setCalendarTag(e.target.value)} placeholder="例如：露營／服務／訓練" /></label>
-          <label>📷 活動相簿連結
-            <input
-              value={albumUrl}
-              onChange={e => setAlbumUrl(e.target.value)}
-              disabled={!photosOn}
-              placeholder={photosOn ? '活動後補：Google Drive 資料夾連結' : '🔒 功能未開通'}
-            />
-            {photosOn
-              ? <AlbumHint url={albumUrl} />
-              : <span className="text-sm text-slate-500" style={{ display: 'block', marginTop: 4 }}>
-                  🔒 「活動相簿」預設關閉（相片涉及小朋友私隱）。要用請團長／管理員喺
-                  「使用者管理 → 權限」開啟；開通後同支部所有人都睇到，其他支部要該支部團長另行授權。
-                </span>}
-          </label>
         </>}
         <label>範圍<select value={scope} onChange={e => setScope(e.target.value as any)}><option value="troop">全旅</option><option value="branch">支部</option></select></label>
         {scope === 'branch' && <label>支部<select value={branchId} onChange={e => setBranchId(e.target.value)}><option value="">選擇支部</option>{branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}</select></label>}
@@ -465,21 +425,6 @@ export default function Page() {
             <label>地點<input value={editLocation} onChange={e => setEditLocation(e.target.value)} /></label>
             <label>費用<input value={editFee} onChange={e => setEditFee(e.target.value)} /></label>
             <label>通告連結<input value={editNoticeUrl} onChange={e => setEditNoticeUrl(e.target.value)} placeholder="https://..." /></label>
-            {editCategory === 'self' && (
-              <label>📷 活動相簿連結
-                <input
-                  value={editAlbumUrl}
-                  onChange={e => setEditAlbumUrl(e.target.value)}
-                  disabled={!photosOn}
-                  placeholder={photosOn ? '貼上 Google Drive 資料夾 / 相簿連結' : '🔒 功能未開通'}
-                />
-                {photosOn
-                  ? <AlbumHint url={editAlbumUrl} />
-                  : <span className="text-sm text-slate-500" style={{ display: 'block', marginTop: 4 }}>
-                      🔒 「活動相簿」未開通，請團長／管理員喺「使用者管理 → 權限」開啟。
-                    </span>}
-              </label>
-            )}
             <label>收款連結<input value={editPaymentUrl} onChange={e => setEditPaymentUrl(e.target.value)} /></label>
             <label>值日小隊<input value={editDutyPatrol} onChange={e => setEditDutyPatrol(e.target.value)} /></label>
             <label>行事曆標籤 🏷️<input value={editCalendarTag} onChange={e => setEditCalendarTag(e.target.value)} placeholder="露營／服務／訓練" /></label>
@@ -493,10 +438,6 @@ export default function Page() {
             {e.calendarTag && <p className="muted" style={{ margin: 0 }}>🏷️ 行事曆標籤：{e.calendarTag}</p>}
             {e.noticeFileName && <p className="muted" style={{ margin: 0 }}>📄 通告檔案：{e.noticeFileName}</p>}
             {e.noticeUrl && <p style={{ margin: 0 }}><a href={e.noticeUrl} target="_blank" rel="noopener noreferrer">🔗 開啟通告連結</a></p>}
-            {e.albumUrl && (photosOn
-              ? <AlbumEmbed url={e.albumUrl} title={`${e.title}・活動相簿`} />
-              : <p className="text-sm text-slate-500 m-0">🔒 已設定活動相簿，但「活動相簿」功能未開通 —— 請團長／管理員喺使用者管理開啟後先睇到。</p>
-            )}
             {e.paymentUrl && <p className="muted" style={{ color: '#b06000', margin: 0 }}>💳 已設收款連結</p>}
             {e.dutyPatrol && <p className="muted" style={{ color: 'purple', margin: 0 }}>🪖 值日：{e.dutyPatrol}</p>}
             {cat === 'district'

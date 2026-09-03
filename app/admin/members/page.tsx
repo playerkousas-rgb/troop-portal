@@ -3,11 +3,26 @@ import { useEffect, useState } from 'react';
 import { AppState, loadState, loadStateSlice } from '@/lib/store';
 import { apiCreateMember, apiLinkParent, apiUpdateMember, apiDeleteMember } from '@/lib/api';
 import { branches } from '@/lib/model';
+import { badgeSchemeFor, parseWantedBadges } from '@/lib/badges';
 import { useConfirm, kv } from '@/components/ConfirmProvider';
 import Auth from '@/components/Auth';
 
 function roleLabel(r?:string){return r==='leader'?'隊長':r==='deputy'?'副隊長':r==='member'?'隊員':'—'}
 function branchName(id?:string){return branches.find(b=>b.id===id)?.short||id||'—'}
+
+/** 領袖一覽：成員登記咗邊啲「想考的章」（b2／b3 先有選單） */
+function wantedBadgesCell(c: AppState['members'][number]) {
+  const scheme = badgeSchemeFor(c.branchId);
+  const list = parseWantedBadges(c.wantedBadges, scheme);
+  if (!scheme) return <span className="muted">—</span>;
+  if (!list.length) return <span className="muted">未登記</span>;
+  return (
+    <span title={list.map(b => `${b.group ? b.group + ' · ' : ''}${b.name}`).join('\n')}>
+      <strong>{list.length} 個</strong>
+      <span className="muted">：{list.slice(0, 2).map(b => b.name).join('、')}{list.length > 2 ? ` 等${list.length}個` : ''}</span>
+    </span>
+  );
+}
 
 export default function Page(){
   const [s,setS]=useState<AppState|null>(null);
@@ -160,7 +175,7 @@ export default function Page(){
 
     <section className="card">
       <table className="table responsive">
-        <thead><tr><th>姓名</th><th>YMIS</th><th>支部</th><th>小隊</th><th>特別身份</th><th>年齡</th><th>Email / 改密碼</th><th>家長連結</th><th>操作</th></tr></thead>
+        <thead><tr><th>姓名</th><th>YMIS</th><th>支部</th><th>小隊</th><th>特別身份</th><th>年齡</th><th>🎖️ 想考的章</th><th>Email / 改密碼</th><th>家長連結</th><th>操作</th></tr></thead>
         <tbody>{s.members.map(c=>{
           const isEdit=editing===c.id;
           if(isEdit)return (
@@ -206,6 +221,7 @@ export default function Page(){
               <td data-label="小隊">{patrolName(c.patrolId)}</td>
               <td data-label="身份">{c.specialRole || roleLabel(c.patrolRole)}</td>
               <td data-label="年齡">{c.age>0?c.age:'—'}</td>
+              <td data-label="想考的章">{wantedBadgesCell(c)}</td>
               <td data-label="Email">{c.email || '—'}</td>
               <td data-label="家長連結"><select value={c.parentUserId||''} onChange={e=>linkParent(c.id,e.target.value)}><option value="">未連結</option>{parents.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select></td>
               <td data-label="操作"><button className="btn" onClick={()=>startEdit(c.id)}>✏️</button> <button className="btn" onClick={()=>del(c.id)}>🗑️</button></td>

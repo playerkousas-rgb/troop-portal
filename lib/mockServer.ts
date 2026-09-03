@@ -19,7 +19,8 @@
  */
 import type { AppState, Equipment } from './store';
 import type { Role } from './model';
-import { branches as modelBranches } from './model';
+import { branches as modelBranches, MANAGER_ROLES, LEADER_ROLES } from './model';
+import { PUBLIC_CARD_IDS, PublicCardId, scopeKey, toggleCard, toggleScope, canToggleCard, canToggleScope } from './publicScope';
 import { DEMO_TROOP_KEY, MOCK_TROOP } from './mockConstants';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
 import path from 'path';
@@ -70,6 +71,13 @@ const seed: AppState = {
     REGISTRY_URL: 'https://troop-router.vercel.app/api/registry.json',
     ANNOUNCEMENT_FOLDER_ID: '',
     MEETINGS_FOLDER_ID: '',
+    // ★ 公開資料三層模型（lib/publicScope.ts）
+    //   第 1 層：管理員開咗邊幾張卡（demo：行事曆＋通告開，相簿未開）
+    //   第 2 層：每張卡嘅內容 scope（troop＝全旅由管理員決定；b*＝各支部由團長決定）
+    PUBLIC_CARDS: 'calendar,notices',
+    PUBLIC_SCOPE_CALENDAR: 'troop,b2,b3',
+    PUBLIC_SCOPE_ALBUMS: 'troop',
+    PUBLIC_SCOPE_NOTICES: 'troop,b2',
   },
   patrols: [
     { id: 'p01', branchId: 'b1', name: 'BEE', short: 'B', memberIds: [], enabled: true, order: 1 },
@@ -85,7 +93,7 @@ const seed: AppState = {
     { id: 'p30', branchId: 'b5', name: 'ROVER', short: 'RV', memberIds: [], enabled: true, order: 1 },
   ],
   members: [
-    { id: 'm01', ymNumber: '3000000001', name: '陳大文', branchId: 'b3', patrolId: 'p12', patrolRole: 'leader', age: 16, dateOfBirth: '2010-06-12', parentUserId: 'u5', active: true },
+    { id: 'm01', ymNumber: '3000000001', name: '陳大文', branchId: 'b3', patrolId: 'p12', patrolRole: 'leader', age: 16, dateOfBirth: '2010-06-12', parentUserId: 'u5', active: true, wantedBadges: 'scout_int_campfire_host|scout_pur_pioneer|scout_srv_first_aider', wantedBadgesAt: '2026-08-28T10:12:00.000Z' },
     { id: 'm02', ymNumber: '3000000002', name: '王小名', branchId: 'b3', patrolId: 'p11', patrolRole: 'member', age: 13, dateOfBirth: '2013-03-01', active: true },
     { id: 'm03', ymNumber: '3000000003', name: '李浩浩', branchId: 'b3', patrolId: 'p10', patrolRole: 'member', age: 15, dateOfBirth: '2011-01-20', active: true },
     { id: 'm04', ymNumber: '3000000004', name: '張磊磊', branchId: 'b3', patrolId: 'p10', patrolRole: 'member', age: 18, dateOfBirth: '2008-11-05', active: true },
@@ -98,6 +106,10 @@ const seed: AppState = {
     { id: 'm11', ymNumber: '3000000011', name: '黃嘉怡', branchId: 'b4', patrolId: 'p21', patrolRole: 'member', age: 19, dateOfBirth: '2007-09-18', active: true },
     { id: 'm12', ymNumber: '3000000012', name: '陳俊傑', branchId: 'b5', patrolId: 'p30', patrolRole: 'member', age: 20, dateOfBirth: '2006-07-22', active: true },
     { id: 'm13', ymNumber: '3000000013', name: '蔡可可', branchId: 'b1', patrolId: 'p02', patrolRole: 'member', age: 7, dateOfBirth: '2019-04-08', parentUserId: 'u9', active: true },
+    // ★ 演示用：同一位家長（u5 王秀蘭）有兩名子女喺**不同支部** ——
+    //   陳大文（b3 童軍・16 歲・可自行報名）＋ 陳小美（b2 幼童軍・9 歲・要家長代報）。
+    //   用嚟示範「家長行事曆只睇到全旅＋子女支部」同「子女表達 ❤️ 有興趣」。
+    { id: 'm14', ymNumber: '3000000014', name: '陳小美', branchId: 'b2', patrolId: 'p2', patrolRole: 'member', age: 9, dateOfBirth: '2017-07-19', parentUserId: 'u5', active: true, wantedBadges: 'cub_astronomer|cub_swimmer|cub_artist', wantedBadgesAt: '2026-08-30T09:05:00.000Z' },
   ],
   users: [
     { id: 'u_admin', name: '陳堅強', email: 'admin@demo.scout', role: 'admin', approved: true },
@@ -109,11 +121,13 @@ const seed: AppState = {
     { id: 'u_gl3', name: '陳志明', email: 'gl3@demo.scout', role: 'group_leader', branchId: 'b3', approved: true },
     { id: 'u_bl', name: '黃志遠', email: 'bl@demo.scout', role: 'branch_leader', branchId: 'b3', approved: true },
     { id: 'u_coach', name: '何健', email: 'coach@demo.scout', role: 'coach', approved: true }, // 教練員冇固定支部
-    { id: 'u5', name: '王秀蘭', email: 'parent1@demo.scout', role: 'parent', childMemberIds: ['m01'], approved: true },
+    { id: 'u5', name: '王秀蘭', email: 'parent1@demo.scout', role: 'parent', childMemberIds: ['m01', 'm14'], approved: true },
     { id: 'u9', name: '林國雄', email: 'parent2@demo.scout', role: 'parent', childMemberIds: ['m05', 'm10', 'm13'], approved: true },
     { id: 'u_m1', name: '陳大文', email: 'm01@demo.scout', role: 'member', branchId: 'b3', memberId: 'm01', approved: true },
     { id: 'u_m2', name: '王小名', email: 'm02@demo.scout', role: 'member', branchId: 'b3', memberId: 'm02', approved: true },
     { id: 'u_m4', name: '張磊磊', email: 'm04@demo.scout', role: 'member', branchId: 'b3', memberId: 'm04', approved: true },
+    // 未成年成員（幼童軍）：同一位家長 u5 嘅第二名子女，支部同哥哥唔同（b2 vs b3）
+    { id: 'u_m14', name: '陳小美', email: 'm14@demo.scout', role: 'member', branchId: 'b2', memberId: 'm14', approved: true },
     { id: 'u_m8', name: '周嘉欣', email: 'm08@demo.scout', role: 'member', branchId: 'b4', memberId: 'm08', approved: true },
   ],
   events: [
@@ -125,6 +139,9 @@ const seed: AppState = {
     { id: 'e05', title: '樂行社區服務日', date: '2026-09-20', location: '觀塘邨', scope: 'branch', branchId: 'b5', kind: 'activity', status: 'published', source: '手動新增', targetMemberIds: ['m09', 'm12'], fee: '0' },
     { id: 'e06', title: '深資遠征(兩日一夜)', date: '2026-10-10', location: '西貢麥理浩徑', scope: 'branch', branchId: 'b4', kind: 'activity', status: 'published', source: '手動新增', targetMemberIds: ['m08', 'm11'], fee: '250', paymentUrl: 'https://pay.example.com/e06' },
     { id: 'e07', title: '小童軍親子日', date: '2026-09-13', location: '本中心園地', scope: 'branch', branchId: 'b1', kind: 'activity', status: 'published', source: '手動新增', targetMemberIds: ['m10', 'm13'], fee: '0' },
+    // ★ 全旅活動：同時涵蓋 u5 兩名子女（b3 陳大文 ＋ b2 陳小美），
+    //   示範「一名子女已報名、另一名子女只表達 ❤️ 有興趣」嘅家長視角。
+    { id: 'e08', title: '全旅親子遠足日', date: '2026-09-27', location: '城門水塘（主壩集合）', scope: 'troop', kind: 'activity', status: 'published', source: '手動新增', targetMemberIds: ['m01', 'm14'], fee: '20', noticeUrl: 'https://example.org/circular/troop-family-hike.pdf', noticeFileName: '全旅親子遠足日通告.docx', calendarTag: '遠足' },
   ],
   replies: [
     { id: 'e01_m01', eventId: 'e01', memberId: 'm01', memberName: '陳大文', branchId: 'b3', parentUserId: 'u5', type: 'registered', operatedBy: 'parent', paid: true, updatedAt: '2026-08-20' },
@@ -137,6 +154,10 @@ const seed: AppState = {
     { id: 'e06_m11', eventId: 'e06', memberId: 'm11', memberName: '黃嘉怡', branchId: 'b4', type: 'interested', operatedBy: 'member', updatedAt: '2026-08-26' },
     { id: 'e07_m10', eventId: 'e07', memberId: 'm10', memberName: '鄭蓓蓓', branchId: 'b1', parentUserId: 'u9', type: 'registered', operatedBy: 'parent', updatedAt: '2026-08-27' },
     { id: 'e07_m13', eventId: 'e07', memberId: 'm13', memberName: '蔡可可', branchId: 'b1', parentUserId: 'u9', type: 'registered', operatedBy: 'parent', paid: true, updatedAt: '2026-08-27' },
+    // ★ 子女表達「❤️ 有興趣」（非報名）：家長端會見到呢個狀態，但回覆 ✅／❌ 仍然係家長嘅決定
+    { id: 'e08_m14', eventId: 'e08', memberId: 'm14', memberName: '陳小美', branchId: 'b2', parentUserId: 'u5', type: 'interested', operatedBy: 'member', updatedAt: '2026-09-01' },
+    { id: 'e03_m14', eventId: 'e03', memberId: 'm14', memberName: '陳小美', branchId: 'b2', parentUserId: 'u5', type: 'interested', operatedBy: 'member', updatedAt: '2026-09-01' },
+    { id: 'e08_m01', eventId: 'e08', memberId: 'm01', memberName: '陳大文', branchId: 'b3', parentUserId: 'u5', type: 'registered', operatedBy: 'member', paid: false, updatedAt: '2026-09-01' },
   ],
   bookmarks: [
     { id: 'bm01', title: '第 118 周年童軍週', source: '香港童軍', mode: 'informational', branchTags: ['全旅'], audienceTags: ['全旅'], status: 'published', officialDeadline: '2026-09-01', targetText: '周年紀念活動,各旅自行報名。' },
@@ -868,6 +889,59 @@ function handleMutate(action: string, p: Record<string, any>) {
     case 'updateMember': {
       const i = findIdx(store.members, 'id', String(p.memberId || ''));
       if (i >= 0) Object.assign(store.members[i], Object.fromEntries(Object.entries(p).filter(([k]) => !['action', 'operatedBy', 'memberId'].includes(k))));
+      return S(ob);
+    }
+    case 'setWantedBadges': {
+      // 成員自助：只容許本人／其家長／有 members 權限嘅領袖（checkMockPermission 唔管呢個 action）
+      const i = findIdx(store.members, 'id', String(p.memberId || ''));
+      if (i < 0) return { success: false, error: '找不到成員' };
+      const me = store.members[i];
+      const opUser = store.users.find(u => u.id === String(p.operatedBy || ''));
+      const opRole = String(opUser?.role || '');
+      // ★ 用共用常數：MANAGER_ROLES（管理層）＋ LEADER_ROLES（團長／支部領袖／教練員）。
+      //   唔好手寫角色清單 —— 之前寫漏 group_leader／branch_leader 令支部領袖都登記唔到。
+      const isLeader = (MANAGER_ROLES as string[]).includes(opRole) || (LEADER_ROLES as string[]).includes(opRole);
+      const isSelf = String(opUser?.memberId || '') === me.id;
+      const isParent = String(me.parentUserId || '') === String(p.operatedBy || '');
+      if (!isLeader && !isSelf && !isParent) return { success: false, error: '只可以登記自己（或自己子女）想考的章。' };
+      if (me.branchId !== 'b2' && me.branchId !== 'b3' && !isLeader) {
+        return { success: false, error: '你嘅支部冇「想考的章」選單，請直接同領袖講。' };
+      }
+      me.wantedBadges = String(p.wantedBadges || '').slice(0, 2000);
+      me.wantedBadgesAt = new Date().toISOString();
+      logAudit(ob, 'setWantedBadges', '成員', me.id, me.wantedBadges ? (me.wantedBadges.split(/[|,;]/).filter(Boolean).length + ' 個章') : '（清空）');
+      return S(ob);
+    }
+    /* ═══ 公開資料：第 1 層（管理員開／關卡片）═══ */
+    case 'setPublicCard': {
+      const card = String(p.card || '');
+      if (!PUBLIC_CARD_IDS.includes(card as PublicCardId)) return { success: false, error: '未知的卡片' };
+      const opUser = store.users.find(u => u.id === String(p.operatedBy || ''));
+      if (!opUser) return { success: false, error: '未能確認操作者身份，請重新登入。' };
+      if (!canToggleCard(String(opUser.role || ''))) return { success: false, error: '只有管理層可以開放公開資料卡片。' };
+      const on = ['true', 'TRUE', '1', 'yes'].includes(String(p.enabled));
+      const key = scopeKey(card as PublicCardId) as keyof typeof store.config;
+      const r = toggleCard(store.config.PUBLIC_CARDS, String(store.config[key] || ''), card as PublicCardId, on);
+      store.config.PUBLIC_CARDS = r.cards;
+      (store.config as any)[key] = r.scopes;
+      logAudit(ob, 'setPublicCard', 'SystemConfig', card, on ? '開放卡片' : '關閉卡片');
+      return S(ob);
+    }
+    /* ═══ 公開資料：第 2 層（內容 scope：troop 由管理員，支部由該支部團長）═══ */
+    case 'setPublicScope': {
+      const card = String(p.card || '');
+      const scope = String(p.scope || '');
+      if (!PUBLIC_CARD_IDS.includes(card as PublicCardId)) return { success: false, error: '未知的卡片' };
+      if (!scope) return { success: false, error: '缺少範圍' };
+      const opUser = store.users.find(u => u.id === String(p.operatedBy || ''));
+      if (!opUser) return { success: false, error: '未能確認操作者身份，請重新登入。' };
+      if (!canToggleScope(String(opUser.role || ''), opUser.branchId, scope)) {
+        return { success: false, error: scope === 'troop' ? '全旅內容只可以由管理層決定公唔公開。' : '只可以開放自己支部嘅內容。' };
+      }
+      const key = scopeKey(card as PublicCardId);
+      const on = ['true', 'TRUE', '1', 'yes'].includes(String(p.enabled));
+      (store.config as any)[key] = toggleScope(String((store.config as any)[key] || ''), scope, on);
+      logAudit(ob, 'setPublicScope', 'SystemConfig', card + '/' + scope, on ? '公開' : '取消公開');
       return S(ob);
     }
     case 'deleteMember': store.members = store.members.filter(m => m.id !== p.memberId); return S(ob);

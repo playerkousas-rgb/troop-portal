@@ -1,10 +1,13 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { AppState, loadStateSlice } from '@/lib/store';
-import { apiSaveConfig, apiTogglePluginStatus } from '@/lib/api';
+import { apiSaveConfig, apiTogglePluginStatus , apiSetPublicCard } from '@/lib/api';
 import Link from 'next/link';
 import Auth from '@/components/Auth';
 import { useConfirm, kv } from '@/components/ConfirmProvider';
+import { PUBLIC_CARDS, cardOpen, cardEffective, openScopes, TROOP_SCOPE } from '@/lib/publicScope';
+import type { PublicCardId } from '@/lib/publicScope';
+import { branches as ALL_BRANCHES } from '@/lib/model';
 
 const FRIENDLY_LABELS: Record<string, string> = {
   TROOP_CODE: '旅團號碼',
@@ -115,12 +118,48 @@ export default function Page() {
     const on = ['false', '0', 'off', 'no'].includes(String(s.config.PUBLIC_VIEW || '').trim().toLowerCase());
     const ok = await confirm({
       title: '確認切換公開瀏覽',
-      message: kv([['變更後狀態', on ? '🟢 公開瀏覽：開放' : '🔴 公開瀏覽：已關閉']]),
+      message: kv([
+        ['變更後狀態', on ? '🟢 公開瀏覽：開放' : '🔴 公開瀏覽：已關閉'],
+        // ★ 用戶要求：呢個開關同時決定「加入我的行事曆」訂閱功能開唔開放，
+        //   因為訂閱連結必然公開（Google／Apple 嘅伺服器唔會帶登入身分嚟攞）。
+        //   切換前必須講清楚會公開咩、唔會公開咩。
+        ...(on ? [
+          ['一併開放', '📲「加入我的行事曆」訂閱（Google／Apple／Outlook 可自動同步）'],
+          ['會公開', '已公佈活動＋已啟用恆常集會（標題、日期、時間、地點、通告連結）'],
+          ['唔會公開', '未公佈（PRIVATE）活動、報名名單、出席紀錄、成員／家長聯絡電話'],
+          ['提示', '任何人拿到訂閱網址都睇到上述公開內容；關閉後訂閱連結會即刻失效（HTTP 403）。'],
+        ] as [string, string][] : [
+          ['一併關閉', '📲「加入我的行事曆」訂閱 —— 已訂閱嘅用戶日曆會停止更新'],
+        ] as [string, string][]),
+      ]),
       confirmLabel: '確認切換',
     });
     if (!ok) return;
     setBusy('PUBLIC_VIEW');
     try { const f = await apiSaveConfig('PUBLIC_VIEW', on ? 'TRUE' : 'FALSE'); setS(f); }
+    catch (e: any) { setErr(e.message); } finally { setBusy(''); }
+  }
+
+  /* ★ 第 1 層：管理員開／關三張公開資料卡（行事曆／相簿／通告），各自獨立。
+     開卡時後端會預設把 troop（全旅內容）一齊公開；各支部內容仍要由該支部團長另外開放。 */
+  async function toggleCard(card: PublicCardId, name: string) {
+    if (!s) return;
+    const on = !cardOpen(s.config, card);
+    const ok = await confirm({
+      title: on ? `確認開放「${name}」卡` : `確認關閉「${name}」卡`,
+      message: kv([
+        ['卡片', `${name}`],
+        ['變更後', on ? '🟢 開放：呢張卡入面「已開放範圍」嘅內容會公開畀未登入訪客' : '🔴 關閉：呢張卡所有內容都唔會公開'],
+        ...((on
+          ? [['預設範圍', '全旅內容會一併設為公開（全旅由管理員決定，可以再關）'],
+             ['各支部', '唔會自動公開 —— 要由該支部團長／支部領袖自己開放']]
+          : [['提示', '各支部已設定嘅範圍會保留，日後開返卡片時唔使重新設定']]) as [string, string][]),
+      ]),
+      confirmLabel: '確認',
+    });
+    if (!ok) return;
+    setBusy('card_' + card); setErr(''); setOk('');
+    try { const f = await apiSetPublicCard({ card, enabled: on }); setS(f); setOk(on ? `✅ 已開放「${name}」卡` : `🔒 已關閉「${name}」卡`); }
     catch (e: any) { setErr(e.message); } finally { setBusy(''); }
   }
 
@@ -156,6 +195,8 @@ export default function Page() {
 
   const locked = String(s.config.system_locked || '').toLowerCase() === 'true';
   const publicOn = !['false', '0', 'off', 'no'].includes(String(s.config.PUBLIC_VIEW || '').trim().toLowerCase());
+  const scopeNames = (card: PublicCardId) =>
+    openScopes(s.config, card).map(id => id === TROOP_SCOPE ? '全旅' : (ALL_BRANCHES.find(b => b.id === id)?.name || id)).join('、');
   const plugins = s.plugins || [];
 
   return <Auth roles={['super_admin', 'troop_super', 'troop_leader', 'admin']}><div className="max-w-3xl mx-auto space-y-4">
@@ -182,10 +223,10 @@ export default function Page() {
       />
     </section>
 
-    {/* 2. 公開瀏覽（清晰開關） */}
+    {/* 2. 公開資料（總掣 ＋ 三張卡片） */}
     <section className="card stack">
-      <h3 className="m-0">🌐 公開瀏覽</h3>
-      <p className="muted m-0">開放：未登入都可以睇公開行事曆／通告／活動。關閉：必須登入先睇到。</p>
+      <h3 className="m-0">🌐 公開瀏覽（總掣）</h3>
+      <p className="muted m-0">開放：未登入都可以睇公開資料。關閉：必須登入先睇到，下面三張卡全部失效。</p>
       <BigSwitch
         on={publicOn}
         busy={busy === 'PUBLIC_VIEW'}
@@ -193,6 +234,59 @@ export default function Page() {
         onLabel="公開瀏覽：開放"
         offLabel="公開瀏覽：已關閉"
       />
+    </section>
+
+    {/* 2b. 三張公開資料卡片 —— 各自獨立，可全開／開兩個／開一個 */}
+    <section className="card stack">
+      <h3 className="m-0">🗂️ 公開資料卡片</h3>
+      <p className="muted m-0">
+        三類公開資料各自獨立開放。<strong>卡片開咗 ≠ 內容開咗</strong> ——
+        每張卡入面再分「全旅」（由你決定）同「各支部」（由該支部團長決定）。
+      </p>
+      {!publicOn && (
+        <p className="m-0 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[13px] text-amber-800">
+          ⚠️ 總掣而家係<strong>關閉</strong>，下面三張卡就算開咗，訪客仍然乜都睇唔到。
+        </p>
+      )}
+      <div className="stack">
+        {PUBLIC_CARDS.map(c => {
+          const on = cardOpen(s.config, c.id);
+          const eff = cardEffective(s.config, c.id);
+          const names = scopeNames(c.id);
+          return (
+            <div key={c.id} className="rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-3">
+              <div className="flex items-center justify-between gap-3 flex-wrap">
+                <div className="min-w-0">
+                  <p className="m-0 font-bold text-slate-800">{c.icon} {c.name}</p>
+                  <p className="m-0 mt-0.5 text-[13px] text-slate-500">{c.desc}</p>
+                </div>
+                <BigSwitch
+                  on={on}
+                  busy={busy === 'card_' + c.id}
+                  onToggle={() => toggleCard(c.id, c.name)}
+                  onLabel="卡片：開放"
+                  offLabel="卡片：關閉"
+                />
+              </div>
+              {on && (
+                <p className="m-0 mt-2 text-[12px] text-slate-500 leading-relaxed">
+                  已公開範圍：<strong>{names || '（無 —— 全部範圍關閉，卡片等於未開）'}</strong>
+                  {!eff && <span className="text-rose-600 font-bold"> ⚠️ 所有範圍都關咗，呢張卡實際等於關閉</span>}
+                  <br />
+                  全旅內容由你在 <Link href="/admin/calendar" className="font-bold">行事曆管理</Link>／相簿／通告頁設定；
+                  各支部內容要由<strong>該支部團長</strong>自己開放。
+                </p>
+              )}
+            </div>
+          );
+        })}
+      </div>
+      <p className="muted m-0 text-[12px] leading-relaxed">
+        訂閱行事曆（Google／Apple／Outlook 自動同步）跟住「行事曆」卡：
+        卡關閉或範圍全關 → 訂閱連結即刻失效（HTTP 403）。
+        公開內容只限<strong>已發佈</strong>項目；未發佈（PRIVATE）活動、報名名單、出席紀錄、
+        成員及家長聯絡電話一律唔會公開。
+      </p>
     </section>
 
     {/* 3. 查看操作紀錄 */}

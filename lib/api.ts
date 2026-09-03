@@ -5,7 +5,7 @@ import { getSession } from './session';
 
 // ==================== 取得旅團資訊 ====================
 
-function getTroopKey(): string {
+export function getTroopKey(): string {
   if (typeof window === 'undefined') return '';
   try {
     const troop = JSON.parse(localStorage.getItem('scoutsystem2_selected_troop') || 'null');
@@ -283,6 +283,23 @@ export function apiDeleteMember(memberId: string) {
 }
 export function apiUpdateMember(p: Record<string, string>) {
   return apiMutate('updateMember', p);
+}
+
+/** 成員自助登記「想考的章」（唔需要 members 權限；後端會檢查係咪本人／家長） */
+export function apiSetWantedBadges(p: { memberId: string; wantedBadges: string }) {
+  return apiMutate('setWantedBadges', p);
+}
+
+/** 公開資料第 1 層：管理員開／關卡片（行事曆／相簿／通告）。
+ *  開卡時後端會預設把 troop（全旅內容）一齊公開。 */
+export function apiSetPublicCard(p: { card: 'calendar' | 'albums' | 'notices'; enabled: boolean }) {
+  return apiMutate('setPublicCard', { card: p.card, enabled: p.enabled ? 'TRUE' : 'FALSE' });
+}
+
+/** 公開資料第 2 層：內容 scope。
+ *  `troop`（全旅內容）只可以由管理層改；支部 scope 由該支部團長／支部領袖改（後端會檢查）。 */
+export function apiSetPublicScope(p: { card: 'calendar' | 'albums' | 'notices'; scope: string; enabled: boolean }) {
+  return apiMutate('setPublicScope', { card: p.card, scope: p.scope, enabled: p.enabled ? 'TRUE' : 'FALSE' });
 }
 
 // ==================== 活動 / 報名 ====================

@@ -8,11 +8,16 @@ export function dashboardFor(role: Role): string {
   switch (role) {
     case 'parent': return '/parent';
     case 'member': return '/member';
+    // ★ 管理員／團長／支部領袖／教練員共用同一個「管理中心」（/admin）：
+    //   版面一樣，只係顯示嘅管理項目按權限多寡不同，而「系統管理」只有管理員先有。
     case 'admin':
     case 'troop_leader':
     case 'troop_super':
-    case 'super_admin': return '/admin';
-    default: return '/leader';
+    case 'super_admin':
+    case 'group_leader':
+    case 'branch_leader':
+    case 'coach': return '/admin';
+    default: return '/';
   }
 }
 export const SESSION_KEY = 'scoutsystem2_current_user';

@@ -199,6 +199,10 @@ function getInitialSheets_() {
       ['ANNOUNCEMENT_FOLDER_ID', '', '公告 PDF 的 Google Drive 資料夾 ID。取得方式：打開 Drive 資料夾，看網址 https://drive.google.com/drive/folders/XXXX，XXXX 就是 ID。資料夾需設為「知道連結的人都可檢視」。'],
       ['MEETINGS_FOLDER_ID', '', '會議文件 PDF 的 Google Drive 資料夾 ID。可在「單位元件設定」或「會議管理」頁設定。'],
       ['REGISTRY_URL', 'https://troop-router.vercel.app/api/registry.json', '轉駁器 registry。'],
+      ['PUBLIC_CARDS', '', '管理員開放的公開資料卡片，逗號分隔：calendar（行事曆）／albums（相簿）／notices（通告）。可全開、開兩個、開一個。'],
+      ['PUBLIC_SCOPE_CALENDAR', 'troop', '行事曆卡片的公開範圍：troop（全旅，由管理員決定）＋各支部 id（由該支部團長決定）。'],
+      ['PUBLIC_SCOPE_ALBUMS', 'troop', '相簿卡片的公開範圍，格式同上。'],
+      ['PUBLIC_SCOPE_NOTICES', 'troop', '通告卡片的公開範圍，格式同上。'],
       
       ['STAFF_TOKEN', '', '（系統用）'],
       ['API_KEY_HASH', '', '（系統用）'],
@@ -258,9 +262,9 @@ function getInitialSheets_() {
       ['applicationId', 'type', 'name', 'email', 'role', 'branchId', 'ymNumbers', 'dateOfBirth', 'gender', 'password', 'status', 'approvedBy', 'createdAt', 'decidedAt', 'note']
     ],
     Members: [
-      ['memberId', 'ymNumber', 'password', 'name', 'email', 'branchId', 'patrolId', 'patrolRole', 'specialRole', 'dateOfBirth', 'parentUserId', 'emergencyContactName', 'emergencyContactPhone', 'active', 'note'],
-      ['m_ex1', '1234567890', '1234567890', '陳大文（範例）', '', 'b3', 'p5', 'leader', '', '2012-03-15', '', '陳太', '9123 4567', true, '範例：童軍支部成員，TIGER 小隊隊長。請修改或刪除。'],
-      ['m_ex2', '2345678901', '2345678901', '李小美（範例）', '', 'b2', 'p1', 'member', '', '2015-07-20', '', '李太', '9876 5432', true, '範例：幼童軍支部成員，RED 隊。請修改或刪除。']
+      ['memberId', 'ymNumber', 'password', 'name', 'email', 'branchId', 'patrolId', 'patrolRole', 'specialRole', 'dateOfBirth', 'parentUserId', 'emergencyContactName', 'emergencyContactPhone', 'active', 'note', 'wantedBadges', 'wantedBadgesAt'],
+      ['m_ex1', '1234567890', '1234567890', '陳大文（範例）', '', 'b3', 'p5', 'leader', '', '2012-03-15', '', '陳太', '9123 4567', true, '範例：童軍支部成員，TIGER 小隊隊長。請修改或刪除。', '', ''],
+      ['m_ex2', '2345678901', '2345678901', '李小美（範例）', '', 'b2', 'p1', 'member', '', '2015-07-20', '', '李太', '9876 5432', true, '範例：幼童軍支部成員，RED 隊。請修改或刪除。', '', '']
     ],
     Meetings: [
       ['meetingId', 'title', 'type', 'date', 'startTime', 'endTime', 'location', 'targetRoles', 'branchId', 'url', 'status', 'calendarTag', 'createdBy', 'createdAt', 'note']
@@ -818,7 +822,9 @@ function mapMembers_() {
       parentUserId: getField_(m, 'parentUserId') || '',
       emergencyContactName: getField_(m, 'emergencyContactName') || '',
       emergencyContactPhone: getField_(m, 'emergencyContactPhone') || '',
-      active: getField_(m, 'active') === '' ? true : parseBool_(getField_(m, 'active'))
+      active: getField_(m, 'active') === '' ? true : parseBool_(getField_(m, 'active')),
+      wantedBadges: String(getField_(m, 'wantedBadges') || ''),
+      wantedBadgesAt: String(getField_(m, 'wantedBadgesAt') || '')
     };
   });
 }
@@ -1892,6 +1898,9 @@ function doGet(e) {
       case 'updateEvent': return wrap_(handleUpdateEvent_(p), p);
       case 'deleteEvent': return wrap_(handleDeleteEvent_(p), p);
       case 'setReply': return wrap_(handleSetReply_(p), p);
+      case 'setWantedBadges': return wrap_(handleSetWantedBadges_(p), p);
+      case 'setPublicCard': return wrap_(handleSetPublicCard_(p), p);
+      case 'setPublicScope': return wrap_(handleSetPublicScope_(p), p);
       case 'togglePaid': return wrap_(handleTogglePaid_(p), p);
       case 'confirmPayment': return wrap_(handleConfirmPayment_(p), p);
       case 'archiveEvent': return wrap_(handleArchiveEvent_(p), p);
@@ -2716,7 +2725,7 @@ function handleCreateMember_(p) {
 }
 
 function handleUpdateMember_(p) {
-  var fields = ['ymNumber', 'password', 'name', 'email', 'branchId', 'patrolId', 'patrolRole', 'specialRole', 'dateOfBirth', 'parentUserId', 'emergencyContactName', 'emergencyContactPhone', 'active', 'note'];
+  var fields = ['ymNumber', 'password', 'name', 'email', 'branchId', 'patrolId', 'patrolRole', 'specialRole', 'dateOfBirth', 'parentUserId', 'emergencyContactName', 'emergencyContactPhone', 'active', 'note', 'wantedBadges', 'wantedBadgesAt'];
   fields.forEach(function (f) {
     if (p[f] !== undefined && p[f] !== null) {
       updateCellByName_('Members', 'memberId', p.memberId, f, p[f]);
@@ -2725,6 +2734,118 @@ function handleUpdateMember_(p) {
   if (p.patrolId) syncPatrolMembers_(p.patrolId);
   writeAudit_(p.operatedBy || 'system', 'updateMember', 'Members', p.memberId, '');
   return { success: true };
+}
+
+/* 成員自助登記「想考的章」（唔需要 members 權限）
+   ・只容許：成員本人、其家長、或有 members 權限嘅領袖
+   ・只寫 wantedBadges / wantedBadgesAt 兩欄，改唔到其他資料 */
+function handleSetWantedBadges_(p) {
+  var memberId = p.memberId;
+  if (!memberId) return { success: false, error: '缺少 memberId' };
+
+  var members = readTable_('Members');
+  var member = members.filter(function (m) { return getField_(m, 'memberId') === memberId; })[0];
+  if (!member) return { success: false, error: '找不到成員' };
+
+  var opId = p.operatedBy || '';
+  var users = readTable_('Users');
+  var op = users.filter(function (u) { return getField_(u, 'userId') === opId; })[0];
+  var opRole = op ? String(getField_(op, 'role')) : '';
+  // ★ 角色清單必須同 lib/model.ts 嘅 MANAGER_ROLES ＋ LEADER_ROLES 一致
+  //   （super_admin／troop_super／troop_leader／admin ＋ group_leader／branch_leader／coach）。
+  var isLeader = ['super_admin', 'troop_super', 'troop_leader', 'admin', 'group_leader', 'branch_leader', 'coach'].indexOf(opRole) >= 0;
+  var isSelf = String(getField_(op, 'memberId') || '') === memberId;
+  var isParent = String(getField_(member, 'parentUserId') || '') === opId;
+  if (!isLeader && !isSelf && !isParent) {
+    return { success: false, error: '只可以登記自己（或自己子女）想考的章。' };
+  }
+
+  // 只有幼童軍（b2）／童軍（b3）支部有呢個選單
+  var branchId = String(getField_(member, 'branchId') || '');
+  if (branchId !== 'b2' && branchId !== 'b3' && !isLeader) {
+    return { success: false, error: '你嘅支部冇「想考的章」選單，請直接同領袖講。' };
+  }
+
+  var value = String(p.wantedBadges || '').slice(0, 2000);
+  updateCellByName_('Members', 'memberId', memberId, 'wantedBadges', value);
+  updateCellByName_('Members', 'memberId', memberId, 'wantedBadgesAt', now_());
+  writeAudit_(opId || 'system', 'setWantedBadges', 'Members', memberId, value ? (value.split(/[|,;]/).length + ' 個章') : '（清空）');
+  return { success: true, wantedBadges: value };
+}
+
+/* ═══ 公開資料：三層模型（第 1 層：管理員開／關卡片）═══
+   三張卡各自獨立：calendar（行事曆）／albums（相簿）／notices（通告）。
+   ★ 開卡時預設把 troop（全旅內容）一齊公開 —— 全旅內容由管理員決定。
+   ★ 各支部內容唔會因為開卡而自動公開，要由該支部團長另外開放。 */
+function handleSetPublicCard_(p) {
+  var card = String(p.card || '');
+  if (['calendar', 'albums', 'notices'].indexOf(card) < 0) return { success: false, error: '未知的卡片' };
+
+  var opId = p.operatedBy || '';
+  var users = readTable_('Users');
+  var op = users.filter(function (u) { return getField_(u, 'userId') === opId; })[0];
+  if (!op) return { success: false, error: '未能確認操作者身份，請重新登入。' };
+  var opRole = String(getField_(op, 'role') || '');
+  if (['super_admin', 'troop_super', 'troop_leader', 'admin'].indexOf(opRole) < 0) {
+    return { success: false, error: '只有管理層可以開放公開資料卡片。' };
+  }
+
+  var on = parseBool_(p.enabled);
+  var key = 'PUBLIC_SCOPE_' + card.toUpperCase();
+  var cards = setInList_(getConfigValue_('PUBLIC_CARDS'), card, on);
+  var scopes = String(getConfigValue_(key) || '');
+  // 開卡而 scope 從未設定過 → 預設公開 troop（全旅內容）
+  if (on && parseArray_(scopes).length === 0) scopes = setInList_(scopes, 'troop', true);
+
+  setConfigValue_('PUBLIC_CARDS', cards);
+  setConfigValue_(key, scopes);
+  writeAudit_(opId || 'system', 'setPublicCard', 'SystemConfig', card, on ? '開放卡片' : '關閉卡片');
+  return { success: true };
+}
+
+/* ═══ 公開資料：三層模型（第 2 層：內容 scope）═══
+   troop（全旅內容）→ 只有管理層可以改
+   b1..b5（支部內容）→ 管理層，或該支部自己嘅團長／支部領袖／教練員 */
+function handleSetPublicScope_(p) {
+  var card = String(p.card || '');
+  var scope = String(p.scope || '');
+  if (['calendar', 'albums', 'notices'].indexOf(card) < 0) return { success: false, error: '未知的卡片' };
+  if (!scope) return { success: false, error: '缺少範圍' };
+
+  var opId = p.operatedBy || '';
+  var users = readTable_('Users');
+  var op = users.filter(function (u) { return getField_(u, 'userId') === opId; })[0];
+  if (!op) return { success: false, error: '未能確認操作者身份，請重新登入。' };
+  var opRole = String(getField_(op, 'role') || '');
+  var ownBranch = String(getField_(op, 'branchId') || '');
+  var adminTier = ['super_admin', 'troop_super', 'troop_leader', 'admin'].indexOf(opRole) >= 0;
+  var branchScoped = ['group_leader', 'branch_leader', 'coach'].indexOf(opRole) >= 0;
+
+  if (scope === 'troop') {
+    if (!adminTier) return { success: false, error: '全旅內容只可以由管理層決定公唔公開。' };
+  } else if (!adminTier && !(branchScoped && ownBranch && ownBranch === scope)) {
+    return { success: false, error: '只可以開放自己支部嘅內容。' };
+  }
+
+  var key = 'PUBLIC_SCOPE_' + card.toUpperCase();
+  var next = setInList_(getConfigValue_(key), scope, parseBool_(p.enabled));
+  setConfigValue_(key, next);
+  writeAudit_(opId || 'system', 'setPublicScope', 'SystemConfig', card + '/' + scope, parseBool_(p.enabled) ? '公開' : '取消公開');
+  return { success: true };
+}
+
+/* 把一個值加入／移出 comma list（troop 排最前，其餘按字母排序） */
+function setInList_(current, value, on) {
+  var list = parseArray_(String(current || ''));
+  var has = list.indexOf(value) >= 0;
+  if (on && !has) list.push(value);
+  if (!on && has) list.splice(list.indexOf(value), 1);
+  list.sort(function (a, b) {
+    if (a === 'troop') return -1;
+    if (b === 'troop') return 1;
+    return a < b ? -1 : (a > b ? 1 : 0);
+  });
+  return list.join(',');
 }
 
 function handleLinkParent_(p) {

@@ -24,6 +24,8 @@ export default function Parent(){
   const parent=s.users.find(u=>u.id===(session?.userId))||s.users.find(u=>u.role==='parent');
   if(!parent)return <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 text-sm text-slate-600">找不到家長帳號。</div>;
   const children=s.members.filter(m=>(parent.childMemberIds||[]).includes(m.id)||m.parentUserId===parent.id);
+  // 🎖️ 只有幼童軍（b2）／童軍（b3）有「想考的章」選單
+  const badgeKids=children.filter(c=>c.branchId==='b2'||c.branchId==='b3');
   const stats=personActivityStats(s,children);
   // 家長報名＝簽署：用家長帳戶登入回覆，無需再簽通告回條
   // ★ 家長只有「參加 / 不參加」。「❤️ 有興趣」係成員專用（成員向家長及領袖表達意見，
@@ -179,6 +181,38 @@ export default function Parent(){
             </Panel>
           );
         })
+      )}
+
+      {/* 🎖️ 想考的章：只有幼童軍（b2）／童軍（b3）子女有選單，家長可以代揀 */}
+      {badgeKids.length > 0 && (
+        <Panel
+          icon="🎖️"
+          title="想考的章"
+          subtitle="由訓練綱要嘅活動／專科徽章入面揀，登記後領袖會安排考核（進度性獎章唔喺呢度揀）"
+          tone="amber"
+          count={`${badgeKids.length} 名子女`}
+        >
+          <div className="grid gap-2">
+            {badgeKids.map(c => {
+              const n = String(c.wantedBadges || '').split(/[|,;]/).map(x => x.trim()).filter(Boolean).length;
+              return (
+                <Link
+                  key={c.id}
+                  href={`/badges?member=${c.id}`}
+                  className="no-underline text-inherit rounded-xl border border-slate-200 bg-slate-50/60 px-3.5 py-3 flex items-center justify-between gap-2 hover:border-amber-300 hover:bg-white transition"
+                >
+                  <span className="min-w-0">
+                    <span className="block font-bold text-slate-800">{c.name}</span>
+                    <span className="block text-sm text-slate-500 font-semibold">
+                      {n ? `已登記 ${n} 個章 · 撳入去修改` : '未登記 · 撳入去揀想考的章'}
+                    </span>
+                  </span>
+                  <span className="text-slate-300 font-black text-xl">→</span>
+                </Link>
+              );
+            })}
+          </div>
+        </Panel>
       )}
 
       {/* 家長唔需要「我的工具」（行事曆／活動同底部按鈕重覆）→ 直接換成子女出席紀錄 */}
