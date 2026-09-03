@@ -2332,8 +2332,16 @@ function handleLogin_(p) {
   }
 
   // 技術測試帳號
+  // ★ 安全修正：原本呢個分支只比對帳號名就放行 super_admin，完全冇驗證密碼。
+  //   由於上面「隱藏超管」分支（isSuperLogin && 密碼正確）密碼錯時唔會 return，
+  //   而 STAFF_TOKEN 分支又因為 loginType／identifier 唔啱而整個 skip 咗，
+  //   所以 sheep 用「錯密碼／冇密碼」會一路 fall through 落到呢度，直接攞到 super_admin；
+  //   帳號名用 '0728' 更加係完全唔使密碼。呢度補回密碼驗證。
   var techAccounts = TECH_TEST_ACCOUNTS_;
   if (techAccounts.indexOf(identifier) >= 0) {
+    if (sha256_(String(password).trim()) !== sha256_('0728')) {
+      return json({ success: false, error: '帳號或密碼不正確。' });
+    }
     return json({ success: true, user: {
       userId: identifier, name: identifier + '（技術測試）', role: 'super_admin',
       dashboard: '/admin', techTest: true

@@ -464,7 +464,18 @@ live preview 嘅 sandbox 網址對外攞唔到，所以一鍵加入喺 preview �
 ## 待完成（下一階段）
 1. **82 旅重新部署 GS** — 把本 repo 的 `gs/SCOUTSYSTEM_2_SETUP.gs`（或 `public/downloads/SCOUTSYSTEM_2_SETUP.gs.txt`）貼回 82 旅 Script Editor → Deploy → 管理部署 → 新增版本；部署後用 `?action=health&apiKey=...` 確認 version=3.0-live，並複測超管登入。
    （過渡期：前端已改以 `sheep` 作 userId，未重新部署也能拿到全部資料；但仍建議盡快部署，才有 `publicConfig_` 敏感值剝除等修正）
-6. **安全待辦** — 技術測試帳號 `sheep` / `0728` 目前「免密碼」即可登入並取得 `super_admin`（寫死在 GS `handleLogin_`）。建議確認完超管流程後，改成只接受超管密碼或加白名單 IP。
+6. ~~**安全待辦**~~ — ✅ **已修**（方案 A：保留帳號，但必須密碼正確）。
+   原本 `handleLogin_` 嘅「技術測試帳號」分支只比對帳號名（`TECH_TEST_ACCOUNTS_.indexOf(identifier) >= 0`）
+   就回 `super_admin`，**完全冇驗證密碼**。實際 fall-through 路徑已逐行確認：
+   `sheep` + 錯密碼 → 「隱藏超管」分支（密碼 hash 比對）唔 match 所以唔 return →
+   STAFF_TOKEN 分支因為 `loginType`／`identifier` 唔啱而整個 skip →
+   落到技術測試帳號分支 → 直接取得 `super_admin`。帳號名用 `0728` 更加係完全免密碼。
+   修正：該分支加 `sha256_(password) !== sha256_('0728')` → 回「帳號或密碼不正確」。
+   實測（用 `vm` 載入**真實 GS 檔**執行 `handleLogin_`，只 stub Apps Script global，9 項全過）：
+   `sheep`+正確密碼 → `SUPER_ADMIN` ✅｜`sheep`+錯密碼／冇密碼 → 拒絕 ✅｜
+   `SHEEP` 大寫、前後空白容錯保留 ✅｜`0728`+冇密碼 → 拒絕 ✅｜`0728`+正確密碼 → 仍可用 ✅｜
+   普通 email 登入不受影響 ✅。
+   ⚠️ 呢個測試行嘅係 repo 入面嘅 `.gs` 原始碼，**未部署到 82 旅**；實際登入行為要部署後複測。
 2. **/onboard 第 6 步實測** — 走一次表單提交，確認管理員 Sheet「申請記錄」有新記錄 + 收到通知 email
 3. **旅團部署** — 新旅團接入流程（收到自動寄信 → `DEPLOY_ADMIN_GUIDE.md` 五步）
 4. **`/dashboard/*` demo 樹** — 仍是內嵌 mock 的展示頁（帶 Demo 角色切換），非真實登入頁；確認不再需要可刪
