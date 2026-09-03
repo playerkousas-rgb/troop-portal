@@ -56,6 +56,12 @@ GS `doGet` 新增以下讀取 action（回傳 `{ success, state }`，state 只�
 1. **🔴 SUPER_ADMIN 角色斷裂** — sheep 登入回傳 userId `SUPER_ADMIN`，但 `buildDashboardCore_` 只在 `TECH_TEST_ACCOUNTS_`（當時係 `['sheep','0728']`）認技術帳號，導致超管（及 `staff_token`）登入後被當 guest、全頁空白，grantFeature / 批量開戶權限校驗也拒絕。已加內建帳號解析 + `isPrivilegedOperator_`。
    （注：`'0728'` 其實係 sheep 嘅**密碼**，唔係帳號名，後來已從 list 移除 —— 見下面「安全待辦」）
 2. **🔴 config 洩漏敏感值** — 所有回傳 state 的 `config` 含 `STAFF_TOKEN`、`INITIAL_ADMIN_PW` 明文、`API_KEY_HASH`、`SUPER_ADMIN_HASH`、`SUPER_ADMIN_USER`（未登入也可见）。已加 `publicConfig_()` 集中剝除（敏感 key 表 + 正則兜底）。
+   **已實測確認有效**（`node vm` 載入真實 GS，餵一個貼近真實 SystemConfig 嘅 config）：
+   7 個 `SENSITIVE_CONFIG_KEYS_`（1056 行）全部被剝除；正則兜底（1063 行）另外擋下
+   `FUTURE_SECRET`／`SOME_TOKEN_V2` 呢類未來新增嘅敏感欄位；正常設定（`TROOP_CODE`／
+   `PUBLIC_CARDS`／`REGISTRY_URL`）照常保留；`JSON.stringify` 後嘅輸出**冇出現任何一個
+   敏感值字串**。合計剝除 9 個 key、保留 6 個。
+   ⚠️ 呢個修正喺 GS 端，**未部署到 82 旅之前，線上回傳嘅 config 仍然會洩漏敏感值**。
 3. **🟡 API Key 複製防呆** — 「重新生成 API Key」彈窗字串雙重轉義（`\\\\n` → 顯示成字面 `\n`），選 key 時容易連同前面的 `n` 一起複製（本次實際事故）。已改用真換行 +「雙擊 key」提示；`doGet` 對 `apiKey` 先 `trim` 再比對。
 4. **🟡 新旅團接入提交** — `/onboard` 第 6 步由 mailto 改為直接 POST 到管理員的接收端 Apps Script（舊版 Scout Admin APP 的接收端，`AKfycbxj5BDD...`），寫入管理員 Sheet「申請記錄」+ Email 通知。旅團端看不到管理員 email，也不會從旅團帳號寄信（不會留對方寄件紀錄）。接收端通知信箱為 `ADMIN_EMAIL`（目前 playerkousas@hotmail.com，可在接收端腳本改）。
 5. 版本號已升 `3.0-live`（部署後 health 可驗證）。
