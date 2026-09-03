@@ -1771,15 +1771,120 @@ u_coach（coach）→ /admin  152 字        u_m14（member）→ /member  648 �
 **啱啱好咬到 5 個 member 帳戶，其餘 8 個仍然綠** —— 方向正確，證明呢個 check
 唔係永遠綠燈。還原後 `grep -c NEGCTRL` → 0，13/13 全綠。
 
-### check 總數：11 個
+### check 總數：12 個
 
 `check:gs` · `check:gscards`（17）· `check:gsroles`（55）· `check:perms`（47/47/18）
 · `check:public`（60）· `check:security`（125）· `check:links`（210）
-· `check:modules` · `check:calendar` · `check:render` · **`check:accounts`（13 個帳戶）**
+· `check:modules` · `check:calendar` · `check:render` · `check:accounts`（13 個帳戶）
+· **`check:pages`（61 個 route）**
 
-其中 4 個需要 live dev server：`check:modules` · `check:calendar` · `check:render` · `check:accounts`。
+其中 5 個需要 live dev server：`check:modules` · `check:calendar` · `check:render` · `check:accounts` · `check:pages`。
 
 ### 驗證
 
 `tsc` 0 error · `next build` exit 0 / **64 routes** · `npm run lint` 9 warnings /
-0 errors（同基線一致）· 11 個 check 全綠。
+0 errors（同基線一致）· 12 個 check 全綠。
+
+---
+
+## 2026-09-03 新增 `npm run check:pages` —— 全部 61 個 route 真正 render
+
+### 點解要做
+
+用戶要求「從新以不同帳戶檢測有沒有BUG 或矛盾地方」。盤點現有 render 類檢查後發現
+一個真實缺口：
+
+| 檢查 | 實際 render 嘅頁面 |
+|---|---|
+| `check:render` | `/admin/users` + demo 行事曆 |
+| `check:accounts` | `/admin`、`/parent`、`/member` |
+
+即係 **61 個 route 入面約 54 個從未喺任何測試 render 過**。一個白屏 bug 可以
+匿喺呢啲頁好耐而冇人發現。`check:pages` 用 jsdom 以 `u_admin`（可達 route 最多
+嘅角色）真正 render **每一個** route，斷言冇 exception 且 DOM 非平凡。
+
+結果：**61/61 全綠，16 秒**，冇發現產品 bug。
+
+### ★ 三個「紅燈其實係工具假象」—— 唔好一概而論
+
+第一次跑有 7 個 route 失敗，逐個查證後**全部唔係產品 bug**：
+
+| 現象 | 真正原因 | 性質 |
+|---|---|---|
+| 4 個 route `Cannot find module 'next/navigation'` | render hook 只 stub 咗 `next/link` | 工具缺口 → 新增 `scripts/stubs/next-navigation.tsx` |
+| `/attendance` `scrollIntoView is not a function` | jsdom 冇實作（實測 `typeof el.scrollIntoView === 'undefined'`） | 工具缺口 → 補 polyfill |
+| `/profile` 只有 34 字 | 表單頁：19 元素 / 4 控件，但 jsdom 入面 `<input>` 冇 `textContent` | **門檻設計錯** → 改用 DOM 元素數 |
+
+`/profile` 呢個特別值得記：**用「60 字」呢類純文字門檻會把正常嘅表單頁判做白屏**。
+量錯咗嘢。故 `check:pages` 嘅門檻係「≥3 個 DOM 元素 **且**（≥10 字 **或** ≥1 個
+表單控件）」。
+
+### ★★★ 最重要嘅教訓：mock hook 嘅**引用身份**必須穩定
+
+加咗 `next/navigation` stub 之後，route `/` **卡死**（>26 秒，記憶體一路涨，
+批次跑會 OOM）。根因唔係記憶體不足，而係**我自己寫嘅 stub 有 bug**：
+
+```js
+// ❌ 錯誤：每次 call 都回傳新物件
+export function useRouter() {
+  return { push, replace, back, forward, refresh, prefetch };
+}
+```
+
+而 `app/page.tsx:39` 同 `app/leader/page.tsx:44` 都係：
+
+```js
+useEffect(() => { …setState… }, [router]);
+```
+
+依賴項 `router` 嘅身份**每次 render 都變** → effect 每次 render 都重跑 →
+setState → 再 render → **無限循環**。真正嘅 Next `useRouter()` 回傳穩定引用。
+
+修法：把物件提升到 module 層級，`useRouter()` 每次回傳同一個物件。
+修完 `/` 由卡死變成 **2 秒**。
+
+> ★ 寫任何 mock/stub hook 時，**回傳值必須係穩定引用**（module 層級常量或
+>   `useMemo`）。身份不穩會令所有 `useEffect(…, [該值])` 變成無限循環，
+>   表現為「卡死／OOM」而唔係明顯嘅 error，極難 debug。
+
+### ★ 診斷過程入面兩個易錯嘅假象
+
+1. **「OOM」唔等於記憶體不足。** 批次跑 333 秒後被殺、stderr 有 `out of memory`
+   字樣，睇落似記憶體問題；實際係上面嘅無限循環。真正嘅對照係：
+   **同樣 8 個 route，手動跑 2 秒全綠，driver spawn 就 333 秒** ——
+   同一份程式碼唔可能只差喺記憶體。
+2. **stdout 去 pipe 係 buffered，process 被 SIGKILL 時緩衝整個丟失。**
+   實測「收到 0 個結果」其實係輸出丟咗，唔代表冇 render。故 `check:pages`
+   除咗 stdout 仲會即時 `appendFileSync` 落 `PAGES_OUT` 檔案，driver 優先讀檔。
+
+### 設計：driver + worker 分批
+
+`check-pages.mjs` 同一個檔案兼任兩職：冇 `PAGES_BATCH` 時係 driver（掃描 route、
+分批 spawn），有 `PAGES_BATCH` 時係 worker（render 指定 route）。分批嘅理由係
+記憶體隔離；每個 child 有 **90 秒硬 timeout + SIGKILL**，並會報出「疑似卡死喺
+邊個 route」—— 今次就係靠呢個先定位到 route `/`。
+
+環境變數：`PAGES_BATCH_SIZE`（預設 8）· `PAGES_CHILD_TIMEOUT_MS`（預設 90000）
+· `PAGES_OUT`（結果落檔）· `PAGES_DEBUG`（印 mode / child stderr）。
+
+### 負對照（已驗證並還原）
+
+`app/updates/page.tsx` 注入 `if (true) return null;` → `check:pages` 正好
+**1 個失敗（60 通過）**，訊息係「DOM 0 元素 / 0 控件 / 0 字 —— 疑似白屏」，
+而 `/dashboard/updates` 冇被誤傷。還原後 `grep -rc NEGCTRL` = **0**。
+
+### 白名單
+
+`/leader` 只有 1 個 DOM 元素 —— 佢係純 client-side redirect 頁，render
+「正在前往你的控制台…」然後 `router.replace(dashboardFor(role))`，
+**設計如此**（見 `app/leader/page.tsx` 註解）。已喺 `ALLOWLIST` 加註理由。
+
+### check 總數：12 個（5 個需要 live dev server）
+
+新增後：`check:gs` · `check:gscards`（17）· `check:gsroles`（55）· `check:perms`
+· `check:public`（60）· `check:security`（125）· `check:links`（210）
+· `check:modules` · `check:calendar` · `check:render` · `check:accounts`（13 個帳戶）
+· **`check:pages`（61 個 route）**
+
+需要 dev server 嘅 5 個：`check:modules` · `check:calendar` · `check:render`
+· `check:accounts` · `check:pages`。

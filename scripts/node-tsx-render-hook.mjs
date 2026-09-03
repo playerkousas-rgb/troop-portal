@@ -28,9 +28,15 @@ function toFile(specifier) {
 
 registerHooks({
   resolve(specifier, context, nextResolve) {
-    // 0. Next 專屬模組 stub —— `next/link` 喺 Next runtime 之外 resolve 唔到
+    // 0. Next 專屬模組 stub —— `next/link` / `next/navigation` 喺 Next runtime 之外
+    //    resolve 唔到（node_modules 入面冇 ESM entry）。冇呢兩個 stub 嘅話，
+    //    /admin/registrations、/leader、/library/import、/login 四個 route
+    //    喺 render 測試會直接炸。
     if (specifier === 'next/link') {
       return { url: pathToFileURL(path.join(ROOT, 'scripts/stubs/next-link.tsx')).href, shortCircuit: true, format: 'module' };
+    }
+    if (specifier === 'next/navigation') {
+      return { url: pathToFileURL(path.join(ROOT, 'scripts/stubs/next-navigation.tsx')).href, shortCircuit: true, format: 'module' };
     }
 
     // 1. @/ alias
