@@ -1,5 +1,5 @@
 'use client';
-import { Role } from './model';
+import type { Role } from './model';
 export type Session = { userId: string; name: string; role: Role; troopCode: string; troopName: string; branchId?: string; memberId?: string; age?: number; dashboard?: string; iat?: number };
 
 /** 角色 → 登入後的首頁。與 /login 原本的導向規則完全一致，只是抽出來共用，

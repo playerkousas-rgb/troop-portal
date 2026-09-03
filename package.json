@@ -12,7 +12,8 @@
     "check:modules": "node --no-warnings=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/check-admin-modules.mjs",
     "check:calendar": "node --no-warnings=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/check-calendar-scope.mjs",
     "check:public": "node --no-warnings=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/node-ts-resolve.mjs --experimental-strip-types scripts/check-public-cards.mjs",
-    "check:security": "node --no-warnings=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/node-ts-resolve.mjs --experimental-strip-types scripts/check-reserved-roles.mjs"
+    "check:security": "node --no-warnings=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/node-ts-resolve.mjs --experimental-strip-types scripts/check-reserved-roles.mjs",
+    "check:links": "node --no-warnings=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/node-ts-resolve.mjs --experimental-strip-types scripts/check-route-links.mjs"
   },
   "dependencies": {
     "@tailwindcss/postcss": "^4.3.3",

@@ -6,6 +6,8 @@ import { branches } from '@/lib/model';
 import { badgeSchemeFor, parseWantedBadges } from '@/lib/badges';
 import { useConfirm, kv } from '@/components/ConfirmProvider';
 import Auth from '@/components/Auth';
+import { getSession } from '@/lib/session';
+import { canAccessRoute } from '@/lib/routeAccess';
 
 function roleLabel(r?:string){return r==='leader'?'隊長':r==='deputy'?'副隊長':r==='member'?'隊員':'—'}
 function branchName(id?:string){return branches.find(b=>b.id===id)?.short||id||'—'}
@@ -25,6 +27,8 @@ function wantedBadgesCell(c: AppState['members'][number]) {
 }
 
 export default function Page(){
+  // ★ link 守衛要用：呢頁 gate 收教練員，但「批量開戶」條 link 去嘅 /admin/users 唔收
+  const session = typeof window === 'undefined' ? null : getSession();
   const [s,setS]=useState<AppState|null>(null);
   const [err,setErr]=useState('');
   const [showAdd,setShowAdd]=useState(false);
@@ -141,7 +145,10 @@ export default function Page(){
     <section className="hero"><span className="badge gold">成員資料庫</span><h1>成員資料庫</h1><p>新增、編輯、刪除成員，指派支部 / 小隊，並連結家長。</p></section>
     {err&&<p className="badge red">{err}</p>}
 
-    <div className="row"><button className="btn primary" onClick={()=>setShowAdd(!showAdd)}>{showAdd?'取消':'＋ 新增成員'}</button><a className="btn gold" href="/admin/users#bulk-onboard">📥 批量開戶 / 匯入成員</a></div>
+    {/* ★ 「批量開戶」要去 /admin/users，但嗰頁 gate 唔收教練員（ROUTE_ROLES['/admin/users']）。
+        呢頁 gate 收教練員，所以條 link 必須自己守 —— 否則教練員撳落去撞「未獲授權」牆。
+        用 canAccessRoute() 而唔係另抄一份角色列表，咁兩邊先唔會 drift。 */}
+    <div className="row"><button className="btn primary" onClick={()=>setShowAdd(!showAdd)}>{showAdd?'取消':'＋ 新增成員'}</button>{canAccessRoute('/admin/users', session?.role)&&<a className="btn gold" href="/admin/users#bulk-onboard">📥 批量開戶 / 匯入成員</a>}</div>
 
     {showAdd&&<section className="card stack"><h3>新增成員</h3>
       <div className="grid">

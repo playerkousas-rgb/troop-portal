@@ -847,6 +847,82 @@ group_leader / branch_leader / coach / parent / member
 普通成員角色冇被搞到；`createdAt` 都缺失時用 `userId` 打破平手。
 負對照：癱瘓 `enforceSingleTroopLeader_` → 4 項失敗，還原後 105 項全綠。
 
+## 2026-09-03 全 repo 連結審計：4 條真斷連結 ＋ `lib/routeAccess.ts`
+
+用戶要求「從新以不同帳戶檢測有沒有 BUG 或矛盾地方，各卡之間的連結有沒有破壞」。
+
+### 審計方法（全部用程式跑，唔係用眼睇）
+
+| 層 | 做咗乜 | 結果 |
+|---|---|---|
+| A | 抽出全 repo 53 個內部路徑引用，對比 60 條 fs route | 4 個「唔存在」全部都係 `public/downloads/` 靜態檔案，經 HTTP 實測 **4/4 都係 200** → 冇斷連結 |
+| B | 底部導航（per-role）× 目標頁 `<Auth>` gate | **0 斷** |
+| C | 管理中心 8 張卡 × 角色 feature（經真實 mock API 攞 `userFeatures`）× 目標頁 gate | **0 斷** |
+| D | **頁→頁** 全部對外連結 × 「源頁可達」× 目標頁 gate = **601 條組合** | **18 條候選** |
+| E | 18 條候選逐個查實際渲染條件（靜態掃描分唔到條件渲染） | **16 條假陽性 ＋ 4 條真 bug** |
+
+### 4 條真斷連結（全部同一個根因）
+
+每頁嘅 `<Auth roles={[...]}>` 同每條 link 嘅顯示條件**各自 hardcode 角色列表**，兩邊 drift：
+
+1. **`/admin/members`（gate 收 coach）→ `/admin/users`（gate 唔收 coach）**
+   條「📥 批量開戶 / 匯入成員」link **完全冇守衛** → 教練員撳落去撞「未獲授權」牆。
+2. **`/equipment`（冇 gate）→ `/admin/equipment`（gate 唔收 coach）**
+   用 `LEADER_ROLES`（**包** coach）決定 show 唔 show「🛠️ 物資管理」掣 → 同一個牆。
+3./4. **`/leader` → `/admin`**
+   `/leader` 冇 gate 就 `redirect('/admin')`，家長／成員跟舊書籤入嚟撞牆
+   （明明佢哋自己有 `/parent` `/member`）。
+
+`components/Auth.tsx` 被拒時顯示「🔒 此功能需要團長授權」死胡同頁，
+所以用戶係**撞牆**而唔係静默失敗 —— 但一樣係壞咗嘅體驗。
+
+### 修法：`lib/routeAccess.ts` 做單一真相來源
+
+- `ROUTE_ROLES`：每個 route 邊啲角色入到（同 17 個實際 `<Auth>` gate **逐項驗證過完全一致**）
+- `ROUTE_ROLE_SETS`：語義化組合（`ADMIN_ONLY` / `ADMIN_AND_BRANCH` / `ADMIN_BRANCH_COACH` / `ALL_LOGGED_IN`）
+- `canAccessRoute(path, role)`：link 守衛用呢個，唔好另抄角色列表
+
+三個檔案改用佢：`app/admin/members/page.tsx`（補 `getSession` + 守衛）、
+`app/equipment/page.tsx`（新增 `canManageEquipment`）、
+`app/leader/page.tsx`（**改成 client component** 用 `dashboardFor(role)`）。
+
+⚠️ `/leader` 必須係 **client** component：session 只存喺 `localStorage`
+（`SESSION_KEY='scoutsystem2_current_user'`），server component 讀唔到，
+而呢個 repo **冇**把 role 鏡像落 cookie。我第一版誤用咗一個自己作嘅
+`scoutsystem2_role` cookie —— `grep` 證實全 repo 冇呢樣嘢，咁寫會令**所有人**
+被當未登入送去 `/login`，比原本個 bug 更差。
+
+### 新增 `npm run check:links`（141 項斷言）
+
+防止再 drift。四節：
+- §1 每頁 `<Auth roles>` 必須同 `ROUTE_ROLES` 完全一致（17 頁）
+- §2 `ROUTE_ROLES` 冇懸空登記（每個 route 都要真係有 `page.tsx`）
+- §3 全 repo 53 個內部路徑必須存在（app route 或 `public/` 靜態檔案）
+- §4 `/leader` 唔可以再無條件 redirect；並驗證 8 個角色嘅 `dashboardFor()` 目標都收自己
+
+**兩個負對照都驗證過並已還原**：
+- 把 `/leader` 改返舊版 `redirect('/admin')` → **3 項失敗**
+- 把 `coach` 加入 `/admin/equipment` gate（模擬 drift）→ **1 項失敗**（§1 抓到）
+
+⚠️ §4 嘅 regex 必須**剝走註釋**先至 match —— `app/leader/page.tsx` 嘅文件註釋
+刻意寫低咗舊行為 `redirect('/admin')` 做解說，直接 match 原文會**假失敗**（第一版中咗）。
+
+### 順帶證實冇問題嘅位（避免下次重複查）
+
+- **`troop_leader` vs `admin` 可見範圍**：經真實 HTTP 逐個 key 比對，**20 個 key 全部一致**
+  → 用戶決定「旅長 ≥ 管理員」喺讀取層面成立。
+- **`photos` feature**：唔係懸空引用，係 `OPT_IN_FEATURES` 入面嘅正規 opt-in feature，
+  經 `USER_SCOPED_GRANTS` 批咗俾 `u_gl3`／`u_bl`／`u_m1`／`u5`（刻意嘅 seed 資料）。
+- **`lib/registry.ts` 用另一套角色詞彙**（`leader` 而唔係 `group_leader`）：
+  經 `mapHubRoleToMinRole()` 轉做 `minRole`，再用 `ROLE_ORDER` 比較 ——
+  `ROLE_ORDER` 入面 `troop_leader` 喺 `admin` 之上，所以冇問題。
+- **`lib/permissions.ts:111-113`**：掃描命中但係**假陽性** —— 個陣列係
+  `assignableRoles()` 嘅**回傳值**（可指派邊啲角色），唔係權限檢查；L112 已經有 `troop_leader`。
+- **`app/dashboard/calendar/page.tsx:68`** `role === 'admin'`：係唯一一處狹窄比較，
+  會漏 `troop_leader`。但 `/dashboard/**` demo 樹嘅角色選擇器（L280）只提供
+  5 個角色、**冇 `troop_leader`**，而 `role` 係本地 state → **唔可達**，
+  屬 latent 不一致而唔係 live bug。**未修**（要修就要連 demo 樹一齊加旅長選項）。
+
 ### 仍需人手做（呢個環境做唔到）
 
 - **82 旅重新部署 GS** —— 上面所有 GS 修正**喺重新部署之前全部係 inert**。
