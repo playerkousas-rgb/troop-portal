@@ -1584,3 +1584,127 @@ kind=toggle  target=u_adm2 → 管理員之間只能加不能減：不可以停�
 **`check:security` 125** · `check:links` 210 · `check:modules` ·
 `check:calendar` · `check:render`。
 GS 251,416 bytes，同 `public/downloads/` 副本 `cmp` 一致。
+
+---
+
+## 2026-09-03 ★★★ 第四條路 `updatePassword` —— 最嚴重嘅一條
+
+### 點解呢條最嚴重
+
+前三條路（改 role／刪除／停用）都係「管理員直接動手」。但改密碼係
+**身份接管**：攻擊者設咗旅長嘅密碼之後可以直接登入做旅長，
+咁樣 `role`／`delete`／`toggle` 三條守衛**全部形同虛設** ——
+因為攻擊者已經變成咗旅長本人。
+
+### 漏洞
+
+`handleUpdatePassword_`（L2590 起，修正前）：
+```js
+var userId = p.userId || p.operatedBy;   // ← p.userId 直接決定改邊個
+var userIdx = findRowIndexById_('Users', 'userId', userId);
+if (userIdx >= 0) {
+  updateCellByName_('Users', 'userId', userId, 'password', newPw);
+```
+冇任何守衛，亦冇驗證操作者係咪本人。
+
+**更嚴重：`updatePassword` 唔喺 `ACTION_REQUIRED_FEATURE_`**，所以
+`checkActionPermission_`（L1921 `if (!required) return null`）**直接放行**
+—— 即係完全冇權限檢查。
+
+實測証明（`check:gsroles` C4 節，經 `doGet` 驅動）：
+```
+{action:'updatePassword', operatedBy:'u_m4', userId:'u_tl', newPassword:'hacked123'}
+→ success=true，旅長密碼變 'hacked123'
+```
+**連普通成員都可以設旅長嘅密碼。** 呢個唔係「管理員越權」，
+而係「任何有 API key 嘅人都可以接管全旅最高權限」。
+
+### 點解隱形咗咁耐
+
+mock 側 `case 'updatePassword': return S(ob);` 係**刻意 no-op**（唔寫密碼）。
+所以 demo 側永遠唔會觸发改密碼嘅行為 —— 開發時日常跑嘅嗰個後端
+根本冇呢個 code path。已喺 mock 加註解警告：
+日後如果要令 mock 真係寫密碼，**必须一併加返同一個守衛**。
+
+### 修正
+
+`gs/…gs:2606-2637` `handleUpdatePassword_`：
+```js
+if (userId && userId !== operatedBy) {
+  // 操作者必須係 super_admin／troop_leader／admin
+  if (['super_admin','troop_leader','admin'].indexOf(opRole) < 0)
+    return { success: false, error: '只有管理層可以重設其他用戶嘅密碼。' };
+  var peer = checkAdminPeerGuard_(p, 'password');   // 再擋管理層目標
+  if (peer) return peer;
+}
+```
+`checkAdminPeerGuard_` 加 `'password'` kind（拒絕訊息：「重設…嘅密碼」）。
+
+**★ 點解唔可以直接加進 `ACTION_REQUIRED_FEATURE_`：**
+咁樣會連**自助改密碼**都擋住（成員／家長冇 `users` feature）。
+所以條件要放喺 handler 入面 —— 自助（`userId === operatedBy`）照放行。
+
+**★ 正常 UI 唔受影響**（已核實）：`lib/api.ts:114` 淨係送 `{ newPassword }`，
+**從來唔送 `userId`** —— 即係前端一直都係自助流程。冇獨立嘅 `resetPassword` action。
+
+### 驗證
+
+`check:gsroles` 由 45 升到 **55 項斷言**（新增 C4 節，11 個）：
+
+| 斷言 | 結果 |
+|---|---|
+| 成員唔可以改旅長嘅密碼 | ✅ 拒絕 |
+| 管理員唔可以改旅長嘅密碼 | ✅ 拒絕 |
+| 管理員唔可以改其他管理員嘅密碼 | ✅ 拒絕 |
+| 對照：自己改自己密碼 | ✅ 可以 |
+| 對照：唔送 `userId` 時改自己密碼 | ✅ 可以 |
+| 對照：管理員幫成員重設密碼 | ✅ 可以（peer guard 只擋管理層） |
+| 旅長可以改管理員密碼 | ✅ 可以（唔受限） |
+
+**Negative control（第 17 個）：**`if (false)` 癱瘓守衛
+→ **恰好 6 項變紅**（三組各 2 項），旅長密碼變 `'hacked123'`；
+還原後 `grep -c NEGCTRL` → 0，`cmp` 同副本一致，55/0 返綠。
+
+### ★ 五個守衛嘅最終位置
+
+```
+grep -n "checkAdminPeerGuard_(p," gs/SCOUTSYSTEM_2_SETUP.gs
+  2634  handleUpdatePassword_   'password'
+  3442  handleToggleUser_       'toggle'
+  3673  handleUpdateUserRole_   'role'
+  3788  handleUpdateUserField_  'role'（只喺 field='role' 時）
+  3798  handleDeleteUser_       'delete'
+```
+
+四種 kind 嘅拒絕訊息已逐一核實（唔靠記憶）：
+`更改…嘅角色`／`刪除…嘅帳號`／`停用…嘅帳號`／`重設…嘅密碼`。
+
+### ★ 教訓（累積，今輪新增第 6、7 條）
+
+1. 「測試綠燈」只証明測咗嗰條路。
+2. 萬用寫入 endpoint 係守衛嘅天然缺口。
+3. 前後端落差反覆出現 —— mock 同 GS 要逐一對比。
+4. 撞啱搵到嘅 bug 代表仲有未搵到嘅 —— 要做系統性 enumerate。
+5. harness 嘅型別轉換要同被測系統一致（Sheet 一切都係字串）。
+6. **mock 嘅 no-op 會掩蓋 GS 嘅漏洞。** 呢個洞隱形咁耐，正正因為
+   demo 後端冇實作改密碼 —— 開發時永遠撞唔到。
+7. **「身份接管」比「權限修改」更根本。** 審計權限時唔好淨係睇
+   「邊個可以改 role」，要問「有冇辦法**變成**嗰個人」。
+   改密碼、改 email、改 memberId 呢類都係同一類。
+
+### 驗證（全套）
+
+`tsc` 0 error · `next build` exit 0 / 64 routes · `npm run lint` 9 warnings / 0 errors
+（同基線一致）· **10 個 check 全綠**：`check:gs` · `check:gscards` 17 ·
+**`check:gsroles` 55** · `check:perms` 47/47/18 · `check:public` 60 ·
+`check:security` 125 · `check:links` 210 · `check:modules` ·
+`check:calendar` · `check:render`。
+GS 253,756 bytes，同 `public/downloads/` 副本 `cmp` 一致。
+
+### ⚠️ 82 旅 live 檢查（更新）
+
+四條路都係**已存在**嘅漏洞（唔係今次引入）。重新部署後請：
+1. 開 `Users` 表，確認 `role='troop_leader'` **恰好一行**
+2. 確認旅長嘅 `password` 同 `approved` 冇被改過嘅痕跡
+3. 睇 `AuditLog` 有冇可疑嘅 `updateUserField role=…`／`toggleUser`／`updatePassword` 紀錄
+4. **如果懷疑旅長帳號被接管過，請即刻改旅長密碼**

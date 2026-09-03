@@ -320,6 +320,71 @@ ok('旅長可以停用管理員（唔受「只能加不能減」限制）',
   `approved=${approvedOf('u_adm2')}｜${JSON.stringify(rt)}`);
 
 // ══════════════════════════════════════════════════════════════
+console.log('\n【C4. 第四條路：updatePassword 改人哋密碼】\n');
+/**
+ * ★ handleUpdatePassword_（L2590-2600）：
+ *     var userId = p.userId || p.operatedBy;   ← p.userId 直接決定改邊個
+ *     updateCellByName_('Users', 'userId', userId, 'password', newPw);
+ *   冇任何 peer guard，亦冇驗證操作者係咪本人。
+ *
+ *   更嚴重：updatePassword **唔喺** ACTION_REQUIRED_FEATURE_，所以
+ *   checkActionPermission_ L1921（if (!required) return null）直接放行 ——
+ *   即係**完全冇權限檢查**，任何有 API key 嘅人（包括普通成員）都可以調用。
+ *
+ *   後果：攻擊者設咗旅長嘅密碼之後就可以直接登入做旅長，
+ *   咁樣前面三條守衛（role／delete／toggle）**全部形同虛設** ——
+ *   因為攻擊者已經變成咗旅長本人。呢個比改 role 更根本。
+ *
+ *   mock 側 updatePassword 係 no-op（return S(ob)），所以 mock 一直冇暴露呢個行為。
+ */
+const pwOf = (id) => { const u = U(id); return u ? String(u.password ?? '') : null; };
+
+// 1. 成員改旅長密碼（最嚴重：連管理層都唔使係）
+resetUsers(); T = TABLES(); AUDIT = [];
+let rp = call({ action: 'updatePassword', operatedBy: 'u_m4', userId: 'u_tl', newPassword: 'hacked123' });
+ok('★ 成員唔可以改旅長嘅密碼', rp.success === false, JSON.stringify(rp));
+ok('  → 旅長密碼冇被改', pwOf('u_tl') !== 'hacked123', `實際 = ${JSON.stringify(pwOf('u_tl'))}`);
+
+// 2. 管理員改旅長密碼
+resetUsers(); T = TABLES();
+rp = call({ action: 'updatePassword', operatedBy: 'u_admin', userId: 'u_tl', newPassword: 'hacked123' });
+ok('★ 管理員唔可以改旅長嘅密碼（否則所有 peer guard 形同虛設）',
+  rp.success === false, JSON.stringify(rp));
+ok('  → 旅長密碼冇被改', pwOf('u_tl') !== 'hacked123', `實際 = ${JSON.stringify(pwOf('u_tl'))}`);
+
+// 3. 管理員改其他管理員密碼
+resetUsers(); T = TABLES();
+rp = call({ action: 'updatePassword', operatedBy: 'u_admin', userId: 'u_adm2', newPassword: 'hacked123' });
+ok('★ 管理員唔可以改其他管理員嘅密碼', rp.success === false, JSON.stringify(rp));
+ok('  → 對方密碼冇被改', pwOf('u_adm2') !== 'hacked123', `實際 = ${JSON.stringify(pwOf('u_adm2'))}`);
+
+// 4. 對照：自己改自己密碼應該可以（正常自助流程）
+resetUsers(); T = TABLES();
+rp = call({ action: 'updatePassword', operatedBy: 'u_m4', userId: 'u_m4', newPassword: 'myNewPw1' });
+ok('對照：自己改自己密碼可以', rp.success === true && pwOf('u_m4') === 'myNewPw1',
+  `pw=${JSON.stringify(pwOf('u_m4'))}｜${JSON.stringify(rp)}`);
+
+// 5. 對照：唔送 userId（即 p.operatedBy fallback）都應該可以
+resetUsers(); T = TABLES();
+rp = call({ action: 'updatePassword', operatedBy: 'u_gl', newPassword: 'glNewPw1' });
+ok('對照：唔送 userId 時改自己密碼可以', rp.success === true && pwOf('u_gl') === 'glNewPw1',
+  `pw=${JSON.stringify(pwOf('u_gl'))}｜${JSON.stringify(rp)}`);
+
+// 6. 對照：管理員幫成員重設密碼應該可以（忘記密碼流程）
+resetUsers(); T = TABLES();
+rp = call({ action: 'updatePassword', operatedBy: 'u_admin', userId: 'u_m4', newPassword: 'reset456' });
+ok('對照：管理員可以幫成員重設密碼（peer guard 只擋管理層）',
+  rp.success === true && pwOf('u_m4') === 'reset456',
+  `pw=${JSON.stringify(pwOf('u_m4'))}｜${JSON.stringify(rp)}`);
+
+// 7. 旅長唔受限
+resetUsers(); T = TABLES();
+rp = call({ action: 'updatePassword', operatedBy: 'u_tl', userId: 'u_adm2', newPassword: 'tlSet789' });
+ok('旅長可以改管理員密碼（唔受「只能加不能減」限制）',
+  rp.success === true && pwOf('u_adm2') === 'tlSet789',
+  `pw=${JSON.stringify(pwOf('u_adm2'))}｜${JSON.stringify(rp)}`);
+
+// ══════════════════════════════════════════════════════════════
 console.log('\n【D. 「全旅只有一個旅長」不變量（enforceSingleTroopLeader_）】\n');
 /**
  * 多個 legacy troop_super 行會被 normalizeRole_ 全部歸一成 troop_leader

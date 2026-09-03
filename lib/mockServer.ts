@@ -1288,6 +1288,19 @@ function handleMutate(action: string, p: Record<string, any>) {
       }
       return S(ob);
     }
+    /**
+     * ★ MOCK 呢度係刻意 no-op（唔寫密碼）—— 亦正正係點解 GS 嗰個洞
+     *   隱形咗咁耐：demo 側永遠唔會觸發改密碼嘅行為。
+     *
+     * GS `handleUpdatePassword_` 原本用 `p.userId || p.operatedBy` 決定改邊個，
+     * 冇任何守衛，而且 updatePassword 唔喺 ACTION_REQUIRED_FEATURE_
+     * → 完全冇權限檢查 → 連普通成員都可以設旅長嘅密碼，
+     *   然後直接登入做旅長，令所有 peer guard 形同虛設。
+     * 已喺 GS 側修正（要求管理層 ＋ checkAdminPeerGuard_(p,'password')）。
+     * 驗證：scripts/check-gs-roles.mjs C4 節（經 doGet 真正執行 GS）。
+     *
+     * 如果日後要令 mock 真係寫密碼，**必须一併加返同一個守衛**。
+     */
     case 'updatePassword': return S(ob);
     case 'updateUserPermissions':
     case 'grantFeature':

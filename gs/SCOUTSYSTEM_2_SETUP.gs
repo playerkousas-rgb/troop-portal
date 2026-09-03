@@ -1881,10 +1881,13 @@ function checkAdminPeerGuard_(p, kind) {
    *   （停用咗嘅旅長做唔到 transferTroopLeader），所以一樣要擋。
    *   分开 kind 只係為咗拒絕訊息用字準確（「停用」唔好講成「刪除」）。
    */
-  var verb = kind === 'delete' ? '刪除' : (kind === 'toggle' ? '停用' : '更改');
-  var noun = kind === 'role' ? '角色' : '帳號';
+  var verb = kind === 'delete' ? '刪除'
+    : (kind === 'toggle' ? '停用'
+      : (kind === 'password' ? '重設' : '更改'));
+  var noun = kind === 'role' ? '角色' : (kind === 'password' ? '密碼' : '帳號');
   var act = kind === 'delete' ? 'deleteUser'
-    : (kind === 'toggle' ? 'toggleUser' : 'updateUserRole');
+    : (kind === 'toggle' ? 'toggleUser'
+      : (kind === 'password' ? 'updatePassword' : 'updateUserRole'));
   writeAudit_(operatedBy, 'DENIED:' + act, 'Security', '',
     'admin 試圖' + verb +
     (isTL ? '旅長' : '另一個管理員') + '嘅' + noun + '（只能加不能減）');
@@ -2588,10 +2591,50 @@ function handleLogin_(p) {
 }
 
 function handleUpdatePassword_(p) {
-  var userId = p.userId || p.operatedBy;
+  var operatedBy = String(p.operatedBy || '');
+  var userId = String(p.userId || operatedBy);
   var newPw = p.newPassword;
   if (!newPw) return { success: false, error: '請提供新密碼' };
-  
+
+  /**
+   * ★ 改**人哋**嘅密碼要有管理層權限 ＋ 過 peer guard（2026-09-03 修正）。
+   *
+   * 呢個係繞過「只能加不能減」嘅**第四條路，而且係最嚴重嘅一條**。
+   * 原本個 handler 係：
+   *     var userId = p.userId || p.operatedBy;
+   *     updateCellByName_('Users', 'userId', userId, 'password', newPw);
+   * —— p.userId 直接決定改邊個，冇任何守衛。
+   *
+   * 更嚴重：updatePassword **唔喺** ACTION_REQUIRED_FEATURE_，所以
+   * checkActionPermission_（L1921 `if (!required) return null`）直接放行
+   * —— 即係完全冇權限檢查。實測証明（check-gs-roles.mjs C4 節）：
+   *   {action:'updatePassword', operatedBy:'u_m4', userId:'u_tl', newPassword:'hacked123'}
+   *   → success=true。**連普通成員都可以設旅長嘅密碼。**
+   *
+   * 後果比改 role 更根本：攻擊者設咗旅長密碼之後可以直接登入做旅長，
+   * 咁樣 role／delete／toggle 三條守衛全部形同虛設 ——
+   * 因為攻擊者已經變成咗旅長本人。
+   *
+   * ★ 點解唔可以直接加進 ACTION_REQUIRED_FEATURE_：
+   *   咁樣會連自助改密碼都擋住（成員／家長冇 'users' feature）。
+   *   所以條件要放喺 handler 入面：自助（userId == operatedBy）照放行。
+   *
+   * ★ 正常 UI 唔受影響：lib/api.ts:114 淨係送 { newPassword }，
+   *   從來唔送 userId —— 即係前端一直都係自助流程。
+   */
+  if (userId && userId !== operatedBy) {
+    var opRow = readTable_('Users')
+      .filter(function (u) { return getField_(u, 'userId') === operatedBy; })[0];
+    var opRole = String(getField_(opRow, 'role') || '').toLowerCase();
+    if (['super_admin', 'troop_leader', 'admin'].indexOf(opRole) < 0) {
+      writeAudit_(operatedBy || 'anonymous', 'DENIED:updatePassword', 'Security', '',
+        'role=' + (opRole || '(匿名)') + ' 試圖重設 ' + userId + ' 嘅密碼（唔係管理層）');
+      return { success: false, error: '只有管理層可以重設其他用戶嘅密碼。' };
+    }
+    var peer = checkAdminPeerGuard_(p, 'password');
+    if (peer) return peer;
+  }
+
   // Try Users table
   var userIdx = findRowIndexById_('Users', 'userId', userId);
   if (userIdx >= 0) {
