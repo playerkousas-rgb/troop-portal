@@ -53,7 +53,8 @@ GS `doGet` 新增以下讀取 action（回傳 `{ success, state }`，state 只�
 已完成：proxy→GS 連線、login（超管/成員/帳號）、全部 slice（修剪驗證通過）、角色過濾（admin 全量/成員自見/guest 空）、寫入回路（create/publish/update/setReply/togglePaid/delete 全通過）、報名統計、審計日誌。
 
 測試中發現並已在 repo 修復（待 82 旅重新部署 GS 生效）：
-1. **🔴 SUPER_ADMIN 角色斷裂** — sheep 登入回傳 userId `SUPER_ADMIN`，但 `buildDashboardCore_` 只在 `TECH_TEST_ACCOUNTS_(['sheep','0728'])` 認技術帳號，導致超管（及 `staff_token`）登入後被當 guest、全頁空白，grantFeature / 批量開戶權限校驗也拒絕。已加內建帳號解析 + `isPrivilegedOperator_`。
+1. **🔴 SUPER_ADMIN 角色斷裂** — sheep 登入回傳 userId `SUPER_ADMIN`，但 `buildDashboardCore_` 只在 `TECH_TEST_ACCOUNTS_`（當時係 `['sheep','0728']`）認技術帳號，導致超管（及 `staff_token`）登入後被當 guest、全頁空白，grantFeature / 批量開戶權限校驗也拒絕。已加內建帳號解析 + `isPrivilegedOperator_`。
+   （注：`'0728'` 其實係 sheep 嘅**密碼**，唔係帳號名，後來已從 list 移除 —— 見下面「安全待辦」）
 2. **🔴 config 洩漏敏感值** — 所有回傳 state 的 `config` 含 `STAFF_TOKEN`、`INITIAL_ADMIN_PW` 明文、`API_KEY_HASH`、`SUPER_ADMIN_HASH`、`SUPER_ADMIN_USER`（未登入也可见）。已加 `publicConfig_()` 集中剝除（敏感 key 表 + 正則兜底）。
 3. **🟡 API Key 複製防呆** — 「重新生成 API Key」彈窗字串雙重轉義（`\\\\n` → 顯示成字面 `\n`），選 key 時容易連同前面的 `n` 一起複製（本次實際事故）。已改用真換行 +「雙擊 key」提示；`doGet` 對 `apiKey` 先 `trim` 再比對。
 4. **🟡 新旅團接入提交** — `/onboard` 第 6 步由 mailto 改為直接 POST 到管理員的接收端 Apps Script（舊版 Scout Admin APP 的接收端，`AKfycbxj5BDD...`），寫入管理員 Sheet「申請記錄」+ Email 通知。旅團端看不到管理員 email，也不會從旅團帳號寄信（不會留對方寄件紀錄）。接收端通知信箱為 `ADMIN_EMAIL`（目前 playerkousas@hotmail.com，可在接收端腳本改）。
@@ -464,18 +465,38 @@ live preview 嘅 sandbox 網址對外攞唔到，所以一鍵加入喺 preview �
 ## 待完成（下一階段）
 1. **82 旅重新部署 GS** — 把本 repo 的 `gs/SCOUTSYSTEM_2_SETUP.gs`（或 `public/downloads/SCOUTSYSTEM_2_SETUP.gs.txt`）貼回 82 旅 Script Editor → Deploy → 管理部署 → 新增版本；部署後用 `?action=health&apiKey=...` 確認 version=3.0-live，並複測超管登入。
    （過渡期：前端已改以 `sheep` 作 userId，未重新部署也能拿到全部資料；但仍建議盡快部署，才有 `publicConfig_` 敏感值剝除等修正）
-6. ~~**安全待辦**~~ — ✅ **已修**（方案 A：保留帳號，但必須密碼正確）。
-   原本 `handleLogin_` 嘅「技術測試帳號」分支只比對帳號名（`TECH_TEST_ACCOUNTS_.indexOf(identifier) >= 0`）
-   就回 `super_admin`，**完全冇驗證密碼**。實際 fall-through 路徑已逐行確認：
-   `sheep` + 錯密碼 → 「隱藏超管」分支（密碼 hash 比對）唔 match 所以唔 return →
-   STAFF_TOKEN 分支因為 `loginType`／`identifier` 唔啱而整個 skip →
-   落到技術測試帳號分支 → 直接取得 `super_admin`。帳號名用 `0728` 更加係完全免密碼。
-   修正：該分支加 `sha256_(password) !== sha256_('0728')` → 回「帳號或密碼不正確」。
-   實測（用 `vm` 載入**真實 GS 檔**執行 `handleLogin_`，只 stub Apps Script global，9 項全過）：
-   `sheep`+正確密碼 → `SUPER_ADMIN` ✅｜`sheep`+錯密碼／冇密碼 → 拒絕 ✅｜
-   `SHEEP` 大寫、前後空白容錯保留 ✅｜`0728`+冇密碼 → 拒絕 ✅｜`0728`+正確密碼 → 仍可用 ✅｜
-   普通 email 登入不受影響 ✅。
-   ⚠️ 呢個測試行嘅係 repo 入面嘅 `.gs` 原始碼，**未部署到 82 旅**；實際登入行為要部署後複測。
+6. ~~**安全待辦**~~ — ✅ **已修**（兩處）。
+
+   **問題 A：技術測試帳號分支冇驗證密碼。**
+   `handleLogin_` 嘅「技術測試帳號」分支只比對帳號名
+   （`TECH_TEST_ACCOUNTS_.indexOf(identifier) >= 0`）就回 `super_admin`。
+   實際 fall-through 路徑已逐行確認：`sheep` + 錯密碼 →
+   「隱藏超管」分支（sha256 密碼比對）唔 match 所以唔 return →
+   STAFF_TOKEN 分支因 `loginType`／`identifier` 唔啱而整個 block skip（連 2331 嘅 return 都唔執行）→
+   落到技術測試帳號分支 → 直接取得 `super_admin`。
+   修正：該分支加 `sha256_(String(password).trim()) !== sha256_('0728')` → 回「帳號或密碼不正確」。
+
+   **問題 B：`'0728'` 被當成帳號名（用戶指出：0728 係密碼，唔係帳號）。**
+   `TECH_TEST_ACCOUNTS_` 原本係 `['sheep', '0728']`，令到：
+   ・用 `0728` 做**帳號名**登入可以取得 super_admin（而且完全免密碼）
+   ・`isPrivilegedOperator_('0728')` → true
+   ・`resolveAttendanceCaller_({operatedBy:'0728'})` → 自動 super_admin
+   ・批量開戶嘅 `troop_super` 降級判斷把 `0728` 當特權操作者
+   修正：`TECH_TEST_ACCOUNTS_ = ['sheep']`（只有一個超管帳號）。
+   `sheep` 必須保留 —— `app/login/page.tsx` 會把帳號正規化成 `'sheep'` 做 session userId。
+   （另：`toggleSystemLock` 第 3749 行嘅 `var techAccounts` 係死變數，声明後從未使用。）
+
+   **實測**（用 `node vm` 載入**真實 `gs/SCOUTSYSTEM_2_SETUP.gs`**，只 stub Apps Script 嘅
+   `Utilities`／`ContentService`／`getSheet_`，17 項全過）：
+   ・`TECH_TEST_ACCOUNTS_` === `['sheep']`，唔含 `'0728'` ✅
+   ・`sheep`+正確密碼 → `SUPER_ADMIN` ✅｜`sheep`+錯密碼／冇密碼 → 拒絕 ✅
+   ・`SHEEP` 大寫、前後空白容錯保留 ✅
+   ・帳號名 `0728`（有密碼／冇密碼）→ 一律拒絕，唔再係 super_admin ✅
+   ・`isPrivilegedOperator_`：sheep／SUPER_ADMIN／staff_token 仍 true，`0728` → false ✅
+   ・`resolveAttendanceCaller_`：sheep → super_admin，`0728` → null ✅
+
+   ⚠️ 呢個測試行嘅係 repo 入面嘅 `.gs` 原始碼，**未部署到 82 旅**；
+   部署後請親自複測：`sheep`+`0728` 應該照入到，`sheep`+亂噏密碼應該被拒。
 2. **/onboard 第 6 步實測** — 走一次表單提交，確認管理員 Sheet「申請記錄」有新記錄 + 收到通知 email
 3. **旅團部署** — 新旅團接入流程（收到自動寄信 → `DEPLOY_ADMIN_GUIDE.md` 五步）
 4. **`/dashboard/*` demo 樹** — 仍是內嵌 mock 的展示頁（帶 Demo 角色切換），非真實登入頁；確認不再需要可刪

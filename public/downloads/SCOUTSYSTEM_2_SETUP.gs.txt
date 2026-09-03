@@ -18,7 +18,11 @@
  */
 
 var SCOUTSYSTEM_VERSION = '3.0-live';
-var TECH_TEST_ACCOUNTS_ = ['sheep', '0728'];
+// 隱藏超管帳號（只有一個：sheep）。
+// ★ '0728' 係 sheep 嘅「密碼」，唔係帳號名 —— 之前誤放喺呢個 list 入面，
+//   導致用 '0728' 做帳號名登入可以取得 super_admin，而且 isPrivilegedOperator_／
+//   resolveAttendanceCaller_／批量開戶嘅 troop_super 判斷都會把 '0728' 當特權帳號。
+var TECH_TEST_ACCOUNTS_ = ['sheep'];
 
 // ==================== 顏色 / 分頁設定 ====================
 
