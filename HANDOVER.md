@@ -1708,3 +1708,78 @@ GS 253,756 bytes，同 `public/downloads/` 副本 `cmp` 一致。
 2. 確認旅長嘅 `password` 同 `approved` 冇被改過嘅痕跡
 3. 睇 `AuditLog` 有冇可疑嘅 `updateUserField role=…`／`toggleUser`／`updatePassword` 紀錄
 4. **如果懷疑旅長帳號被接管過，請即刻改旅長密碼**
+
+---
+
+## 2026-09-03 新增 `npm run check:accounts` —— 逐個帳戶 render 自己嘅首頁
+
+### 點解要有呢個 check
+
+用戶要求：「從新以**不同帳戶**檢測有沒有 BUG 或矛盾地方」。
+
+呢一環之前**完全冇 check 覆蓋**：
+
+| 現有 check | 覆蓋到乜 | 覆蓋唔到乜 |
+|---|---|---|
+| `check:links` §1 | `<Auth roles>` ≡ `ROUTE_ROLES`（靜態） | 頁面 render 唔 render 到 |
+| `check:links` §4 | `dashboardFor(role)` 嘅目標**理論上**收呢個角色 | 實際 render 結果 |
+| `check:render` | `/admin/users`（3 個角色）＋ demo 行事曆 | 其餘 10 個帳戶 |
+
+即係話：**從來冇任何 check 驗證過「每個真實帳戶撳入去，佢自己嘅首頁真係
+render 得出內容」**。gate 啱 ≠ 頁 render 到 —— 頁面可以因為 state slice 缺欄位、
+session 欄位唔齊、或者 useEffect 爆 error 而白屏。
+
+★ HTTP 200 證明唔到 client render：`getSession()`／`getTroopKey()` 讀
+`localStorage`，SSR 階段讀唔到。所以必须用 jsdom 行 useEffect。
+
+### 做法
+
+1. 由**真實 dev server** 攞帳戶清單（唔好自己砌假資料）
+2. 逐個帳戶 seed `localStorage` session
+3. 用 `dashboardFor(role)` 決定佢應該去邊
+4. 斷言三樣：(a) `canAccessRoute` 收呢個角色 (b) 頁面真係 render 出內容
+   （≥60 字，少過當作白屏） (c) render 冇爆 exception
+
+需要 live dev server（`npm run dev`）。
+
+### 實測結果（13 個帳戶全過）
+
+```
+u_admin（admin）→ /admin  354 字        u5（parent）→ /parent  1132 字
+u_tl（troop_leader）→ /admin  353 字    u9（parent）→ /parent  1300 字
+u_gl（group_leader）→ /admin  338 字    u_m1（member）→ /member  769 字
+u_gl3（group_leader）→ /admin  338 字   u_m2（member）→ /member  762 字
+u_bl（branch_leader）→ /admin  285 字   u_m4（member）→ /member  473 字
+u_coach（coach）→ /admin  152 字        u_m14（member）→ /member  648 字
+                                        u_m8（member）→ /member  419 字
+```
+
+注意 `u_coach` 只有 152 字 —— 佢得 1 個 feature（`attendance`），所以管理中心
+只有 1 張卡。呢個同 `check:modules` 嘅結果一致（u_coach 1 張卡），兩個 check
+由唔同角度互相印證。
+
+### Negative control（第 10 個）
+
+喺 `app/member/page.tsx` 注入 `if(true) return null;` 令 `/member` 白屏：
+
+```
+❌ u_m1（member）→ /member  白屏：只 render 出 0 字 →「」
+❌ u_m2 / u_m4 / u_m14 / u_m8   （同一個原因）
+❌ 5 個帳戶有問題（通過 8 個）
+```
+
+**啱啱好咬到 5 個 member 帳戶，其餘 8 個仍然綠** —— 方向正確，證明呢個 check
+唔係永遠綠燈。還原後 `grep -c NEGCTRL` → 0，13/13 全綠。
+
+### check 總數：11 個
+
+`check:gs` · `check:gscards`（17）· `check:gsroles`（55）· `check:perms`（47/47/18）
+· `check:public`（60）· `check:security`（125）· `check:links`（210）
+· `check:modules` · `check:calendar` · `check:render` · **`check:accounts`（13 個帳戶）**
+
+其中 4 個需要 live dev server：`check:modules` · `check:calendar` · `check:render` · `check:accounts`。
+
+### 驗證
+
+`tsc` 0 error · `next build` exit 0 / **64 routes** · `npm run lint` 9 warnings /
+0 errors（同基線一致）· 11 個 check 全綠。
