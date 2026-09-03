@@ -7,9 +7,9 @@ import { badgeSchemeFor, parseWantedBadges } from '@/lib/badges';
    模擬資料
    ═══════════════════════════════════════════════════ */
 
-type Role = 'super_admin' | 'admin' | 'group_leader' | 'branch_leader' | 'coach' | 'parent' | 'member';
+type Role = 'admin' | 'group_leader' | 'branch_leader' | 'coach' | 'parent' | 'member';
 const ROLE_LABEL: Record<Role, string> = {
-  super_admin: '技術測試', admin: '管理員', group_leader: '團長',
+  admin: '管理員', group_leader: '團長',
   branch_leader: '支部領袖', coach: '教練員', parent: '家長', member: '成員',
 };
 
@@ -102,8 +102,8 @@ export default function ProfilePage() {
     setBadgeNote('');
   }
 
-  const isManager = ['admin', 'super_admin', 'group_leader', 'branch_leader'].includes(role);
-  const isLeader = ['admin', 'super_admin', 'group_leader', 'branch_leader', 'coach'].includes(role);
+  const isManager = ['admin', 'group_leader', 'branch_leader'].includes(role);
+  const isLeader = ['admin', 'group_leader', 'branch_leader', 'coach'].includes(role);
   const isParent = role === 'parent';
   const isMember = role === 'member';
   const isParentOrMember = isParent || isMember;

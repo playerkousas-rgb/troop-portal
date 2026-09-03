@@ -112,8 +112,9 @@ const seed: AppState = {
     { id: 'm14', ymNumber: '3000000014', name: '陳小美', branchId: 'b2', patrolId: 'p2', patrolRole: 'member', age: 9, dateOfBirth: '2017-07-19', parentUserId: 'u5', active: true, wantedBadges: 'cub_astronomer|cub_swimmer|cub_artist', wantedBadgesAt: '2026-08-30T09:05:00.000Z' },
   ],
   users: [
+    // ★ 演示旅團刻意唔設 super_admin 帳戶：超管係系統層級嘅隱藏帳號（真實旅團 GS 先有），
+    //   demo 最高只到「管理員」。避免任何人對住 troop_demo 就攞到 super_admin session。
     { id: 'u_admin', name: '陳堅強', email: 'admin@demo.scout', role: 'admin', approved: true },
-    { id: 'u_super', name: '超級管理員', email: 'sheep@demo.scout', role: 'super_admin', approved: true },
     { id: 'u_tl', name: '周旅長', email: 'tl@demo.scout', role: 'troop_leader', approved: true },
     // 團長 = 某一個團／支部嘅負責人（李偉國 = 深資團 b4 團長）
     { id: 'u_gl', name: '李偉國', email: 'gl@demo.scout', role: 'group_leader', branchId: 'b4', approved: true },

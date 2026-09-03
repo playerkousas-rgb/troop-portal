@@ -511,19 +511,32 @@ live preview 嘅 sandbox 網址對外攞唔到，所以一鍵加入喺 preview �
 
    **⚠️ 陷阱：MOCK 後台嘅免密碼登入係設計如此，千祈唔好「順手修」。**
    `lib/mockServer.ts` 嘅 `handleMockLogin`（513–535 行）完全冇讀 `p.password`，
-   實測 `u_super` 用空密碼／錯密碼／`0728` 都回 `super_admin`（3/3）。呢個**唔係**同一個洞：
+   demo 帳號用咩密碼都入到。呢個**唔係**上面嗰個洞：
    ・範圍只限演示旅團 —— `app/api/proxy/route.ts` 第 44 行：只有 `troopKey === DEMO_TROOP_KEY`
      （`troop_demo`）先行 MOCK；真實旅團一律 `fetch` 去 Apps Script（161／192 行）。
    ・demo 帳號**根本冇 password 欄位**（seed 只有 id／name／email／role／approved），冇嘢可驗證。
    ・`app/login/page.tsx` 第 55 行嘅 demo 快捷按鈕本身就傳 `password: ''` —— 加密碼檢查會直接搞壞佢。
    ・`lib/mock.ts` 第 22–28 行 `isMockMode()` 要 localStorage 開關 **且** 目前選中嘅係 `troop_demo`
      先成立，註解寫明係為咗避免把真旅團誤當 MOCK。
-   殘留考量（**產品決定，未處理**）：`troop_demo` 冇 env 開關，任何人對住佢都攞到
-   `super_admin` session —— 但攞到嘅係 seed 假資料，碰唔到真實旅團數據。
-   如果唔想公開 demo，需要加 env flag 控制 `troop_demo` 係咪可選。
+
+   **✅ 已處理：演示旅團唔再設超管帳戶（用戶指示「demo 也不應該存在超管這一帳戶的，只有管理員」）。**
+   原本 seed 有個 `u_super`（`role: 'super_admin'`），任何人對住 `troop_demo` 都攞到
+   `super_admin` session。已拆走，demo 最高只到「管理員」：
+   ・`lib/mockServer.ts` seed 刪走 `u_super`（並加註解講明點解刻意唔設）
+   ・`app/dashboard/page.tsx`／`app/dashboard/profile/page.tsx` 嘅 `Role` union、
+     `ROLE_LABEL`（原標籤「技術測試」）、`isManager`／`isLeader` 一併清走 `super_admin`
+     （呢兩頁嘅角色切換清單本來就冇包佢，預設分別係 `admin`／`member`）
+   ・`super_admin` **作為角色**仍保留喺 mock 嘅 role list（`ROLE_FEATURES`／`TROOP_WIDE` 等）
+     同 `check-public-cards.mjs` —— 真實旅團 GS 仍然有超管角色，拆嘅只係 demo 帳戶。
+   實測（live HTTP，`.mockdata` 已重設）：`u_super` ✘、舊 email `sheep@demo.scout` ✘
+   （兩者皆回「找不到此帳號」）；`DEMO_ACCOUNTS` 8 個快捷帳號 8/8 照常登入
+   （u_m1／u_m14／u_m4 member、u5 parent、u_bl branch_leader、u_coach coach、
+   u_gl group_leader、u_admin admin）。
+   `troop_demo` 仍然冇 env 開關、恆常可選 —— 用戶揀咗保持現狀，而家最高只係 admin，
+   而且攞到嘅係 seed 假資料，碰唔到真實旅團數據。
 2. **/onboard 第 6 步實測** — 走一次表單提交，確認管理員 Sheet「申請記錄」有新記錄 + 收到通知 email
 3. **旅團部署** — 新旅團接入流程（收到自動寄信 → `DEPLOY_ADMIN_GUIDE.md` 五步）
-4. **`/dashboard/*` demo 樹** — 仍是內嵌 mock 的展示頁（帶 Demo 角色切換），非真實登入頁；確認不再需要可刪
+4. **`/dashboard/*` demo 樹** — 仍是內嵌 mock 的展示頁（帶 Demo 角色切換），非真實登入頁。**用戶已決定保留**（2026-09-03），繼續作展示用途；已一併清走佢嘅 `super_admin` 角色，最高只到管理員。
 5. ~~**README 死鏈**~~ — ✅ 已處理：`ATTENDANCE_INTEGRATION.md` 從未 commit 過（`git log --all -- 'ATTENDANCE_INTEGRATION.md'` 為空），無法還原內容，所以刪咗條死鏈；簽到／報名分流嘅說明保留喺 README 本文。
 
 ## 技術棧
