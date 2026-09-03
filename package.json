@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "next lint",
     "check:gs": "bash scripts/check-gs-sync.sh",
+    "check:gscards": "node scripts/check-gs-public-cards.mjs",
     "check:perms": "node scripts/check-permissions.mjs",
     "check:modules": "node --no-warnings=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/check-admin-modules.mjs",
     "check:calendar": "node --no-warnings=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/check-calendar-scope.mjs",

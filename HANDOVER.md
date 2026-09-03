@@ -1285,3 +1285,87 @@ HTTP 200 同 SSR 都證明唔到 client render（呢頁 state 由 `useEffect` �
 （dev server log 見到 `troopKey=unknown … 400` 先至搵到原因。）
 
 **推廣：任何「未登入」嘅 jsdom render 測試都要咁做。**
+
+---
+
+## 2026-09-03 ★ 新建 `check:gscards` —— repo 第一個真正執行 GS 嘅測試
+
+### 填緊嘅缺口
+
+直到呢個 commit 為止，`gs/SCOUTSYSTEM_2_SETUP.gs` 嘅驗證狀態係：
+
+| 驗證手段 | 覆盖到乜 |
+|---|---|
+| `check:gs`（`check-gs-sync.sh`） | 淨係 byte-identity 同步檢查 |
+| `node --check`（`.gs`→`.js` 複製） | **淨係語法** —— 有 3 個未定義識別符都照樣通過 |
+| grep | 只証明「有定義」，唔証明「執行啱」 |
+
+即係 `handleSetPublicCard_` / `handleSetPublicScope_`
+**從來冇被執行過一次**。而 GS 先係 82 旅嘅生產路徑。
+
+### 做法
+
+`scripts/check-gs-public-cards.mjs` 用 `vm.runInContext` 載入整份 GS，
+stub 資料層（`readTable_`／`getField_`／`updateCellByName_`／`writeAudit_`），
+然後**經 `doGet` 驅動** —— 直接 call handler 證明唔到任何嘢，
+因為會跳過 API Key 認證（`doGet:1980-1990`）同 `checkActionPermission_`（L1995）。
+
+stub 必须喺 `runInContext` **之後**先設（GS 自己定義咗同名函數，要被覆蓋先至接管到）。
+
+### ★ 測試場景刻意用 82 旅 live Sheet 嘅真實狀態
+
+```
+PUBLIC_CARDS         = 'calendar,notices'
+PUBLIC_SCOPE_NOTICES = 'troop,b2'
+PUBLIC_SCOPE_ACTIVITIES = (未寫過)
+```
+呢個係整個歸一化嘅存在理由。用新格式做 fixture 嘅話，呢個測試乜都証明唔到。
+
+### 結果（17 項斷言全過）
+
+```
+✅ 起點確實係舊格式（否則呢個測試冇意義）
+✅ 舊 client 送 card=notices 唔會回「未知的卡片」
+✅   → 寫入後 PUBLIC_CARDS 已歸一（notices 被刪走）      實際 = "calendar"
+✅   → scope 由舊 key fallback 讀到並寫去新 key            實際 = "troop,b2"
+✅ 管理員用新 id 關閉「活動」卡成功
+✅   → ★ 舊 id notices 真係被刪走（唔係寫返 calendar,notices）  實際 = "calendar"
+✅   → 張卡真係關咗（唔會靜默失敗）
+✅ 喺舊格式入面重開「活動」卡成功
+✅   → 重開後 activities 喺列表入面                    實際 = "activities,calendar"
+✅   → calendar 冇被誤刪
+✅   → ★ 舊 id notices 已被清走（寫入時自動遷移，唔留垃圾）
+✅   → 冇重複 id
+✅ 未知卡片仍然被拒                                   {"success":false,"error":"未知的卡片"}
+✅ 支部領袖改卡被拒                                   {"success":false,"error":"只有管理層可以開放公開資料卡片。"}
+✅ 舊 client 送 card=notices 設定 scope 唔會回「未知的卡片」
+✅   → scope 寫入新 key PUBLIC_SCOPE_ACTIVITIES         實際 = "troop,b2"
+✅ 未知卡片設定 scope 仍然被拒
+```
+
+**Negative control（第 13 個）：**令 `normalizeCards_` 變成 identity
+（`if (true) return String(csv||'')`）→ **3 項斷言變紅**，
+`PUBLIC_CARDS` 留返 `"calendar,notices"`（正正係靜默失敗）。
+還原後 `grep -c NEGCTRL` → 0，`cmp` 同 `public/downloads/` 一致，17/0 返綠。
+
+### ★ 過程中又一個斷言寫錯（產品係啱嘅）
+
+第一版我斷言「重開後 `PUBLIC_CARDS` 同時有新舊 id」。實際回
+`"activities,calendar"` —— **舊 id 被清走咗**。
+
+追蹤：`normalizeCards_('calendar,notices')` 把 `notices` 映射做 `activities`
+→ `['calendar','activities']` → `setInList_` 加入 `activities`（已存在）
+→ 寫回 `'activities,calendar'`。
+
+產品冇錯，而且比我預期**更好**：寫入時順手清走舊 id，唔留垃圾喺 Sheet。
+已拆成 4 個正確斷言（activities 喺列表／calendar 冇被誤刪／
+notices 已清走／冇重複 id）。
+
+**呢個 session 第四次「失敗嘅斷言原來係測試錯，唔係產品錯」。**
+
+### 驗證（全套）
+
+`tsc` 0 error · `next build` exit 0 / 64 routes · `npm run lint` 9 warnings / 0 errors
+（同基線一致）· **9 個 check 全綠**：`check:gs` · **`check:gscards` 17**（新）·
+`check:perms` 47/47/18 · `check:public` 60 · `check:security` 114 ·
+`check:links` 210 · `check:modules` · `check:calendar` · `check:render`。
