@@ -441,6 +441,16 @@ PRIVATE 活動、報名名單、聯絡電話一概唔入 feed。
   `/albums` 用 `'albums'`（訪客喺卡未開時顯示 `<PublicLocked>`）；
   `/notices` 用 `'notices'`（通告嘅 `branchTags` 存顯示名，經 `tagToScope()` 譯返 branchId）。
 - 訂閱掣跟 `publicViewEnabled() && cardEffective(config,'calendar')`。
+- **內容範圍掣已抽成共用組件** `components/ui/PublicScopePanel.tsx`（三張卡共用，逐卡文案），
+  掛喺 `/admin/calendar`（行事曆）、`/albums`（相簿）、`/notices`（通告）——
+  管理層見到「全旅內容」＋所有支部，支部領袖只見自己支部。
+  （之前只有行事曆有掣，後端三張卡都支援，團長實際上冇地方開自己支部嘅相簿／通告。）
+
+**檢查**：`npm run check:public` —— **唔需要 dev server**，直接 import 前後端共用嘅
+`lib/publicScope.ts` 逐條規則斷言（48 項）：三張卡獨立、開卡默認公開全旅、關卡保留 scope、
+範圍全關⇒卡片等於未開、`isItemPublic` 三層、權限分層。
+（經 `scripts/node-ts-resolve.mjs` 補 `.ts` 副檔名，先至可以 import 有 relative import 嘅 .ts ——
+其餘 check 腳本 import 嘅都係 leaf 模組所以唔使。）
 
 ⚠️ **要正式部署先至用得**：訂閱要 Google／Apple 嘅伺服器搵到個 URL。
 live preview 嘅 sandbox 網址對外攞唔到，所以一鍵加入喺 preview 度实测唔到；部署上 Vercel 之後先得。

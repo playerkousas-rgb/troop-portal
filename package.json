@@ -10,7 +10,8 @@
     "check:gs": "bash scripts/check-gs-sync.sh",
     "check:perms": "node scripts/check-permissions.mjs",
     "check:modules": "node --no-warnings=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/check-admin-modules.mjs",
-    "check:calendar": "node --no-warnings=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/check-calendar-scope.mjs"
+    "check:calendar": "node --no-warnings=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/check-calendar-scope.mjs",
+    "check:public": "node --no-warnings=MODULE_TYPELESS_PACKAGE_JSON --import ./scripts/node-ts-resolve.mjs --experimental-strip-types scripts/check-public-cards.mjs"
   },
   "dependencies": {
     "@tailwindcss/postcss": "^4.3.3",
