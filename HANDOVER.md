@@ -468,7 +468,7 @@ live preview 嘅 sandbox 網址對外攞唔到，所以一鍵加入喺 preview �
 2. **/onboard 第 6 步實測** — 走一次表單提交，確認管理員 Sheet「申請記錄」有新記錄 + 收到通知 email
 3. **旅團部署** — 新旅團接入流程（收到自動寄信 → `DEPLOY_ADMIN_GUIDE.md` 五步）
 4. **`/dashboard/*` demo 樹** — 仍是內嵌 mock 的展示頁（帶 Demo 角色切換），非真實登入頁；確認不再需要可刪
-5. **README 死鏈** — `ATTENDANCE_INTEGRATION.md` 未隨 repo 上傳，README 的連結失效（可補檔或刪連結）
+5. ~~**README 死鏈**~~ — ✅ 已處理：`ATTENDANCE_INTEGRATION.md` 從未 commit 過（`git log --all -- 'ATTENDANCE_INTEGRATION.md'` 為空），無法還原內容，所以刪咗條死鏈；簽到／報名分流嘅說明保留喺 README 本文。
 
 ## 技術棧
 - **前端**: Next.js 14 (App Router) + TypeScript + Tailwind CSS
