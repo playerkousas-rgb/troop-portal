@@ -18,7 +18,10 @@ const MODULES = [
   { icon: '📷', title: '相簿管理', subtitle: '相片 · 分支權限', detail: '活動完結後補上相簿連結（通告與相片分開處理）', href: '/dashboard/admin/albums', tone: 'violet' },
   { icon: '👤', title: '帳戶管理', subtitle: '成員 · 家長 · 權限', detail: '帳號、角色、支部小隊資料及申請審核', href: '/dashboard/admin/users', tone: 'slate' },
   // 系統管理：由舊版管理中心底部嘅「操作紀錄」小標籤升級而成（用戶要求 #6）
-  { icon: '🛠️', title: '系統管理', subtitle: '設定 · 操作紀錄 · 元件', detail: '系統設定、操作紀錄（含審核紀錄）及擴充元件', href: '/dashboard/admin/audit', tone: 'slate' },
+  // ★ href 指去 hub 頁（同正式版 /admin/system 一致），唔好直指 /dashboard/admin/audit。
+  //   直指 leaf 頁會令 settings／plugins／branches／marketplace／connectors
+  //   全部冇入站連結（用戶永遠到唔到）—— check:links §5 會捉呢類孤兒頁。
+  { icon: '🛠️', title: '系統管理', subtitle: '設定 · 操作紀錄 · 元件', detail: '系統設定、操作紀錄（含審核紀錄）及擴充元件', href: '/dashboard/admin/system', tone: 'slate' },
 ] as const;
 
 const toneStyles: Record<string, string> = {

@@ -298,6 +298,16 @@ export default function Page() {
       </p>
       <div className="row" style={{ marginTop: 6, flexWrap: 'wrap' }}>
         <Link href="/admin/registrations" className="btn gold">📊 活動統計（只計旅團活動）→</Link>
+        {/*
+          ★ 通告PDF 入口（用戶要求：「通告PDF 和 活動統計 不屬於 管理中心；
+            兩者都屬於 活動管理」）。活動統計嗰條一直喺度，但通告PDF 嗰條從來冇加過
+            → 令 /notices 變成孤兒頁（全 repo 零入站連結），而 /notices 係
+            三張公開卡入面 `notices` 卡嘅**唯一**管理面
+            （PublicScopePanel card="notices" ＋ 全 repo 唯一用 apiUpdatePdfTags 嘅頁）。
+            冇呢條 link，管理員就冇辦法管「活動通告 PDF」嗰張公開卡。
+            check:links §5 會捉呢類孤兒頁。
+        */}
+        <Link href="/notices" className="btn">📄 通告PDF（活動通告文件・標籤・公開範圍）→</Link>
       </div>
     </section>
 

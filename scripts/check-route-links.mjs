@@ -157,6 +157,182 @@ console.log('\n【§4 legacy redirect 頁唔可以再無條件送去有 gate 嘅
   }
 }
 
+// ==================== §5 孤兒頁偵測（每個 route 都要可達） ====================
+/**
+ * §3 只驗證「被連結嘅路徑存在」，冇驗證反方向 ——「存在嘅路徑有冇人連過去」。
+ * 2026-09-03 審計就漏咗呢一類：demo 樹有 5 個頁面完全冇入站連結
+ * （/dashboard/admin/{settings,plugins,branches}、/dashboard/{marketplace,connectors}），
+ * 因為管理中心嘅「系統管理」卡直接指去 leaf 頁 /dashboard/admin/audit，
+ * 而正式版係指去 hub 頁 /admin/system 再分流。用戶永遠到唔到嗰 5 頁。
+ *
+ * ★★ 呢度有個我踩過兩次嘅陷阱，務必保留：
+ *   引用唔止 `href="/x"` 一種寫法。實際見過 4 種：
+ *     1. href="/badges"                      （精確字串）
+ *     2. href={`/badges?member=${c.id}`}     （模板字串 —— 有 $ 插值）
+ *     3. { href: '/badges' }                 （物件屬性，array.map 砌卡）
+ *     4. router.push('/x') / redirect('/x')
+ *   §3 嘅 regex 用 [^'"`$]* **刻意排除 $**（因為模板字串嘅完整路徑攞唔到），
+ *   所以形式 2 完全唔會被 §3 捕捉。我頭兩次 grep 就因為只配形式 1，
+ *   誤判 `/badges` 係死碼 —— 佢其實有 /member:42 同 /parent:201 兩條入站連結。
+ *   下面嘅 INBOUND 刻意用「路徑前綴」比對，4 種形式一律計。
+ */
+console.log('\n【§5 每個 app route 都要有入站連結（唔可以有孤兒頁）】');
+{
+  /**
+   * ★ 第一版用 `href=|router.push|redirect(` 做前綴，結果 6 個假陽性。
+   *   實際見過嘅引用形式遠多過呢三種：
+   *     1. href="/badges"                                  精確字串
+   *     2. href={`/badges?member=${c.id}`}                 模板字串（有 $ 插值）
+   *     3. { href: '/badges' }                             物件屬性（array.map 砌卡）
+   *     4. href: canUsers ? '/admin/users?tab=x' : '/admin/applications'   三元
+   *     5. href: isDemo ? '/dashboard' : (role === 'parent' ? '/parent' : …)  嵌套三元
+   *   形式 4/5 嘅引號唔緊跟 `href:`，任何「前綴式」regex 都會漏。
+   *   → 改成：**剝走註解後，配任何引號包住嘅內部路徑**，再排除已知非連結來源。
+   *
+   * ★ 剝註解係必須嘅（§4 已經踩過）：lib/routeAccess.ts 同 app/leader/page.tsx
+   *   嘅文件註釋刻意寫低咗路徑做解說，唔剝就會假陽性。
+   */
+  const QUOTED_PATH = /['"`](\/[A-Za-z0-9\-_/]*)/g;
+
+  /** 呢啲檔／陣列列出嚟嘅路徑唔係連結，要排除 */
+  const NOT_A_LINK_FILES = new Set([
+    'lib/routeAccess.ts',   // 路由登記表（gate 定義），唔係導航
+  ]);
+  // HIDDEN_PATHS 係「呢啲頁唔顯示 bottom nav」嘅排除清單，列出嚟≠連過去
+  const stripNonLinkArrays = (txt) => txt.replace(/const\s+HIDDEN_PATHS\s*=\s*\[[^\]]*\]/g, '');
+
+  const inbound = new Map();   // route → [引用位置]
+  for (const f of srcFiles) {
+    const selfFile = rel(f);
+    if (NOT_A_LINK_FILES.has(selfFile)) continue;
+    const txt = stripNonLinkArrays(fs.readFileSync(f, 'utf8'))
+      .replace(/\/\*[\s\S]*?\*\//g, '')   // block comment
+      .replace(/^\s*\/\/.*$/gm, '');      // line comment
+    let m;
+    while ((m = QUOTED_PATH.exec(txt))) {
+      const raw = m[1].replace(/\/+$/, '') || '/';
+      const line = txt.slice(0, m.index).split('\n').length;
+      if (!inbound.has(raw)) inbound.set(raw, []);
+      inbound.get(raw).push(`${selfFile}:${line}`);
+    }
+  }
+
+  /**
+   * 刻意唔需要入站連結嘅頁。加新條目要寫理由 —— 呢個 allowlist 應該長期保持極短。
+   */
+  const ENTRY_POINTS = new Map([
+    // 根頁：app 入口，由瀏覽器直接入
+    ['/', 'app 入口，由瀏覽器直接入'],
+    // legacy redirect 頁：存在嘅目的就係接舊書籤（見 §4）。
+    // 冇任何頁應該連去佢 —— 佢係俾 2026 年前嘅外部書籤／QR code 用。
+    ['/leader', 'legacy redirect 頁，專接舊書籤；冇頁應該連去佢（見 §4）'],
+    /**
+     * 外部引入頁：由站外嘅「童軍通告圖書館」(https://scout-circulars.vercel.app/)
+     * 帶住 query 參數跳入嚟（?title=&sourceSite=&deadline=&fee=&audience=）。
+     * 頁內 L158 自己寫住「從圖書館引入時，標題、來源、截止、費用、對象已自動帶入」，
+     * 而且 app/library/ 根本冇 index 頁 —— 佢唔係站内導航嘅一部分，係外部 entry point。
+     * gate 係 ADMIN_BRANCH_COACH（lib/routeAccess.ts:68）。
+     */
+    ['/library/import', '外部通告圖書館帶 query 參數跳入；app/library/ 冇 index 頁'],
+    /**
+     * 已接入旅團公開目錄頁。
+     *
+     * ★ 2026-09-03 問過用戶，佢嘅答覆重新定義咗「公開展示」：
+     *   「先連結進旅團，再看旅團是否開放了行事曆等公開資料卡片，
+     *     可在不登入情況下觀看（下方 4 大按鈕）其之三」
+     *   即係公開展示嘅正常流程係：根頁 `/` 揀旅團 → 底欄三個公開掣
+     *   （行事曆／相簿／活動）→ 內容由三張公開卡決定。
+     *   呢個流程入面**冇**一個獨立嘅旅團目錄頁，根頁嘅 inline 旅團選擇器
+     *   已經做咗「先連結進旅團」呢一步。
+     *
+     *   用戶冇揀「刪除」，所以保留呢頁做直接網址／QR code 分享用嘅 entry point。
+     *   ⚠️ 佢同根頁嘅旅團選擇器功能重疊 —— 如果確定唔需要，刪頁時要一齊清
+     *      components/LatestNewsBar.tsx:11 同 components/layout/BottomNav.tsx:39
+     *      兩個 HIDDEN_PATHS 陣列入面嘅 '/troops'。
+     */
+    ['/troops', '已接入旅團公開目錄；正常流程經根頁揀旅團，呢頁只供直接網址分享'],
+  ]);
+
+  /**
+   * ★★ 淨係數「有冇入站連結」係唔夠嘅 —— 要數「由 entry point 出發現唔現場到」。
+   *
+   * 我做 negative control 時親身撞到：把管理中心嘅「系統管理」卡由 hub 頁
+   * `/dashboard/admin/system` 改返指去 leaf 頁 `/dashboard/admin/audit` 之後，
+   * hub 自己變孤兒（✅ 被捉到），但 hub 下面嗰 5 個頁
+   * （settings／plugins／branches／marketplace／connectors）**仍然有入站連結**
+   * —— 因為佢哋嘅入站連結來自嗰個已經不可達嘅 hub。
+   * 用戶實際上已經到唔到佢哋，但「有冇入站連結」呢個判準話佢哋冇事。
+   *
+   * 所以呢度做真正嘅 BFS 可達性分析：由 ENTRY_POINTS 出發，沿住連結行，
+   * 行唔到嘅 route 就係不可達（不論直接定傳遞性）。
+   */
+
+  // 每條 route 自己嘅 page.tsx 連去邊
+  const pageLinks = new Map();     // route → Set<target route>
+  // 全站共用元件嘅 link（app/layout.tsx 渲染 TopNav／LatestNewsBar／BackButton／
+  // SiteFooter／BottomNav，所以佢哋嘅 link 由**每一頁**都到）
+  const globalLinks = new Set();
+
+  for (const f of srcFiles) {
+    const selfFile = rel(f);
+    if (NOT_A_LINK_FILES.has(selfFile)) continue;
+    const txt = stripNonLinkArrays(fs.readFileSync(f, 'utf8'))
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .replace(/^\s*\/\/.*$/gm, '');
+    const isPage = /(^|\/)app\/.*\/page\.tsx$/.test(selfFile.replace(/\\/g, '/'))
+      || selfFile.replace(/\\/g, '/') === 'app/page.tsx';
+    let owner = null;
+    if (isPage) {
+      const r = '/' + selfFile.replace(/\\/g, '/').replace(/^app\//, '').replace(/\/page\.tsx$/, '');
+      owner = r === '/' ? '/' : r.replace(/\/$/, '');
+      if (!pageLinks.has(owner)) pageLinks.set(owner, new Set());
+    }
+    let m;
+    QUOTED_PATH.lastIndex = 0;
+    while ((m = QUOTED_PATH.exec(txt))) {
+      const raw = m[1].replace(/\/+$/, '') || '/';
+      if (!routes.has(raw)) continue;          // 只關心真係 route 嘅目標
+      if (owner) pageLinks.get(owner).add(raw);
+      else globalLinks.add(raw);               // 共用元件／lib → 全域可達
+    }
+  }
+
+  // BFS
+  const reached = new Set();
+  const queue = [...ENTRY_POINTS.keys()].filter((r) => routes.has(r));
+  while (queue.length) {
+    const cur = queue.shift();
+    if (reached.has(cur)) continue;
+    reached.add(cur);
+    const next = new Set([...(pageLinks.get(cur) || []), ...globalLinks]);
+    for (const n of next) if (!reached.has(n)) queue.push(n);
+  }
+
+  let unreachable = 0;
+  for (const route of [...routes].sort()) {
+    if (ENTRY_POINTS.has(route)) {
+      console.log(`  ⏭️  ${route} —— entry point（${ENTRY_POINTS.get(route)}）`);
+      passed++;
+      continue;
+    }
+    const directIn = (inbound.get(route) || []).filter(
+      (l) => !l.startsWith(`app${route === '/' ? '' : route}/page.tsx:`),
+    );
+    if (reached.has(route)) {
+      ok(`${route} 可達`, true);
+    } else {
+      unreachable++;
+      ok(`${route} 可達`, false,
+        directIn.length === 0
+          ? '完全冇入站連結 → 用戶永遠到唔到（直接孤兒頁）。'
+          : `有入站連結（${directIn.slice(0, 3).join(', ')}）但**上游自己不可達** → `
+            + '傳遞性孤兒頁：用戶一樣到唔到。要修上游，唔係修呢頁。',
+      );
+    }
+  }
+  console.log(`  （檢查咗 ${routes.size} 個 route；由 ${ENTRY_POINTS.size} 個 entry point 出發可達 ${reached.size} 個；不可達 ${unreachable} 個）`);
+}
+
 // ==================== 結果 ====================
 console.log('');
 if (errors.length) {

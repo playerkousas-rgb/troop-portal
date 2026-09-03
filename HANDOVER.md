@@ -1006,3 +1006,119 @@ admin          isAdminRole=True   myBranch=(空)  → ['全旅','幼童軍','童
 · 8 個 check 全綠（`check:gs` · `check:perms` 47/47/18 · `check:public` 46 ·
 `check:security` **114** · `check:links` **141** · `check:modules` · `check:calendar` · `check:render`）。
 GS 模板 244,654 bytes，同 `public/downloads/` 副本 `cmp` 一致。
+
+---
+
+## 2026-09-03 孤兒頁審計：`check:links` §5（BFS 可達性分析）
+
+### 發現
+
+全 repo 61 個 app route 做可達性掃描，搵到 **5 個完全冇入站連結嘅頁面**，
+全部喺 `/dashboard/**` demo 樹：
+
+```
+/dashboard/admin/settings      ⚙️ 系統設定（168 行）
+/dashboard/admin/plugins       🧩 單位元件設定
+/dashboard/admin/branches      🏢 支部與小隊設定
+/dashboard/marketplace         🛒 元件市場
+/dashboard/connectors          🔌 轉駁中心
+```
+
+**根因：**真實 UI 嘅管理中心「系統管理」卡指去 **hub 頁** `/admin/system`
+（`app/admin/system/page.tsx`，由 hub 再分流去 settings／audit／plugins／
+marketplace／connectors）。但 demo 樹嘅同一張卡**直接指去 leaf 頁**
+`/dashboard/admin/audit`（審核紀錄，嗰頁一條 href 都冇）→ 上面 5 頁
+用戶永遠到唔到。
+
+**修法：**新建 `app/dashboard/admin/system/page.tsx`（鏡像正式版 hub），
+管理中心張卡改指去佢。5 頁全部恢復可達。
+
+> `/dashboard/admin/branches` 有少少特殊：demo 管理中心刻意冇「支部管理」卡
+> （見 `app/dashboard/admin/page.tsx` 底部註解「支部及小隊已併入帳戶管理」），
+> 但頁面本身仍然存在。而家挂喺 hub 入面令佢可達；如果要跟 demo 嘅設計刪除呢頁，
+> 改 hub 入面嗰一行就得。**未刪** —— 刪頁係破壞性操作，用戶冇明確要求。
+
+### `check:links` §5 —— 點解要用 BFS 而唔係數入站連結
+
+**第一版**只數「有冇入站連結」。**Negative control 證明咗呢個判準唔夠：**
+把管理中心張卡由 hub 改返指去 leaf 頁之後，hub 自己變孤兒（✅ 被捉到），
+但佢下面嗰 5 頁**仍然有入站連結** —— 因為佢哋嘅入站連結來自嗰個已經不可達嘅 hub。
+用戶實際上已經到唔到佢哋，但「有冇入站連結」話佢哋冇事。
+
+**而家嘅做法：**由 4 個 entry point 出發做 BFS，沿住連結行，行唔到嘅 route
+就係不可達（不論直接定傳遞性）。同一個 negative control 而家**啱啱好咬到 6 個**
+（hub ＋ 5 個下游頁），而唔係頭先嘅 1 個。
+
+```
+（檢查咗 61 個 route；由 4 個 entry point 出發可達 61 個；不可達 0 個）
+```
+
+### ★ 引用形式有 5 種 —— 呢個陷阱我今次 session 踩咗兩次
+
+第一版 §5 用 `href=|router.push|redirect(` 做前綴，結果 **6 個假陽性**。
+實際見過嘅內部路徑引用形式：
+
+| # | 形式 | 例子 | 前綴式 regex |
+|---|---|---|---|
+| 1 | 精確字串 | `href="/badges"` | ✅ |
+| 2 | 模板字串 | ``href={`/badges?member=${c.id}`}`` | ❌ 有 `$` 插值 |
+| 3 | 物件屬性 | `{ href: '/badges' }`（array.map 砌卡） | ✅ |
+| 4 | 三元 | `href: canUsers ? '/admin/users?tab=x' : '/admin/applications'` | ❌ 引號唔緊跟 |
+| 5 | 嵌套三元 | `href: isDemo ? '/dashboard' : (role === 'parent' ? '/parent' : …)` | ❌ |
+
+**教訓：**我審計時用形式 1 嘅 grep，誤判 `/badges` 係死碼 —— 佢其實有
+`app/member/page.tsx:42`（形式 3）同 `app/parent/page.tsx:201`（形式 2）
+兩條入站連結。而家 §5 改成「**剝走註解後，配任何引號包住嘅內部路徑**」，
+再排除兩個已知非連結來源（`lib/routeAccess.ts` 登記表、`HIDDEN_PATHS` 排除陣列）。
+
+### 4 個 entry point（allowlist，每個都要寫理由）
+
+| Route | 理由 |
+|---|---|
+| `/` | app 入口，由瀏覽器直接入 |
+| `/leader` | legacy redirect 頁，專接舊書籤；冇頁應該連去佢（見 §4） |
+| `/library/import` | 外部通告圖書館帶 query 參數跳入（`?title=&sourceSite=&deadline=&fee=&audience=`）；`app/library/` 冇 index 頁 |
+| `/troops` | 已接入旅團公開目錄；正常流程經根頁揀旅團，呢頁只供直接網址分享 |
+
+`/troops` 嘅處置問過用戶，佢嘅答覆重新定義咗「公開展示」：
+「先連結進旅團，再看旅團是否開放了行事曆等公開資料卡片，可在不登入情況下觀看
+（下方 4 大按鈕）其之三」—— 即係正常流程係根頁揀旅團 → 底欄三個公開掣 →
+內容由三張公開卡決定，呢個流程入面冇獨立嘅旅團目錄頁。用戶冇揀「刪除」，
+所以保留做 entry point。
+
+> ⚠️ 如果日後確定要刪 `/troops`，要一齊清 `components/LatestNewsBar.tsx:11`
+> 同 `components/layout/BottomNav.tsx:39` 兩個 `HIDDEN_PATHS` 陣列入面嘅 `'/troops'`。
+
+### 順手修咗：`/notices` 冇入口
+
+`/admin/events:300` 一直有「📊 活動統計」連結（用戶要求：通告PDF 同活動統計
+都屬於活動管理），但**冇通告PDF 嗰條** → 令 `/notices` 變孤兒。
+
+**`/notices` 唔可以刪** —— 證據：
+
+| 卡片 | 消費頁 | `isItemPublic` | `PublicScopePanel` |
+|---|---|---|---|
+| `calendar` | `/calendar` | 4 | — |
+| `albums` | `/albums` | 2 | 2 |
+| `notices` | **`/notices`** | 2 | 2 |
+
+三張公開卡（`lib/publicScope.ts:29-33`）嘅消費面**一一對應**，
+`/notices` 係 `notices` 卡**唯一**嘅表面，亦係全 repo 唯一用
+`apiUpdatePdfTags` 嘅頁。刪咗佢，三張公開卡會剩兩張。
+
+> **順帶發現（未修，屬設計問題）：**`/activities`（底欄「🎯 活動」）
+> **完全冇消費任何公開卡** —— `isItemPublic` 0 處、`cardEffective` 0 處，
+> 只用咗 L0 嘅 `publicViewEnabled`（全旅公開總開關）。
+> 對照 `/calendar` 用 `isItemPublic` 4 處。
+> 即係「活動」呢個底欄掣冇做 L1／L2 卡片＋範圍過濾。
+> **未修** —— 呢個係產品決定（活動頁應該跟邊張卡？定係自成一格？），要問用戶。
+
+### 驗證
+
+`tsc` 0 error · `next build` exit 0 / **64 routes**（由 63 加 1 = 新 hub 頁）
+· `npm run lint` 9 warnings / 0 errors（同基線一致）
+· 8 個 check 全綠，其中 `check:links` **210 項斷言**（§1-5）。
+
+**Negative control（第 10 個）：**管理中心張卡由 hub 改指 leaf 頁 →
+BFS 版咬到 6 個不可達（hub ＋ 5 下游頁），舊「數入站連結」版只咬到 1 個。
+還原後 0 殘留、210 項全綠。
