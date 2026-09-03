@@ -109,5 +109,75 @@ for (const [role, uid, name] of CASES) {
   console.log(`     （交接掣 ${handoverCount} 個｜旅長金徽章 ${badgeCount} 個｜fetch ${fetchCount} 次）\n`);
 }
 
+// ============================================================================
+// 第二階段：/dashboard/** demo 樹嘅旅長（2026-09-03 用戶決定）
+//
+// 用戶：「多加1個旅長（其實只是 COPY 管理員）讓用戶感覺有而已。」
+// demo 樹原本 3 個 local `type Role` 都冇 troop_leader（super_admin 喺 88c783f
+// 被移除時一齊冇咗），所以 demo 樹冇辦法展示旅長。而家加返。
+//
+// ★ 呢度順便鎖死一個真 bug：app/dashboard/calendar/page.tsx 嘅
+//   `isAdminRole = role === 'admin'` 係狹窄比較，會漏 troop_leader
+//   → 旅長喺 demo 行事曆睇唔到其他支部。而家改成 `|| role === 'troop_leader'`。
+//
+// ★ 量度方法有兩個陷阱，記錄喺呢度免得重蹈：
+//   1. 唔好用 `text.includes('童軍')` 數支部 —— 「童軍」係「幼童軍」嘅子字串，
+//      活動標題「幼童軍露營」會假陽性命中。
+//   2. 唔好自己砌 BRANCHES —— 真實嘅係 6 個（含「小童軍」），漏一個就數錯。
+//   正確做法：攞支部 filter 列（由 visibleBranches render，頭一個掣係「全部」），
+//   用**精確**按鈕文字比對。
+// ============================================================================
+const DemoPage = (await import('@/app/dashboard/calendar/page.tsx')).default;
+// 同 app/dashboard/calendar/page.tsx L14 保持一致
+const DEMO_BRANCHES = ['小童軍', '幼童軍', '童軍', '深資', '樂行', '全旅'];
+
+function readBranchChips(host) {
+  const all = [...host.querySelectorAll('button')];
+  const anchor = all.find((b) => (b.textContent || '').trim() === '全部');
+  if (!anchor || !anchor.parentElement) return null;
+  return [...anchor.parentElement.querySelectorAll('button')]
+    .map((b) => (b.textContent || '').trim())
+    .filter((t) => t && t !== '全部');
+}
+
+async function renderDemoAs(roleLabel) {
+  const host = document.createElement('div');
+  document.body.appendChild(host);
+  const root = createRoot(host);
+  await act(async () => { root.render(React.createElement(DemoPage)); });
+  for (let i = 0; i < 20; i++) {
+    await act(async () => { await new Promise((r) => setTimeout(r, 50)); });
+    if (!/載入中/.test(host.textContent || '')) break;
+  }
+  const chip = [...host.querySelectorAll('button')].find((b) => (b.textContent || '').trim() === roleLabel);
+  if (chip) {
+    await act(async () => { chip.click(); });
+    for (let i = 0; i < 10; i++) await act(async () => { await new Promise((r) => setTimeout(r, 50)); });
+  }
+  const chips = readBranchChips(host);
+  root.unmount();
+  host.remove();
+  return { hasChip: !!chip, chips };
+}
+
+console.log('── /dashboard/** demo 樹：旅長角色 ──');
+const demoTl = await renderDemoAs('旅長');
+const demoAdmin = await renderDemoAs('管理員');
+const demoBl = await renderDemoAs('支部領袖');
+
+ok('  demo 行事曆嘅角色選擇器有「旅長」掣', demoTl.hasChip);
+ok('  旅長睇到全部 6 個支部（isAdminRole 已包含 troop_leader）',
+  demoTl.chips && demoTl.chips.length === DEMO_BRANCHES.length,
+  `實際 ${demoTl.chips ? demoTl.chips.length : 'null'}/${DEMO_BRANCHES.length}`);
+ok('  旅長 == 管理員（用戶要求「COPY 管理員」）',
+  JSON.stringify(demoTl.chips) === JSON.stringify(demoAdmin.chips),
+  `旅長=${JSON.stringify(demoTl.chips)}｜管理員=${JSON.stringify(demoAdmin.chips)}`);
+// 支部領袖 myBranch='童軍' → 全旅＋童軍。確認旅長改動冇波及佢。
+ok('  支部領袖仍只睇到全旅＋自己支部（旅長改動冇波及）',
+  demoBl.chips && demoBl.chips.length === 2 && demoBl.chips.includes('全旅')
+    && demoBl.chips.includes('童軍') && !demoBl.chips.includes('幼童軍'),
+  `實際 ${JSON.stringify(demoBl.chips)}`);
+console.log('');
+
 console.log(bad === 0 ? '✅ 全部通過' : `❌ ${bad} 項失敗`);
 process.exit(bad === 0 ? 0 : 1);
