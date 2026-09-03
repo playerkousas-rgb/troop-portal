@@ -620,6 +620,31 @@ live preview 嘅 sandbox 網址對外攞唔到，所以一鍵加入喺 preview �
 3. **旅團部署** — 新旅團接入流程（收到自動寄信 → `DEPLOY_ADMIN_GUIDE.md` 五步）
 4. **`/dashboard/*` demo 樹** — 仍是內嵌 mock 的展示頁（帶 Demo 角色切換），非真實登入頁。**用戶已決定保留**（2026-09-03），繼續作展示用途；已一併清走佢嘅 `super_admin` 角色，最高只到管理員。
 5. ~~**README 死鏈**~~ — ✅ 已處理：`ATTENDANCE_INTEGRATION.md` 從未 commit 過（`git log --all -- 'ATTENDANCE_INTEGRATION.md'` 為空），無法還原內容，所以刪咗條死鏈；簽到／報名分流嘅說明保留喺 README 本文。
+6. **`npm run lint` 已可用**（2026-09-03 新增）。
+   之前 `package.json` 有 `"lint": "next lint"` 但 repo **從未裝過 eslint、亦冇任何 config 檔**，
+   所以一跑就 block 喺互動 prompt（`? How would you like to configure ESLint?`）—— 即係呢個
+   check 一直係死嘅。已補：`eslint@8.57.1` ＋ `eslint-config-next@14.2.35`（devDependencies）
+   ＋ `.eslintrc.json`（`extends: next/core-web-vitals`，ignore `node_modules`／`.next`／
+   `public/downloads`）。
+   ⚠️ 呢個改動係 agent 自己決定加嘅（用戶嘅標準要求列咗 `lint` 係項目 check 之一，
+   而檢查受阻時解除阻塞屬於任務一部分）。**如果唔想要，revert 呢三個檔就可以**：
+   `.eslintrc.json`、`package.json`、`package-lock.json`。
+
+   **結果（實測）**：10 個 warning、**0 個 error**、exit code 0。
+   全部 warning 都係 `react-hooks/exhaustive-deps`，分佈喺 6 個既有檔案：
+   `app/admin/equipment/page.tsx`(3)、`app/equipment/page.tsx`(3)、
+   `app/admin/registrations/page.tsx`(1)、`app/admin/users/page.tsx`(1)、
+   `app/attendance/page.tsx`(1)、`app/dashboard/calendar/page.tsx`(1)。
+   **呢 10 個刻意冇修** —— 佢哋係既有 code、唔關今輪改動，而「補齊 hook 依賴」會改變
+   render／effect 觸發時機，屬於有行為風險嘅改動，唔應該溝入安全修正一齊做。
+   要處理請獨立開一個 task。
+   （原本 12 個；`components/ui/SubscribeCalendar.tsx` 嗰 2 個係本 session 新寫嘅 code，
+   已修：`branchIds.join(',')` 抽做 `branchParam` 變數，避免複雜表達式做 dependency。）
+
+   ⚠️ **副作用**：Next 14 嘅 `next build` 預設會跑 ESLint，所以加咗 config 之後
+   build 輸出多咗「Linting and checking validity of types...」同嗰 10 個 warning。
+   已實測確認 **build 仍然通過**（exit 0、63 條路由）—— warning 唔會令 build 失敗，
+   只有 error 先會。
 
 ## 技術棧
 - **前端**: Next.js 14 (App Router) + TypeScript + Tailwind CSS

@@ -31,15 +31,19 @@ export default function SubscribeCalendar({
   const [copied, setCopied] = useState(false);
   const [open, setOpen] = useState(false);
 
+  // 抽做獨立變數：直接用 branchIds.join(',') 做 dependency 係「複雜表達式」，
+  // ESLint 靜態分析唔到（react-hooks/exhaustive-deps），而且每次 render 都係新字串。
+  const branchParam = branchIds.join(',');
+
   useEffect(() => {
     const u = new URL('/api/ics', window.location.origin);
     // 同全 app 一樣由 localStorage 攞目前旅團（lib/api.ts getTroopKey）
     const troopKey = getTroopKey();
     if (!troopKey) { setFeedUrl(''); return; }
     u.searchParams.set('troopKey', troopKey);
-    if (branchIds.length) u.searchParams.set('branch', branchIds.join(','));
+    if (branchParam) u.searchParams.set('branch', branchParam);
     setFeedUrl(u.toString());
-  }, [branchIds.join(',')]);
+  }, [branchParam]);
 
   const googleUrl = useMemo(
     () => (feedUrl ? `https://calendar.google.com/calendar/render?cid=${encodeURIComponent(feedUrl)}` : ''),
