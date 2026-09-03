@@ -465,7 +465,9 @@ live preview 嘅 sandbox 網址對外攞唔到，所以一鍵加入喺 preview �
 ## 待完成（下一階段）
 1. **82 旅重新部署 GS** — 把本 repo 的 `gs/SCOUTSYSTEM_2_SETUP.gs`（或 `public/downloads/SCOUTSYSTEM_2_SETUP.gs.txt`）貼回 82 旅 Script Editor → Deploy → 管理部署 → 新增版本；部署後用 `?action=health&apiKey=...` 確認 version=3.0-live，並複測超管登入。
    （過渡期：前端已改以 `sheep` 作 userId，未重新部署也能拿到全部資料；但仍建議盡快部署，才有 `publicConfig_` 敏感值剝除等修正）
-6. ~~**安全待辦**~~ — ✅ **已修**（兩處）。
+6. ~~**安全待辦**~~ — ✅ **已修**（三處：問題 A／問題 B／提權洞）。
+   ⚠️ 三處**全部都係 GS 端改動，未部署到 82 旅之前一律無效** —— 見上面第 1 項。
+   回歸保護：`npm run check:security`（38 項斷言，執行真實代碼；負向對照已驗證有效）。
 
    **問題 A：技術測試帳號分支冇驗證密碼。**
    `handleLogin_` 嘅「技術測試帳號」分支只比對帳號名
