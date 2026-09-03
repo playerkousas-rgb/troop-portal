@@ -495,6 +495,17 @@ live preview 嘅 sandbox 網址對外攞唔到，所以一鍵加入喺 preview �
    ・`isPrivilegedOperator_`：sheep／SUPER_ADMIN／staff_token 仍 true，`0728` → false ✅
    ・`resolveAttendanceCaller_`：sheep → super_admin，`0728` → null ✅
 
+   **超管 dashboard 全鏈路另測**（`buildDashboardCore_`，12 項全過）——
+   呢個係部署後最大風險位（認唔到超管 → 全頁空白）：
+   ・`app/login/page.tsx` 第 112–114 行：超管嘅 session userId 係 **`sheep`**（唔係 `SUPER_ADMIN`），
+     所以 `buildDashboardCore_` 必須靠 `TECH_TEST_ACCOUNTS_` 先認到 —— 保留 `sheep` 係必要嘅。
+   ・`sheep` 同 `SUPER_ADMIN` 都拿到 **16 個 userFeatures**（兩者一致）✅｜`staff_token` 亦有 ✅
+   ・`0728` 同未知 userId → **0 個 feature**（特權已收緊）✅
+   ・端到端：`sheep`+`0728` 登入 → 前端計出 `sessionUserId='sheep'` → dashboard 有全套 feature ✅
+   ・`sheep`+錯密碼喺 login 就被擋，到唔到 dashboard ✅
+   ※ 注意 `buildDashboardCore_` 回傳嘅係 `state`（patrols／users／userFeatures…），**冇 `user` 欄位**；
+     判別 role 要用 `state.userFeatures`，唔好假設有 `state.user.role`。
+
    ⚠️ 呢個測試行嘅係 repo 入面嘅 `.gs` 原始碼，**未部署到 82 旅**；
    部署後請親自複測：`sheep`+`0728` 應該照入到，`sheep`+亂噏密碼應該被拒。
 2. **/onboard 第 6 步實測** — 走一次表單提交，確認管理員 Sheet「申請記錄」有新記錄 + 收到通知 email
