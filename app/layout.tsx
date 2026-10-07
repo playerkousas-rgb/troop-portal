@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { Analytics } from '@vercel/analytics/next';
 import TopNav from '@/components/layout/TopNav';
 import LatestNewsBar from '@/components/LatestNewsBar';
 import BackButton from '@/components/layout/BackButton';
@@ -27,6 +28,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <SiteFooter />
           <BottomNav />
         </ConfirmProvider>
+        <Analytics />
       </body>
     </html>
   );
