@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { buildIcs } from '@/lib/ics';
 import { branches } from '@/lib/model';
-import { isItemPublic, cardEffective, openScopes } from '@/lib/publicScope';
+import { isItemPublic, cardEffective } from '@/lib/publicScope';
+import { getProxyContext, handleProxyGet } from '@/lib/proxy';
 
 /**
  * 行事曆訂閱 feed（.ics）—— 真正「一鍵加入自己嘅行事曆」
@@ -25,14 +26,6 @@ import { isItemPublic, cardEffective, openScopes } from '@/lib/publicScope';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-/** 由請求推斷對外 origin（Vercel 會經 proxy，唔可以信 request.url 嘅 host） */
-function publicOrigin(req: NextRequest): string {
-  const fwdProto = req.headers.get('x-forwarded-proto') || 'http';
-  const fwdHost = req.headers.get('x-forwarded-host') || req.headers.get('host') || '';
-  if (fwdHost) return `${fwdProto}://${fwdHost}`;
-  return new URL(req.url).origin;
-}
-
 export async function GET(req: NextRequest) {
   const sp = new URL(req.url).searchParams;
   const troopKey = sp.get('troopKey') || '';
@@ -42,17 +35,20 @@ export async function GET(req: NextRequest) {
     return new NextResponse('缺少 troopKey', { status: 400, headers: { 'Content-Type': 'text/plain; charset=utf-8' } });
   }
 
-  // 經現有 proxy 攞資料 → 旅團解析、API Key、MOCK 全部重用，唔使複製一套
-  const origin = publicOrigin(req);
-  const upstream = new URL(`${origin}/api/proxy`);
-  upstream.searchParams.set('action', 'getState');
-  upstream.searchParams.set('troopKey', troopKey);
-  upstream.searchParams.set('userId', '');
-  upstream.searchParams.set('keys', 'events,regularMeetings,cancelledMeetings,config');
+  // 直接重用 proxy 的旅團解析、API Key、MOCK 與 GAS 請求邏輯，避免再啟動另一個 Function。
+  const proxyParams = new URLSearchParams({
+    action: 'getState',
+    troopKey,
+    userId: '',
+    keys: 'events,regularMeetings,cancelledMeetings,config',
+  });
+  const proxyContext = getProxyContext(proxyParams);
 
   let state: any;
   try {
-    const res = await fetch(upstream.toString(), { cache: 'no-store', headers: { Accept: 'application/json' } });
+    const res = proxyContext instanceof NextResponse
+      ? proxyContext
+      : await handleProxyGet(proxyContext, proxyParams);
     const json = await res.json();
     if (!json?.success || !json?.state) {
       return new NextResponse(json?.error || '無法讀取旅團行事曆', { status: 502, headers: { 'Content-Type': 'text/plain; charset=utf-8' } });
@@ -68,8 +64,6 @@ export async function GET(req: NextRequest) {
   }
 
   // 第 2 層：只有 scope 開咗嘅內容先入 feed —— troop（全旅，管理員決定）＋各支部（該支部團長決定）
-  const opted = openScopes(state.config, 'calendar');
-
   const wanted = branchParam ? branchParam.split(',').map(x => x.trim()).filter(Boolean) : [];
   // isItemPublic 已經包埋三層判斷（總掣／卡片／scope）
   const inScope = (b?: string) => isItemPublic(state.config, 'calendar', b)
@@ -120,7 +114,7 @@ export async function GET(req: NextRequest) {
       'Content-Type': 'text/calendar; charset=utf-8',
       'Content-Disposition': `inline; filename="${filename}"`,
       // 訂閱端會定期返嚟攞；唔好 cache 太耐，但都唔好每次都打後台
-      'Cache-Control': 'public, max-age=300, s-maxage=300',
+      'Cache-Control': 'public, max-age=300, s-maxage=900, stale-while-revalidate=3600',
     },
   });
 }
