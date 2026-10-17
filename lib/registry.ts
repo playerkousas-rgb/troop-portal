@@ -66,7 +66,7 @@ export const fallbackRegistry: Registry = {
 
 export async function fetchRegistry(): Promise<{ registry: Registry; fromFallback: boolean; error?: string }> {
   try {
-    const res = await fetch(REGISTRY_URL, { cache: 'no-store' });
+    const res = await fetch(REGISTRY_URL);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     return { registry: await res.json(), fromFallback: false };
   } catch (e: any) {
